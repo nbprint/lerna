@@ -1,6 +1,6 @@
 # lerna
 
-lerna is a collection of plugins and extensions for hydra
+lerna is a collection of plugins and extensions for [hydra](https://hydra.cc)
 
 [![Build Status](https://github.com/timkpaine/lerna/actions/workflows/build.yaml/badge.svg?branch=main&event=push)](https://github.com/timkpaine/lerna/actions/workflows/build.yaml)
 [![codecov](https://codecov.io/gh/timkpaine/lerna/branch/main/graph/badge.svg)](https://codecov.io/gh/timkpaine/lerna)
