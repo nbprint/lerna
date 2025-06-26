@@ -1,15 +1,20 @@
+import sys
 from importlib import import_module
-from importlib.metadata import EntryPoints, entry_points
 from logging import getLogger
 
 from hydra.core.config_search_path import ConfigSearchPath
 from hydra.plugins.search_path_plugin import SearchPathPlugin
 
+if sys.version_info < (3, 10):
+    from importlib_metadata import entry_points
+else:
+    from importlib.metadata import entry_points
+
 _log = getLogger("lerna")
 
 # NOTE: use `lernaplugins` instead of `plugins`
 # for https://github.com/facebookresearch/hydra/pull/3052
-_discovered_plugins: EntryPoints = entry_points(group="hydra.lernaplugins")
+_discovered_plugins = entry_points(group="hydra.lernaplugins")
 for entry_point in _discovered_plugins:
     try:
         mod = import_module(entry_point.value)
