@@ -9,7 +9,7 @@ description = "lerna is a collection of plugins and extensions for hydra"
 readme = "README.md"
 license = { text = "Apache-2.0" }
 version = "0.1.0"
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 keywords = []
 
 classifiers = [
@@ -18,14 +18,15 @@ classifiers = [
     "Programming Language :: Python :: Implementation :: CPython",
     "Programming Language :: Python :: Implementation :: PyPy",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
 ]
 
-dependencies = []
+dependencies = [
+    "hydra-core",
+]
 
 [project.optional-dependencies]
 develop = [
@@ -70,7 +71,6 @@ ignore = [
 ]
 
 [tool.coverage.run]
-branch = true
 omit = [
     "lerna/tests/integration/",
 ]
@@ -90,10 +90,16 @@ artifacts = []
 src = "/"
 
 [tool.hatch.build.targets.sdist]
-packages = ["lerna"]
+packages = [
+    "lerna",
+    "hydra_plugins",
+]
 
 [tool.hatch.build.targets.wheel]
-packages = ["lerna"]
+packages = [
+    "lerna",
+    "hydra_plugins",
+]
 
 [tool.hatch.build.targets.wheel.shared-data]
 
@@ -114,4 +120,4 @@ known-first-party = ["lerna"]
 section-order = ["future", "standard-library", "third-party", "first-party", "local-folder"]
 
 [tool.ruff.lint.per-file-ignores]
-"__init__.py" = ["F401"]
+"__init__.py" = ["F401", "F403"]

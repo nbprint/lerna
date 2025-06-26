@@ -18,15 +18,15 @@ install:  ## install library
 .PHONY: lint lints fix format
 
 lint:  ## run python linter with ruff
-	python -m ruff check lerna
-	python -m ruff format --check lerna
+	python -m ruff check lerna hydra_plugins
+	python -m ruff format --check lerna hydra_plugins
 
 # Alias
 lints: lint
 
 fix:  ## fix python formatting with ruff
-	python -m ruff check --fix lerna
-	python -m ruff format lerna
+	python -m ruff check --fix lerna hydra_plugins
+	python -m ruff format lerna hydra_plugins
 
 # alias
 format: fix
