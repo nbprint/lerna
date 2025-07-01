@@ -2,8 +2,8 @@
 _commit: 42057e0
 _src_path: https://github.com/python-project-templates/base.git
 add_extension: python
-email: t.paine154@gmail.com
-github: timkpaine
+email: dev@1kbgz.com
+github: 1kbgz
 project_description: lerna is a collection of plugins and extensions for hydra
 project_name: lerna
 python_version_primary: '3.11'

@@ -2,9 +2,9 @@
 
 `lerna` is a collection of plugins and extensions for [hydra](https://hydra.cc)
 
-[![Build Status](https://github.com/timkpaine/lerna/actions/workflows/build.yaml/badge.svg?branch=main&event=push)](https://github.com/timkpaine/lerna/actions/workflows/build.yaml)
-[![codecov](https://codecov.io/gh/timkpaine/lerna/branch/main/graph/badge.svg)](https://codecov.io/gh/timkpaine/lerna)
-[![License](https://img.shields.io/github/license/timkpaine/lerna)](https://github.com/timkpaine/lerna)
+[![Build Status](https://github.com/1kbgz/lerna/actions/workflows/build.yaml/badge.svg?branch=main&event=push)](https://github.com/1kbgz/lerna/actions/workflows/build.yaml)
+[![codecov](https://codecov.io/gh/1kbgz/lerna/branch/main/graph/badge.svg)](https://codecov.io/gh/1kbgz/lerna)
+[![License](https://img.shields.io/github/license/1kbgz/lerna)](https://github.com/1kbgz/lerna)
 [![PyPI](https://img.shields.io/pypi/v/lerna.svg)](https://pypi.python.org/pypi/lerna)
 
 ## Overview
