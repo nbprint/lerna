@@ -125,11 +125,11 @@ dmypy.json
 .pyre/
 
 # Documentation
-docs/_build/
 /site
+index.md
+docs/_build/
 docs/api
 docs/index.md
-_template/labextension
 
 # Jupyter
 .ipynb_checkpoints
