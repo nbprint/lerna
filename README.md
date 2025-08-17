@@ -9,6 +9,7 @@
 
 ## Overview
 
+<<<<<<< before updating
 `lerna` extends `hydra` with added functionality.
 Due to the long release intervals of `hydra`, some of this functionality may move to `hydra`, or remain in `lerna` indefinitely.
 
@@ -24,5 +25,7 @@ fake-package = "fake_package.plugin"
 This will check `fake_package.plugin` for `hydra` search path plugins, without the need to deal with `hydra`'s `hydra_plugins` installation.
 
 
+=======
+>>>>>>> after updating
 > [!NOTE]
 > This library was generated using [copier](https://copier.readthedocs.io/en/stable/) from the [Base Python Project Template repository](https://github.com/python-project-templates/base).
