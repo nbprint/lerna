@@ -1,8 +1,9 @@
 # Changes here will be overwritten by Copier
-_commit: 51ca397
+_commit: 3a223c6
 _src_path: https://github.com/python-project-templates/base.git
 add_docs: false
 add_extension: python
+add_wiki: false
 email: dev@1kbgz.com
 github: 1kbgz
 project_description: lerna is a collection of plugins and extensions for hydra

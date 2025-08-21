@@ -23,6 +23,5 @@ fake-package = "fake_package.plugin"
 
 This will check `fake_package.plugin` for `hydra` search path plugins, without the need to deal with `hydra`'s `hydra_plugins` installation.
 
-
 > [!NOTE]
 > This library was generated using [copier](https://copier.readthedocs.io/en/stable/) from the [Base Python Project Template repository](https://github.com/python-project-templates/base).

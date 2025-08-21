@@ -6,6 +6,11 @@
 develop:  ## install dependencies and build library
 	uv pip install -e .[develop]
 
+requirements:  ## install prerequisite python build requirements
+	python -m pip install --upgrade pip toml
+	python -m pip install `python -c 'import toml; c = toml.load("pyproject.toml"); print("\n".join(c["build-system"]["requires"]))'`
+	python -m pip install `python -c 'import toml; c = toml.load("pyproject.toml"); print(" ".join(c["project"]["optional-dependencies"]["develop"]))'`
+
 build:  ## build the python library
 	python -m build -n
 
@@ -15,20 +20,27 @@ install:  ## install library
 #########
 # LINTS #
 #########
-.PHONY: lint lints fix format
+.PHONY: lint-py lint-docs fix-py fix-docs lint lints fix format
 
-lint:  ## run python linter with ruff
-	python -m ruff check lerna hydra_plugins
-	python -m ruff format --check lerna hydra_plugins
+lint-py:  ## lint python with ruff
+	python -m ruff check lerna
+	python -m ruff format --check lerna
 
-# Alias
+lint-docs:  ## lint docs with mdformat and codespell
+	python -m mdformat --check README.md 
+	python -m codespell_lib README.md 
+
+fix-py:  ## autoformat python code with ruff
+	python -m ruff check --fix lerna
+	python -m ruff format lerna
+
+fix-docs:  ## autoformat docs with mdformat and codespell
+	python -m mdformat README.md 
+	python -m codespell_lib --write README.md 
+
+lint: lint-py lint-docs  ## run all linters
 lints: lint
-
-fix:  ## fix python formatting with ruff
-	python -m ruff check --fix lerna hydra_plugins
-	python -m ruff format lerna hydra_plugins
-
-# alias
+fix: fix-py fix-docs  ## run all autoformatters
 format: fix
 
 ################
@@ -88,7 +100,7 @@ dist-check:  ## run python dist checker with twine
 
 dist: clean dist-build dist-check  ## build all dists
 
-publish: dist  # publish python assets
+publish: dist  ## publish python assets
 
 #########
 # CLEAN #
