@@ -22,29 +22,17 @@ install:  ## install library
 #########
 .PHONY: lint-py lint-docs fix-py fix-docs lint lints fix format
 
-<<<<<<< before updating
-lint:  ## run python linter with ruff
-	python -m ruff check lerna hydra_plugins
-	python -m ruff format --check lerna hydra_plugins
-=======
 lint-py:  ## lint python with ruff
 	python -m ruff check lerna
 	python -m ruff format --check lerna
->>>>>>> after updating
 
 lint-docs:  ## lint docs with mdformat and codespell
 	python -m mdformat --check README.md 
 	python -m codespell_lib README.md 
 
-<<<<<<< before updating
-fix:  ## fix python formatting with ruff
-	python -m ruff check --fix lerna hydra_plugins
-	python -m ruff format lerna hydra_plugins
-=======
 fix-py:  ## autoformat python code with ruff
 	python -m ruff check --fix lerna
 	python -m ruff format lerna
->>>>>>> after updating
 
 fix-docs:  ## autoformat docs with mdformat and codespell
 	python -m mdformat README.md 
