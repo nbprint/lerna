@@ -146,6 +146,7 @@ lerna/extension
 # Jupyter
 .ipynb_checkpoints
 .autoversion
+Untitled*.ipynb
 !lerna/extension/lerna.json
 !lerna/extension/install.json
 lerna/nbextension
