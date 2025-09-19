@@ -4,8 +4,8 @@ _src_path: https://github.com/python-project-templates/base.git
 add_docs: false
 add_extension: python
 add_wiki: false
-email: dev@1kbgz.com
-github: 1kbgz
+email: t.paine154@gmail.com
+github: nbprint
 project_description: lerna is a collection of plugins and extensions for hydra
 project_name: lerna
 python_version_primary: '3.11'

@@ -4,7 +4,7 @@ build-backend="hatchling.build"
 
 [project]
 name = "lerna"
-authors = [{name = "the lerna authors", email = "dev@1kbgz.com"}]
+authors = [{name = "the lerna authors", email = "t.paine154@gmail.com"}]
 description = "lerna is a collection of plugins and extensions for hydra"
 readme = "README.md"
 license = { text = "Apache-2.0" }
@@ -51,8 +51,8 @@ develop = [
 [project.scripts]
 
 [project.urls]
-Repository = "https://github.com/1kbgz/lerna"
-Homepage = "https://github.com/1kbgz/lerna"
+Repository = "https://github.com/nbprint/lerna"
+Homepage = "https://github.com/nbprint/lerna"
 
 [tool.bumpversion]
 current_version = "1.0.1"
