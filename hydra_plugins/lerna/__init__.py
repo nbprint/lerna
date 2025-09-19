@@ -1,1 +1,1 @@
-from .searchpath import *
+from .searchpath import LernaGenericSearchPathPlugin  # noqa: F401

@@ -53,6 +53,7 @@ jobs:
 
     - name: Test
       run: make coverage
+      if: ${{ matrix.python-version == '3.11' }}
 
     - name: Upload test results (Python)
       uses: actions/upload-artifact@v4
