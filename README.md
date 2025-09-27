@@ -18,6 +18,10 @@ This is a standalone implementation of [this open Pull Request](https://github.c
 
 ```toml
 [project.entry-points."hydra.lernaplugins"]
+fake-package = "pkg:fake_package.config"
+
+# Or use a python plugin
+[project.entry-points."hydra.lernaplugins"]
 fake-package = "fake_package.plugin"
 ```
 
