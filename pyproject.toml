@@ -103,19 +103,13 @@ src = "/"
 [tool.hatch.build.targets.sdist]
 packages = [
     "lerna",
-<<<<<<< before updating
     "hydra_plugins",
-=======
->>>>>>> after updating
 ]
 
 [tool.hatch.build.targets.wheel]
 packages = [
     "lerna",
-<<<<<<< before updating
     "hydra_plugins",
-=======
->>>>>>> after updating
 ]
 
 [tool.hatch.build.targets.wheel.shared-data]
@@ -150,11 +144,7 @@ section-order = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
-<<<<<<< before updating
-"__init__.py" = ["F401", "F403"]
-=======
 "__init__.py" = [
     "F401",
     "F403",
 ]
->>>>>>> after updating
