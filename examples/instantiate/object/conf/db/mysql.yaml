@@ -1,0 +1,4 @@
+_target_: my_app.MySQLConnection
+host: localhost
+user: root
+password: 1234

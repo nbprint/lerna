@@ -1,0 +1,5 @@
+# @package _global_
+defaults:
+  - optimizer: adam
+  - dataset: imagenet
+  - optional optimizer_dataset: ${optimizer}_${dataset}

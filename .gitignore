@@ -99,8 +99,13 @@ celerybeat.pid
 .env
 .venv
 env/
+!src/env/
+!lerna/conf/hydra/env/
+!lerna/**/env/
+!lerna/**/env_defaults/
 venv/
 ENV/
+!lerna/**/ENV/
 env.bak/
 venv.bak/
 

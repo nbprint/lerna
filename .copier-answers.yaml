@@ -1,12 +1,12 @@
 # Changes here will be overwritten by Copier
-_commit: 37f89c1
+_commit: 06be9d8
 _src_path: https://github.com/python-project-templates/base.git
 add_docs: false
-add_extension: python
+add_extension: rust
 add_wiki: false
-email: t.paine154@gmail.com
-github: nbprint
-project_description: lerna is a collection of plugins and extensions for hydra
+email: dev@1kbgz.com
+github: 1kbgz
+project_description: Lerna is a framework for elegantly configuring complex applications
 project_name: lerna
 python_version_primary: '3.11'
 team: the lerna authors

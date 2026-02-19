@@ -1,0 +1,2 @@
+type: nesterov
+lr: 0.001

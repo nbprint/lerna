@@ -1,0 +1,3 @@
+defaults:
+  - db: mysql
+  - override hydra/launcher: example

@@ -1,0 +1,4 @@
+defaults:
+  - dataset: imagenet
+  - model: alexnet
+  - optional dataset_model: ${dataset}_${model}

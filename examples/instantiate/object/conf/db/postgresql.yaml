@@ -1,0 +1,5 @@
+_target_: my_app.PostgreSQLConnection
+host: localhost
+user: root
+password: 1234
+database: tutorial
