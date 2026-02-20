@@ -95,8 +95,10 @@ ignore = [
 
 [tool.cibuildwheel]
 build = "cp310-*"
-test-command = "pytest -vvv {project}/lerna/tests"
-test-requires = ["pytest", "pytest-cov", "pytest-sugar", "pytest-xdist"]
+# Run a simple import test to verify the wheel is installable
+# Full tests are run by `make tests` separately
+test-command = "python -c 'import lerna; print(lerna.__version__)'"
+test-requires = []
 
 [tool.cibuildwheel.linux]
 before-all = """
@@ -165,7 +167,8 @@ packages = [
 exclude = [
     "examples",
     "rust",
-    "src"
+    "src",
+    "lerna/tests"
 ]
 
 [tool.pytest.ini_options]
