@@ -43,7 +43,7 @@ state = copy.deepcopy(Singleton.get_state())
         ),
         param(
             StructuredConfigSource,
-            "structured://lerna.tests.test_apps.config_source_test.structured",
+            "structured://tests.test_apps.config_source_test.structured",
             id="StructuredConfigSource",
         ),
     ],

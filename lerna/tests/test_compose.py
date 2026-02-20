@@ -361,7 +361,7 @@ def test_missing_bad_config_dir_error(hydra_restore_singletons: Any) -> None:
 
 def test_initialize_with_module(hydra_restore_singletons: Any) -> None:
     with initialize_config_module(
-        config_module="lerna.tests.test_apps.app_with_cfg_groups.conf",
+        config_module="tests.test_apps.app_with_cfg_groups.conf",
         job_name="my_pp",
         version_base=None,
     ):
@@ -377,7 +377,7 @@ def test_hydra_main_passthrough(hydra_restore_singletons: Any) -> None:
 
 
 def test_initialization_root_module(monkeypatch: Any) -> None:
-    monkeypatch.chdir("lerna/tests/test_apps/init_in_app_without_module")
+    monkeypatch.chdir("tests/test_apps/init_in_app_without_module")
     subprocess.check_call([sys.executable, "main.py"])
     subprocess.check_call([sys.executable, "-m", "main"])
 

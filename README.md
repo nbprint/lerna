@@ -96,6 +96,131 @@ python my_app.py -m learning_rate=interval(0.001,0.1) batch_size=choice(16,32,64
 
 These are shell-specific completion behaviors, not functional differences.
 
+### Hydra Issues Fixed in Lerna
+
+Lerna addresses several long-standing Hydra issues that have been open for years:
+
+#### List Modification from CLI ([#1547](https://github.com/facebookresearch/hydra/issues/1547), [#2477](https://github.com/facebookresearch/hydra/issues/2477))
+
+Lerna adds intuitive, cross-platform list operations:
+
+```bash
+# Append items to a list
+python app.py 'tags=append(new_tag)'
+python app.py 'tags=append(a,b,c)'  # Multiple items
+
+# Prepend items
+python app.py 'tags=prepend(first)'
+
+# Insert at specific index
+python app.py 'tags=insert(0,first_item)'
+
+# Remove by index
+python app.py 'tags=remove_at(0)'      # Remove first
+python app.py 'tags=remove_at(-1)'     # Remove last
+
+# Remove by value
+python app.py 'tags=remove_value(old_tag)'
+
+# Clear entire list
+python app.py 'tags=list_clear()'
+```
+
+| Function            | Description            | Example Result         |
+| ------------------- | ---------------------- | ---------------------- |
+| `append(...)`       | Add items to end       | `[a, b]` → `[a, b, c]` |
+| `prepend(...)`      | Add items to beginning | `[b, c]` → `[a, b, c]` |
+| `insert(idx, val)`  | Insert at index        | `[a, c]` → `[a, b, c]` |
+| `remove_at(idx)`    | Remove by index        | `[a, b, c]` → `[b, c]` |
+| `remove_value(val)` | Remove first match     | `[a, b, c]` → `[a, c]` |
+| `list_clear()`      | Clear all items        | `[a, b, c]` → `[]`     |
+
+These functions use shell-safe syntax (quote the entire override) and work on bash, zsh, fish, PowerShell, and cmd.
+
+#### No More ANTLR ([#2570](https://github.com/facebookresearch/hydra/issues/2570))
+
+Hydra's ANTLR-based parser breaks when `PYTHONOPTIMIZE=1` or `PYTHONOPTIMIZE=2` is set. Lerna's Rust parser has no Python dependencies and works in all environments.
+
+```bash
+# This breaks Hydra but works with Lerna
+PYTHONOPTIMIZE=2 python app.py db=postgres
+```
+
+#### Default Overrides in Decorator ([#2459](https://github.com/facebookresearch/hydra/issues/2459))
+
+Lerna adds an `overrides` parameter to `@lerna.main()` for setting default overrides that can be overridden from CLI:
+
+```python
+@lerna.main(
+    config_path="conf",
+    config_name="config",
+    overrides=["db.driver=postgres", "server.port=8080"]  # Default overrides
+)
+def my_app(cfg: DictConfig) -> None:
+    print(cfg.db.driver)  # "postgres" by default, CLI can override
+```
+
+```bash
+# Uses decorator defaults
+python app.py                        # db.driver=postgres
+
+# CLI overrides take precedence
+python app.py db.driver=mysql        # db.driver=mysql
+```
+
+#### Instantiate Lookup Without Calling ([#2140](https://github.com/facebookresearch/hydra/issues/2140))
+
+Lerna adds `_call_=False` to `instantiate()` for importing non-callable objects (like `torch.int64`):
+
+```python
+from lerna.utils import instantiate
+from omegaconf import OmegaConf
+
+# Import a non-callable object directly
+cfg = OmegaConf.create({
+    "_target_": "torch.int64",
+    "_call_": False,  # Don't try to call it
+})
+dtype = instantiate(cfg)  # Returns torch.int64 directly
+```
+
+#### Backward-Compatible Plugin Discovery
+
+Lerna discovers plugins from both `lerna_plugins` and `hydra_plugins` namespaces, enabling gradual migration:
+
+```python
+# Both work:
+# - lerna_plugins.my_plugin.MyPlugin  (new Lerna plugins)
+# - hydra_plugins.my_plugin.MyPlugin  (existing Hydra plugins)
+```
+
+#### Subfolder Config Append Fix ([#2935](https://github.com/facebookresearch/hydra/issues/2935))
+
+Hydra incorrectly treats appended defaults as relative paths when the main config is in a subfolder:
+
+```bash
+# Hydra bug: this fails because it looks for server/db/postgresql
+python app.py --config-name=server/alpha +db@db_2=postgresql
+
+# Lerna: correctly treats appended configs as absolute paths
+python app.py --config-name=server/alpha +db@db_2=postgresql  # Works!
+```
+
+#### Relative Path in Defaults Fix ([#2878](https://github.com/facebookresearch/hydra/issues/2878))
+
+Hydra produces empty string keys when using `..` in defaults list paths:
+
+```yaml
+# Hydra bug with ../dir2 produces config with empty string keys
+# Lerna normalizes paths correctly
+defaults:
+  - ../dir2: child.yaml  # Now works correctly
+```
+
+#### importlib-resources 6.2+ Compatibility ([#2870](https://github.com/facebookresearch/hydra/issues/2870))
+
+Hydra breaks with importlib-resources 6.2+ due to `OrphanPath` objects not having `is_file()`/`is_dir()` methods. Lerna handles this gracefully.
+
 ### Third-Party Plugins
 
 Hydra's plugin ecosystem (Optuna, Ray, Submitit, etc.) references `hydra` internally. To use them with Lerna:

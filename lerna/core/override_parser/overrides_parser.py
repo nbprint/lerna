@@ -21,6 +21,7 @@ from lerna.core.override_parser.types import (
     IntervalSweep,
     Key,
     ListExtensionOverrideValue,
+    ListOperationType,
     Override,
     OverrideType,
     Quote,
@@ -51,16 +52,28 @@ class OverridesParser:
     _functions: Optional[Functions] = None
 
     @classmethod
-    def create(cls, config_loader: Optional[ConfigLoader] = None) -> "OverridesParser":
-        """Create an OverridesParser instance."""
-        return cls(functions=None, config_loader=config_loader)
+    def create(
+        cls,
+        config_loader: Optional[ConfigLoader] = None,
+        searchpath: Optional[List[str]] = None,
+    ) -> "OverridesParser":
+        """Create an OverridesParser instance.
+
+        Args:
+            config_loader: ConfigLoader for resolving glob sweeps
+            searchpath: Optional searchpath from hydra.searchpath config,
+                       used to ensure pkg:// sources are available for glob sweeps
+        """
+        return cls(functions=None, config_loader=config_loader, searchpath=searchpath)
 
     def __init__(
         self,
         functions: Optional[Functions] = None,
         config_loader: Optional[ConfigLoader] = None,
+        searchpath: Optional[List[str]] = None,
     ):
         self.config_loader = config_loader
+        self.searchpath = searchpath
         self._functions = functions
         # Pass functions to Rust parser if provided
         if functions is not None:
@@ -71,7 +84,7 @@ class OverridesParser:
     def _parse_with_rust(self, s: str) -> Override:
         """Parse using Rust parser and convert to Python Override."""
         data = self._rust_parser.parse_to_dict(s)
-        return _rust_dict_to_override(data, self.config_loader)
+        return _rust_dict_to_override(data, self.config_loader, self.searchpath)
 
     def parse_rule(self, s: str, rule_name: str) -> Any:
         """Parse a rule using the Rust parser.
@@ -242,8 +255,32 @@ def _convert_rust_value(value: Any) -> Any:
         return value
 
 
-def _rust_dict_to_override(data: dict, config_loader: Optional[ConfigLoader] = None) -> Override:
-    """Convert Rust parser output dict to Python Override object."""
+def _parse_list_operation(operation_str: str) -> ListOperationType:
+    """Convert list operation string from Rust to Python enum."""
+    operation_map = {
+        "APPEND": ListOperationType.APPEND,
+        "PREPEND": ListOperationType.PREPEND,
+        "INSERT": ListOperationType.INSERT,
+        "REMOVE_AT": ListOperationType.REMOVE_AT,
+        "REMOVE_VALUE": ListOperationType.REMOVE_VALUE,
+        "CLEAR": ListOperationType.CLEAR,
+    }
+    return operation_map.get(operation_str, ListOperationType.APPEND)
+
+
+def _rust_dict_to_override(
+    data: dict,
+    config_loader: Optional[ConfigLoader] = None,
+    searchpath: Optional[List[str]] = None,
+) -> Override:
+    """Convert Rust parser output dict to Python Override object.
+
+    Args:
+        data: Dict from Rust parser
+        config_loader: ConfigLoader for resolving glob sweeps
+        searchpath: Optional searchpath from hydra.searchpath config,
+                   used to ensure pkg:// sources are available for glob sweeps
+    """
     # Map override type strings to enum
     type_map = {
         "CHANGE": OverrideType.CHANGE,
@@ -272,6 +309,10 @@ def _rust_dict_to_override(data: dict, config_loader: Optional[ConfigLoader] = N
 
     # Convert value - first convert any Rust types to Python types
     raw_value = _convert_rust_value(data["value"])
+
+    # Initialize list operation fields (only used for EXTEND_LIST type)
+    list_operation: Optional[ListOperationType] = None
+    list_index: Optional[int] = None
 
     if raw_value is None:
         value: Any = None
@@ -358,6 +399,11 @@ def _rust_dict_to_override(data: dict, config_loader: Optional[ConfigLoader] = N
             value = ext_values
             override_type = OverrideType.EXTEND_LIST
             value_type = ValueType.ELEMENT  # ListExtension uses ELEMENT value_type
+
+            # Extract list operation and index
+            operation_str = raw_value.get("operation", "APPEND")
+            list_operation = _parse_list_operation(operation_str)
+            list_index = raw_value.get("index")
         else:
             # Regular dict value
             value = raw_value
@@ -372,6 +418,9 @@ def _rust_dict_to_override(data: dict, config_loader: Optional[ConfigLoader] = N
         package=data.get("package"),
         input_line=data.get("input_line"),
         config_loader=config_loader,
+        list_operation=list_operation,
+        list_index=list_index,
+        searchpath=searchpath,
     )
     override.validate()
     return override

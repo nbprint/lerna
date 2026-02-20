@@ -252,10 +252,46 @@ impl Sweep for IntervalSweep {
     }
 }
 
-/// A list extension value (for extend_list function)
+/// List operation type
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[repr(u8)]
+pub enum ListOperationType {
+    /// Append items to end (extend_list, append)
+    Append = 1,
+    /// Prepend items to beginning
+    Prepend = 2,
+    /// Insert item at index
+    Insert = 3,
+    /// Remove item at index
+    RemoveAt = 4,
+    /// Remove first matching value
+    RemoveValue = 5,
+    /// Clear the list
+    Clear = 6,
+}
+
+impl std::fmt::Display for ListOperationType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ListOperationType::Append => write!(f, "APPEND"),
+            ListOperationType::Prepend => write!(f, "PREPEND"),
+            ListOperationType::Insert => write!(f, "INSERT"),
+            ListOperationType::RemoveAt => write!(f, "REMOVE_AT"),
+            ListOperationType::RemoveValue => write!(f, "REMOVE_VALUE"),
+            ListOperationType::Clear => write!(f, "CLEAR"),
+        }
+    }
+}
+
+/// A list operation value (for list manipulation functions)
 #[derive(Clone, Debug, PartialEq)]
 pub struct ListExtension {
+    /// The type of list operation
+    pub operation: ListOperationType,
+    /// Values for the operation (items to add, or value to remove)
     pub values: Vec<ParsedElement>,
+    /// Index for insert/remove_at operations
+    pub index: Option<i64>,
 }
 
 /// A glob choice sweep (pattern-based selection)

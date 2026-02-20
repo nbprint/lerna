@@ -510,35 +510,24 @@ def get_args_parser() -> argparse.ArgumentParser:
         def __repr__(self) -> str:
             return f"Install or Uninstall shell completion:\n{_get_completion_help()}"
 
-    if sys.version_info >= (3, 14):
-        # Python 3.14+ adds help message validation via ArgumentParser._check_help,
-        # which calls formatter._expand_help(action) to validate that action.help
-        # is a string that can be used in string formatting (e.g., "text %(prog)s").
-        # This breaks our LazyCompletionHelp because `_expand_help` expects an actual
-        # string.
-        # It is safe to disable this validation temporarily because LazyCompletionHelp.
-        # __repr__() returns a plain string (no % formatting)
-        original_check_help = argparse.ArgumentParser._check_help  # type: ignore
-        argparse.ArgumentParser._check_help = (  # type: ignore
-            lambda self, action: None
-        )
-        try:
-            parser.add_argument(
-                "--shell-completion",
-                "-sc",
-                action="store_true",
-                help=LazyCompletionHelp(),  # type: ignore
-            )
-        finally:
-            # Immediately restore normal validation
-            argparse.ArgumentParser._check_help = original_check_help  # type: ignore
-    else:
-        parser.add_argument(
-            "--shell-completion",
-            "-sc",
-            action="store_true",
-            help=LazyCompletionHelp(),  # type: ignore
-        )
+        def __str__(self) -> str:
+            # Python 3.14+ argparse validates help strings in add_argument via
+            # _check_help -> _expand_help, which expects a string-like object
+            # that supports 'in' operator (for checking '%' formatting).
+            # This fixes Hydra #3121.
+            return self.__repr__()
+
+        def __contains__(self, item: str) -> bool:
+            # Support 'in' operator for Python 3.14+ argparse validation
+            # which checks if '%' is in the help string for formatting
+            return item in str(self)
+
+    parser.add_argument(
+        "--shell-completion",
+        "-sc",
+        action="store_true",
+        help=LazyCompletionHelp(),  # type: ignore
+    )
 
     parser.add_argument(
         "--config-path",

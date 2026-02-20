@@ -205,10 +205,6 @@ class TestRunCompletion:
         not is_expect_exists(),
         reason="expect should be installed to run the expects tests",
     )
-    @mark.skipif(
-        sys.platform == "darwin" and os.environ.get("CI") == "true",
-        reason="shell integration tests are flaky on macOS CI",
-    )
     @mark.parametrize("prog", [["python", "lerna/test_utils/completion.py"]])
     @mark.parametrize(
         "shell",

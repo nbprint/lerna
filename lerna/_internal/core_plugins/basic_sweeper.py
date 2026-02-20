@@ -140,7 +140,16 @@ class BasicSweeper(Sweeper):
         params_conf = self._parse_config()
         params_conf.extend(arguments)
 
-        parser = OverridesParser.create(config_loader=self.hydra_context.config_loader)
+        # Extract searchpath from config for glob sweep support
+        # This ensures pkg:// sources from hydra.searchpath are available
+        searchpath = OmegaConf.select(self.config, "hydra.searchpath")
+        if searchpath is not None:
+            searchpath = list(searchpath)  # Convert to plain list
+
+        parser = OverridesParser.create(
+            config_loader=self.hydra_context.config_loader,
+            searchpath=searchpath,
+        )
         overrides = parser.parse_overrides(params_conf)
 
         self.overrides = self.split_arguments(overrides, self.max_batch_size)

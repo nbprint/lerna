@@ -1029,14 +1029,20 @@ def test_list_extend_override(
     expected_key: str,
     expected_value: Any,
 ) -> None:
-    test_override(
-        "",
-        value,
-        OverrideType.EXTEND_LIST,
-        expected_key,
-        expected_value,
-        ValueType.ELEMENT,
+    line = value
+    ret = parse_rule(line, "override")
+    # extend_list defaults to APPEND list_operation
+    from lerna.core.override_parser.types import ListOperationType
+
+    expected = Override(
+        input_line=line,
+        type=OverrideType.EXTEND_LIST,
+        key_or_group=expected_key,
+        _value=expected_value,
+        value_type=ValueType.ELEMENT,
+        list_operation=ListOperationType.APPEND,
     )
+    assert ret == expected
 
 
 def test_deprecated_name_package(hydra_restore_singletons: Any) -> None:

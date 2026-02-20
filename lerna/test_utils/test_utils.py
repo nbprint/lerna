@@ -135,10 +135,7 @@ class SweepTaskFunction:
             Path(self.temp_dir).mkdir(parents=True, exist_ok=True)
         else:
             self.temp_dir = tempfile.mkdtemp()
-        # Normalize path separators to forward slashes for cross-platform consistency
-        # and quote the path to handle special characters
-        normalized_temp_dir = self.temp_dir.replace("\\", "/")
-        overrides.append(f'hydra.sweep.dir="{normalized_temp_dir}"')
+        overrides.append(f"hydra.sweep.dir={self.temp_dir}")
 
         try:
             validate_config_path(self.config_path)
@@ -189,7 +186,7 @@ def chdir_hydra_root(subdir: Optional[str] = None) -> None:
     Change the cwd to the root of the hydra project.
     used from unit tests to make them runnable from anywhere in the tree.
     """
-    _chdir_to_dir_containing(target="Makefile")
+    _chdir_to_dir_containing(target="ATTRIBUTION")
 
     if subdir is not None:
         os.chdir(subdir)

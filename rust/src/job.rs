@@ -182,14 +182,7 @@ mod tests {
     #[test]
     fn test_compute_output_dir() {
         let dir = compute_output_dir("/output", 0, &[], false);
-        // Normalize path separators for cross-platform testing
-        // On Windows, "/output" becomes "D:/output" (current drive root)
-        let dir_str = dir.to_string_lossy().replace('\\', "/");
-        assert!(
-            dir_str.ends_with("/output/0"),
-            "Expected path to end with /output/0, got: {}",
-            dir_str
-        );
+        assert_eq!(dir.to_str().unwrap(), "/output/0");
     }
 
     #[test]

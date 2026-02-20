@@ -358,10 +358,51 @@ class ConfigLoaderImpl(ConfigLoader):
                             f"Could not append to config list. The existing value of '{override.key_or_group}' is {config_val} which is not a list."
                         )
                     # Extract value from ListExtensionOverrideValue if needed
-                    from lerna.core.override_parser.types import ListExtensionOverrideValue
+                    from lerna.core.override_parser.types import ListExtensionOverrideValue, ListOperationType
 
                     extend_value = value.values if isinstance(value, ListExtensionOverrideValue) else value
-                    config_val.extend(extend_value)
+
+                    # Apply the appropriate list operation based on override.list_operation
+                    list_op = override.list_operation
+                    if list_op is None or list_op == ListOperationType.APPEND:
+                        # Default behavior: append items to end
+                        config_val.extend(extend_value)
+                    elif list_op == ListOperationType.PREPEND:
+                        # Insert items at beginning
+                        for i, item in enumerate(extend_value):
+                            config_val.insert(i, item)
+                    elif list_op == ListOperationType.INSERT:
+                        # Insert item at specified index
+                        idx = override.list_index if override.list_index is not None else 0
+                        if idx < 0:
+                            idx = len(config_val) + idx + 1
+                        for i, item in enumerate(extend_value):
+                            config_val.insert(idx + i, item)
+                    elif list_op == ListOperationType.REMOVE_AT:
+                        # Remove item at specified index
+                        idx = override.list_index if override.list_index is not None else 0
+                        if idx < 0:
+                            idx = len(config_val) + idx
+                        if 0 <= idx < len(config_val):
+                            del config_val[idx]
+                        else:
+                            raise ConfigCompositionException(
+                                f"Cannot remove item at index {idx} from list '{override.key_or_group}' (length={len(config_val)})"
+                            )
+                    elif list_op == ListOperationType.REMOVE_VALUE:
+                        # Remove first occurrence of value
+                        for val in extend_value:
+                            try:
+                                # Find and remove the value
+                                for i, item in enumerate(config_val):
+                                    if item == val:
+                                        del config_val[i]
+                                        break
+                            except ValueError:
+                                raise ConfigCompositionException(f"Cannot remove value {val!r} from list '{override.key_or_group}': value not found")
+                    elif list_op == ListOperationType.CLEAR:
+                        # Clear all items from the list
+                        config_val.clear()
                 else:
                     try:
                         OmegaConf.update(cfg, key, value, merge=True)

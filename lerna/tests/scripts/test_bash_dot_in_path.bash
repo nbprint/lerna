@@ -2,7 +2,7 @@
 # Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved
 
 # Navigate to app with minimal configuration
-cd lerna/tests/test_apps/app_with_cfg/
+cd tests/test_apps/app_with_cfg/
 
 # Locate python
 PYTHON=$(command -v python)

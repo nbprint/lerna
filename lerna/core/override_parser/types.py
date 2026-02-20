@@ -198,6 +198,17 @@ class ValueType(Enum):
     INTERVAL_SWEEP = 6
 
 
+class ListOperationType(Enum):
+    """Type of list operation for EXTEND_LIST overrides"""
+
+    APPEND = 1  # Append items to end (default)
+    PREPEND = 2  # Prepend items to beginning
+    INSERT = 3  # Insert item at index
+    REMOVE_AT = 4  # Remove item at index
+    REMOVE_VALUE = 5  # Remove first matching value
+    CLEAR = 6  # Clear the list
+
+
 @dataclass
 class Key:
     # the config-group or config dot-path
@@ -277,6 +288,16 @@ class Override:
 
     # Configs repo
     config_loader: Optional[ConfigLoader] = None
+
+    # For EXTEND_LIST type: the specific list operation (defaults to APPEND)
+    list_operation: Optional[ListOperationType] = None
+
+    # For INSERT and REMOVE_AT operations: the index
+    list_index: Optional[int] = None
+
+    # Optional searchpath for glob sweeps (from hydra.searchpath config)
+    # Used to ensure pkg:// sources are available when enumerating group options
+    searchpath: Optional[List[str]] = None
 
     def is_delete(self) -> bool:
         """
@@ -364,7 +385,16 @@ class Override:
             if self.config_loader is None:
                 raise HydraException("ConfigLoader is not set")
 
-            ret = self.config_loader.get_group_options(self.key_or_group, results_filter=ObjectType.CONFIG)
+            # Build searchpath override list if searchpath is set
+            # This ensures pkg:// sources from hydra.searchpath are available for glob sweeps
+            overrides: Optional[List[str]] = None
+            if self.searchpath:
+                # Format as hydra.searchpath override
+                import json
+
+                overrides = [f"hydra.searchpath={json.dumps(self.searchpath)}"]
+
+            ret = self.config_loader.get_group_options(self.key_or_group, results_filter=ObjectType.CONFIG, overrides=overrides)
             return iter(self._value.filter(ret))
         else:
             assert False
