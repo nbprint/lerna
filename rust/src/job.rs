@@ -182,7 +182,9 @@ mod tests {
     #[test]
     fn test_compute_output_dir() {
         let dir = compute_output_dir("/output", 0, &[], false);
-        assert_eq!(dir.to_str().unwrap(), "/output/0");
+        // Normalize path separators for cross-platform testing
+        let dir_str = dir.to_string_lossy().replace('\\', "/");
+        assert_eq!(dir_str, "/output/0");
     }
 
     #[test]
