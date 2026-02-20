@@ -294,17 +294,22 @@ mod tests {
         assert_eq!(ctx.id, "abc123");
         assert_eq!(ctx.num, 0);
         assert!(ctx.chdir);
-        assert_eq!(ctx.output_dir, PathBuf::from("/output/test"));
+        // Normalize path separators for cross-platform comparison
+        let output_dir_str = ctx.output_dir.to_string_lossy().replace('\\', "/");
+        assert_eq!(output_dir_str, "/output/test");
         assert_eq!(ctx.overrides.len(), 1);
     }
 
     #[test]
     fn test_compute_output_dir() {
         let dir = compute_output_dir("/output/run", None);
-        assert_eq!(dir, PathBuf::from("/output/run"));
+        // Normalize path separators for cross-platform comparison
+        let dir_str = dir.to_string_lossy().replace('\\', "/");
+        assert_eq!(dir_str, "/output/run");
 
         let dir = compute_output_dir("/output/sweep", Some("0"));
-        assert_eq!(dir, PathBuf::from("/output/sweep/0"));
+        let dir_str = dir.to_string_lossy().replace('\\', "/");
+        assert_eq!(dir_str, "/output/sweep/0");
     }
 
     #[test]
