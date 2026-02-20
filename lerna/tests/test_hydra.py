@@ -1149,7 +1149,7 @@ def test_module_run(tmpdir: Any, directory: str, file: str, module: str, error: 
 def test_multirun_structured_conflict(tmpdir: Any, overrides: List[str], error: bool, expected: Any) -> None:
     cmd = [
         "lerna/tests/test_apps/multirun_structured_conflict/my_app.py",
-        f"hydra.sweep.dir=\"{str(tmpdir).replace(chr(92), chr(47))}\"",
+        f'hydra.sweep.dir="{str(tmpdir).replace(chr(92), chr(47))}"',
         "hydra.job.chdir=True",
     ]
     cmd.extend(overrides)
@@ -1181,7 +1181,7 @@ class TestVariousRuns:
     )
     def test_run_with_missing_default(self, cmd_base: List[str], tmpdir: Any, sweep: bool) -> None:
         cmd = cmd_base + [
-            f"hydra.sweep.dir=\"{str(tmpdir).replace(chr(92), chr(47))}\"",
+            f'hydra.sweep.dir="{str(tmpdir).replace(chr(92), chr(47))}"',
             "hydra.job.chdir=True",
             "--config-name=unspecified_mandatory_default",
             "--config-path=../../../test_utils/configs",
@@ -1198,7 +1198,7 @@ Available options:
 
     def test_command_line_interpolations_evaluated_lazily(self, cmd_base: List[str], tmpdir: Any) -> None:
         cmd = cmd_base + [
-            f"hydra.sweep.dir=\"{str(tmpdir).replace(chr(92), chr(47))}\"",
+            f'hydra.sweep.dir="{str(tmpdir).replace(chr(92), chr(47))}"',
             "hydra.job.chdir=True",
             "+foo=10,20",
             "+bar=${foo}",
@@ -1214,7 +1214,7 @@ bar: 20"""
 
     def test_multirun_config_overrides_evaluated_lazily(self, cmd_base: List[str], tmpdir: Any) -> None:
         cmd = cmd_base + [
-            f"hydra.sweep.dir=\"{str(tmpdir).replace(chr(92), chr(47))}\"",
+            f'hydra.sweep.dir="{str(tmpdir).replace(chr(92), chr(47))}"',
             "hydra.job.chdir=True",
             "+foo=10,20",
             "+bar=${foo}",
@@ -1230,7 +1230,7 @@ bar: 20"""
 
     def test_multirun_defaults_override(self, cmd_base: List[str], tmpdir: Any) -> None:
         cmd = cmd_base + [
-            f"hydra.sweep.dir=\"{str(tmpdir).replace(chr(92), chr(47))}\"",
+            f'hydra.sweep.dir="{str(tmpdir).replace(chr(92), chr(47))}"',
             "hydra.job.chdir=True",
             "group1=file1,file2",
             "--multirun",
@@ -1247,7 +1247,7 @@ bar: 100"""
 
     def test_run_pass_list(self, cmd_base: List[str], tmpdir: Any) -> None:
         cmd = cmd_base + [
-            f"hydra.sweep.dir=\"{str(tmpdir).replace(chr(92), chr(47))}\"",
+            f'hydra.sweep.dir="{str(tmpdir).replace(chr(92), chr(47))}"',
             "hydra.job.chdir=True",
             "+foo=[1,2,3]",
         ]
@@ -1259,7 +1259,7 @@ bar: 100"""
 def test_app_with_error_exception_sanitized(tmpdir: Any, monkeypatch: Any) -> None:
     cmd = [
         "lerna/tests/test_apps/app_with_runtime_config_error/my_app.py",
-        f"hydra.sweep.dir=\"{str(tmpdir).replace(chr(92), chr(47))}\"",
+        f'hydra.sweep.dir="{str(tmpdir).replace(chr(92), chr(47))}"',
         "hydra.job.chdir=True",
     ]
 
@@ -1305,7 +1305,7 @@ def test_app_with_error_exception_sanitized(tmpdir: Any, monkeypatch: Any) -> No
 def test_hydra_to_job_config_interpolation(tmpdir: Any) -> Any:
     cmd = [
         "lerna/tests/test_apps/hydra_to_cfg_interpolation/my_app.py",
-        f"hydra.sweep.dir=\"{str(tmpdir).replace(chr(92), chr(47))}\"",
+        f'hydra.sweep.dir="{str(tmpdir).replace(chr(92), chr(47))}"',
         "hydra.job.chdir=True",
         "b=${a}",
         "a=foo",
@@ -1589,7 +1589,7 @@ def test_disable_chdir(tmpdir: Path, multirun: bool, expected: List[str]) -> Non
     cmd = [
         "examples/tutorials/basic/running_your_hydra_app/3_working_directory/my_app.py",
         f'hydra.run.dir="{tmpdir}"',
-        f"hydra.sweep.dir=\"{str(tmpdir).replace(chr(92), chr(47))}\"",
+        f'hydra.sweep.dir="{str(tmpdir).replace(chr(92), chr(47))}"',
         "hydra.job.chdir=False",
     ]
     if multirun:
@@ -1646,7 +1646,7 @@ def test_hydra_resolver_in_output_dir(tmpdir: Path, multirun: bool) -> None:
         "lerna/tests/test_apps/hydra_resolver_in_output_dir/my_app.py",
         f"hydra.run.dir='{output_dir}'",
         f"hydra.sweep.subdir='{subdir}'",
-        f"hydra.sweep.dir=\"{str(tmpdir).replace(chr(92), chr(47))}\"",
+        f'hydra.sweep.dir="{str(tmpdir).replace(chr(92), chr(47))}"',
         "hydra.job.chdir=False",
     ]
 
@@ -1797,7 +1797,7 @@ def test_hydra_mode(
     cmd.extend(
         [
             f"hydra.run.dir='{tmpdir}'",
-            f"hydra.sweep.dir=\"{str(tmpdir).replace(chr(92), chr(47))}\"",
+            f'hydra.sweep.dir="{str(tmpdir).replace(chr(92), chr(47))}"',
             "hydra.job.chdir=False",
             "hydra.hydra_logging.formatters.simple.format='[HYDRA] %(message)s'",
             "hydra.job_logging.formatters.simple.format='[JOB] %(message)s'",
@@ -1841,7 +1841,7 @@ def test_hydra_runtime_choice_1882(tmpdir: Path) -> None:
     cmd = [
         "lerna/tests/test_apps/app_with_cfg_groups/my_app_with_runtime_choices_print.py",
         "--multirun",
-        f"hydra.sweep.dir=\"{str(tmpdir).replace(chr(92), chr(47))}\"",
+        f'hydra.sweep.dir="{str(tmpdir).replace(chr(92), chr(47))}"',
         "hydra.hydra_logging.formatters.simple.format='[HYDRA] %(message)s'",
         "hydra.job_logging.formatters.simple.format='[JOB] %(message)s'",
         "hydra.job.chdir=False",
