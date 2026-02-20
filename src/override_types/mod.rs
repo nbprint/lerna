@@ -4,13 +4,9 @@
 use pyo3::prelude::*;
 
 use lerna::{
-    Quote as RustQuote,
-    QuotedString as RustQuotedString,
-    OverrideType as RustOverrideType,
-    ValueType as RustValueType,
-    Key as RustKey,
+    Key as RustKey, OverrideType as RustOverrideType, Quote as RustQuote,
+    QuotedString as RustQuotedString, ValueType as RustValueType,
 };
-
 
 /// Python-exposed Quote enum
 #[pyclass(name = "Quote", eq, eq_int)]
@@ -53,7 +49,6 @@ impl From<PyQuote> for RustQuote {
         }
     }
 }
-
 
 /// Python-exposed OverrideType enum
 #[pyclass(name = "OverrideType", eq, eq_int)]
@@ -99,7 +94,6 @@ impl From<RustOverrideType> for PyOverrideType {
         }
     }
 }
-
 
 /// Python-exposed ValueType enum
 #[pyclass(name = "ValueType", eq, eq_int)]
@@ -154,7 +148,6 @@ impl From<RustValueType> for PyValueType {
     }
 }
 
-
 /// Python-exposed QuotedString
 #[pyclass(name = "QuotedString")]
 #[derive(Clone, Debug)]
@@ -190,7 +183,10 @@ impl PyQuotedString {
     }
 
     fn __repr__(&self) -> String {
-        format!("QuotedString(text={:?}, quote={:?})", self.inner.text, self.inner.quote)
+        format!(
+            "QuotedString(text={:?}, quote={:?})",
+            self.inner.text, self.inner.quote
+        )
     }
 }
 
@@ -199,7 +195,6 @@ impl From<RustQuotedString> for PyQuotedString {
         Self { inner: qs }
     }
 }
-
 
 /// Python-exposed Key
 #[pyclass(name = "Key")]
@@ -247,7 +242,10 @@ impl PyKey {
     }
 
     fn __repr__(&self) -> String {
-        format!("Key(key_or_group={:?}, package={:?})", self.inner.key_or_group, self.inner.package)
+        format!(
+            "Key(key_or_group={:?}, package={:?})",
+            self.inner.key_or_group, self.inner.package
+        )
     }
 }
 

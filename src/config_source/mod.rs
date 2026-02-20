@@ -38,7 +38,9 @@ fn config_value_to_py(py: Python<'_>, value: &ConfigValue) -> PyResult<Py<PyAny>
             Ok(dict.into_any().unbind())
         }
         ConfigValue::Missing => Ok("???".into_pyobject(py)?.to_owned().into_any().unbind()),
-        ConfigValue::Interpolation(s) => Ok(s.as_str().into_pyobject(py)?.to_owned().into_any().unbind()),
+        ConfigValue::Interpolation(s) => {
+            Ok(s.as_str().into_pyobject(py)?.to_owned().into_any().unbind())
+        }
     }
 }
 
@@ -171,7 +173,8 @@ impl ConfigSource for PyConfigSourceWrapper {
     fn available(&self) -> bool {
         Python::attach(|py| {
             let source = self.py_source.bind(py);
-            source.call_method0("available")
+            source
+                .call_method0("available")
                 .and_then(|r| r.extract::<bool>())
                 .unwrap_or(false)
         })
@@ -180,27 +183,34 @@ impl ConfigSource for PyConfigSourceWrapper {
     fn load_config(&self, config_path: &str) -> Result<ConfigResult, ConfigLoadError> {
         Python::attach(|py| {
             let source = self.py_source.bind(py);
-            let result = source.call_method1("load_config", (config_path,))
+            let result = source
+                .call_method1("load_config", (config_path,))
                 .map_err(|e| ConfigLoadError::new(e.to_string()))?;
 
             // Extract ConfigResult fields from Python object
-            let provider: String = result.getattr("provider")
+            let provider: String = result
+                .getattr("provider")
                 .and_then(|v| v.extract())
                 .unwrap_or_default();
-            let path: String = result.getattr("path")
+            let path: String = result
+                .getattr("path")
                 .and_then(|v| v.extract())
                 .unwrap_or_default();
-            let is_schema_source: bool = result.getattr("is_schema_source")
+            let is_schema_source: bool = result
+                .getattr("is_schema_source")
                 .and_then(|v| v.extract())
                 .unwrap_or(false);
 
             // Extract header - call get_header() method
-            let header: HashMap<String, String> = result.call_method0("get_header")
+            let header: HashMap<String, String> = result
+                .call_method0("get_header")
                 .and_then(|h| {
                     if let Ok(dict) = h.cast::<PyDict>() {
                         let mut map = HashMap::new();
                         for (k, v) in dict.iter() {
-                            if let (Ok(key), Ok(val)) = (k.extract::<String>(), v.extract::<String>()) {
+                            if let (Ok(key), Ok(val)) =
+                                (k.extract::<String>(), v.extract::<String>())
+                            {
                                 map.insert(key, val);
                             }
                         }
@@ -212,10 +222,11 @@ impl ConfigSource for PyConfigSourceWrapper {
                 .unwrap_or_default();
 
             // Extract config - call get_config() method
-            let config = result.call_method0("get_config")
+            let config = result
+                .call_method0("get_config")
                 .map_err(|e| ConfigLoadError::new(e.to_string()))?;
-            let config_value = py_to_config_value(&config)
-                .map_err(|e| ConfigLoadError::new(e.to_string()))?;
+            let config_value =
+                py_to_config_value(&config).map_err(|e| ConfigLoadError::new(e.to_string()))?;
 
             Ok(ConfigResult {
                 provider,
@@ -230,7 +241,8 @@ impl ConfigSource for PyConfigSourceWrapper {
     fn is_group(&self, config_path: &str) -> bool {
         Python::attach(|py| {
             let source = self.py_source.bind(py);
-            source.call_method1("is_group", (config_path,))
+            source
+                .call_method1("is_group", (config_path,))
                 .and_then(|r| r.extract::<bool>())
                 .unwrap_or(false)
         })
@@ -239,7 +251,8 @@ impl ConfigSource for PyConfigSourceWrapper {
     fn is_config(&self, config_path: &str) -> bool {
         Python::attach(|py| {
             let source = self.py_source.bind(py);
-            source.call_method1("is_config", (config_path,))
+            source
+                .call_method1("is_config", (config_path,))
                 .and_then(|r| r.extract::<bool>())
                 .unwrap_or(false)
         })
@@ -257,7 +270,8 @@ impl ConfigSource for PyConfigSourceWrapper {
                 Some(ObjectType::NotFound) => py.None(),
             };
 
-            source.call_method1("list", (config_path, filter_arg))
+            source
+                .call_method1("list", (config_path, filter_arg))
                 .and_then(|r| r.extract::<Vec<String>>())
                 .unwrap_or_default()
         })
@@ -305,7 +319,8 @@ impl PyFileConfigSource {
 
     /// Load a config
     fn load_config(&self, _py: Python<'_>, config_path: &str) -> PyResult<PyConfigResult> {
-        self.inner.load_config(config_path)
+        self.inner
+            .load_config(config_path)
             .map(|r| PyConfigResult::from(r))
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyIOError, _>(e.to_string()))
     }
@@ -347,17 +362,21 @@ pub struct PyConfigSourceManager {
 impl PyConfigSourceManager {
     #[new]
     fn new() -> Self {
-        Self { sources: Vec::new() }
+        Self {
+            sources: Vec::new(),
+        }
     }
 
     /// Add a Rust file source
     fn add_file_source(&mut self, provider: String, path: String) {
-        self.sources.push(Arc::new(FileConfigSource::new(&provider, &path)));
+        self.sources
+            .push(Arc::new(FileConfigSource::new(&provider, &path)));
     }
 
     /// Add a Python source
     fn add_python_source(&mut self, source: Py<PyAny>) {
-        self.sources.push(Arc::new(PyConfigSourceWrapper::new(source)));
+        self.sources
+            .push(Arc::new(PyConfigSourceWrapper::new(source)));
     }
 
     /// Number of sources
@@ -384,7 +403,8 @@ impl PyConfigSourceManager {
     fn load_config(&self, _py: Python<'_>, config_path: &str) -> PyResult<Option<PyConfigResult>> {
         for source in &self.sources {
             if source.is_config(config_path) {
-                return source.load_config(config_path)
+                return source
+                    .load_config(config_path)
                     .map(|r| Some(PyConfigResult::from(r)))
                     .map_err(|e| PyErr::new::<pyo3::exceptions::PyIOError, _>(e.to_string()));
             }
@@ -401,7 +421,8 @@ impl PyConfigSourceManager {
             _ => None,
         };
 
-        let mut items: Vec<String> = self.sources
+        let mut items: Vec<String> = self
+            .sources
             .iter()
             .flat_map(|s| s.list(config_path, filter))
             .collect();

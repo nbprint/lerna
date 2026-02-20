@@ -33,7 +33,6 @@ mod validation;
 
 pub use example::Example;
 
-
 #[pymodule]
 fn lerna(_py: Python, m: &Bound<PyModule>) -> PyResult<()> {
     // Core types

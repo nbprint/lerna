@@ -1,22 +1,18 @@
 // Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved
 //! Python bindings for job runner module
 
+use pyo3::exceptions::{PyIOError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};
-use pyo3::exceptions::{PyIOError, PyValueError};
 use std::path::PathBuf;
 
-use lerna::job_runner::{
-    JobContext as RustJobContext,
-    JobStatus as RustJobStatus,
-    compute_output_dir as rust_compute_output_dir,
-    create_output_dirs as rust_create_output_dirs,
-    setup_job_environment as rust_setup_job_environment,
-    serialize_config_to_yaml,
-    save_config_file as rust_save_config_file,
-    save_overrides_file as rust_save_overrides_file,
-};
 use lerna::config::value::{ConfigDict, ConfigValue};
+use lerna::job_runner::{
+    compute_output_dir as rust_compute_output_dir, create_output_dirs as rust_create_output_dirs,
+    save_config_file as rust_save_config_file, save_overrides_file as rust_save_overrides_file,
+    serialize_config_to_yaml, setup_job_environment as rust_setup_job_environment,
+    JobContext as RustJobContext, JobStatus as RustJobStatus,
+};
 
 /// Convert Python dict to ConfigDict
 fn py_to_config_dict(py: Python, obj: &Bound<'_, PyAny>) -> PyResult<ConfigDict> {
@@ -58,7 +54,10 @@ fn py_to_config_value(py: Python, obj: &Bound<'_, PyAny>) -> PyResult<ConfigValu
         }
         Ok(ConfigValue::List(items))
     } else if let Ok(_dict) = obj.cast::<PyDict>() {
-        Ok(ConfigValue::Dict(py_to_config_dict(py, &obj.clone().into_any())?))
+        Ok(ConfigValue::Dict(py_to_config_dict(
+            py,
+            &obj.clone().into_any(),
+        )?))
     } else {
         // Fallback: convert to string
         Ok(ConfigValue::String(obj.str()?.to_string()))
@@ -200,7 +199,12 @@ fn create_output_dirs(output_dir: &str, subdir: Option<&str>) -> PyResult<String
 
 /// Save a config dictionary to a YAML file
 #[pyfunction]
-fn save_config(py: Python, config: &Bound<'_, PyAny>, filename: &str, output_dir: &str) -> PyResult<String> {
+fn save_config(
+    py: Python,
+    config: &Bound<'_, PyAny>,
+    filename: &str,
+    output_dir: &str,
+) -> PyResult<String> {
     let config_dict = py_to_config_dict(py, config)?;
     rust_save_config_file(&config_dict, filename, &PathBuf::from(output_dir))
         .map(|p| p.to_string_lossy().replace('\\', "/"))

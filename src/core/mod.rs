@@ -1,11 +1,10 @@
 // Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved
 //! PyO3 bindings for core types
 
-use pyo3::prelude::*;
 use pyo3::exceptions::PyValueError;
+use pyo3::prelude::*;
 
 use lerna::ObjectType as RustObjectType;
-
 
 /// Python-exposed ObjectType enum
 #[pyclass(name = "ObjectType", eq, eq_int)]
@@ -27,7 +26,10 @@ impl PyObjectType {
             0 => Ok(PyObjectType::NotFound),
             1 => Ok(PyObjectType::Config),
             2 => Ok(PyObjectType::Group),
-            _ => Err(PyValueError::new_err(format!("Invalid ObjectType value: {}", value))),
+            _ => Err(PyValueError::new_err(format!(
+                "Invalid ObjectType value: {}",
+                value
+            ))),
         }
     }
 

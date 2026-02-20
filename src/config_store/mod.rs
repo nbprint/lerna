@@ -1,12 +1,12 @@
 // Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved
 //! PyO3 bindings for ConfigStore
 
+use pyo3::exceptions::PyKeyError;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};
-use pyo3::exceptions::PyKeyError;
 
-use lerna::config_store::{self, ConfigNode as RustConfigNode};
 use lerna::config::value::{ConfigDict, ConfigValue};
+use lerna::config_store::{self, ConfigNode as RustConfigNode};
 
 /// Convert ConfigValue to a Python object
 fn config_value_to_py(py: Python, value: &ConfigValue) -> PyResult<Py<PyAny>> {
@@ -16,10 +16,10 @@ fn config_value_to_py(py: Python, value: &ConfigValue) -> PyResult<Py<PyAny>> {
         ConfigValue::Int(i) => Ok((*i).into_pyobject(py)?.to_owned().into_any().unbind()),
         ConfigValue::Float(f) => Ok((*f).into_pyobject(py)?.to_owned().into_any().unbind()),
         ConfigValue::String(s) => Ok(s.as_str().into_pyobject(py)?.to_owned().into_any().unbind()),
-        ConfigValue::Interpolation(s) => Ok(s.as_str().into_pyobject(py)?.to_owned().into_any().unbind()),
-        ConfigValue::Missing => {
-            Ok("???".into_pyobject(py)?.to_owned().into_any().unbind())
+        ConfigValue::Interpolation(s) => {
+            Ok(s.as_str().into_pyobject(py)?.to_owned().into_any().unbind())
         }
+        ConfigValue::Missing => Ok("???".into_pyobject(py)?.to_owned().into_any().unbind()),
         ConfigValue::List(items) => {
             let list = PyList::empty(py);
             for item in items {
@@ -27,9 +27,7 @@ fn config_value_to_py(py: Python, value: &ConfigValue) -> PyResult<Py<PyAny>> {
             }
             Ok(list.into_any().unbind())
         }
-        ConfigValue::Dict(dict) => {
-            config_dict_to_py(py, dict)
-        }
+        ConfigValue::Dict(dict) => config_dict_to_py(py, dict),
     }
 }
 

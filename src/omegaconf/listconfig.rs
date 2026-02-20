@@ -6,11 +6,9 @@ use pyo3::prelude::*;
 use pyo3::types::PyList;
 use std::sync::{Arc, RwLock};
 
-use lerna::omegaconf::{
-    AnyNode, ListConfig, Node, NodeValue, OmegaConf, ConfigValue,
-};
+use lerna::omegaconf::{AnyNode, ConfigValue, ListConfig, Node, NodeValue, OmegaConf};
 
-use super::dictconfig::{py_to_config_value, node_arc_to_py};
+use super::dictconfig::{node_arc_to_py, py_to_config_value};
 
 /// Python-facing ListConfig class
 #[pyclass(name = "ListConfig")]
@@ -48,11 +46,7 @@ impl PyListConfig {
             })?;
 
             let len = cfg.len() as isize;
-            let actual_index = if index < 0 {
-                len + index
-            } else {
-                index
-            };
+            let actual_index = if index < 0 { len + index } else { index };
 
             if actual_index < 0 || actual_index >= len {
                 return Err(PyIndexError::new_err("list index out of range"));
@@ -69,16 +63,13 @@ impl PyListConfig {
     fn __setitem__(&mut self, index: isize, value: &Bound<PyAny>) -> PyResult<()> {
         let config_value = py_to_config_value(value)?;
         let node = config_value_to_node(config_value);
-        let mut cfg = self.inner.write().map_err(|e| {
-            PyRuntimeError::new_err(format!("Failed to lock ListConfig: {}", e))
-        })?;
+        let mut cfg = self
+            .inner
+            .write()
+            .map_err(|e| PyRuntimeError::new_err(format!("Failed to lock ListConfig: {}", e)))?;
 
         let len = cfg.len() as isize;
-        let actual_index = if index < 0 {
-            len + index
-        } else {
-            index
-        };
+        let actual_index = if index < 0 { len + index } else { index };
 
         if actual_index < 0 || actual_index >= len {
             return Err(PyIndexError::new_err("list index out of range"));
@@ -90,16 +81,13 @@ impl PyListConfig {
 
     /// Delete a value by index
     fn __delitem__(&mut self, index: isize) -> PyResult<()> {
-        let mut cfg = self.inner.write().map_err(|e| {
-            PyRuntimeError::new_err(format!("Failed to lock ListConfig: {}", e))
-        })?;
+        let mut cfg = self
+            .inner
+            .write()
+            .map_err(|e| PyRuntimeError::new_err(format!("Failed to lock ListConfig: {}", e)))?;
 
         let len = cfg.len() as isize;
-        let actual_index = if index < 0 {
-            len + index
-        } else {
-            index
-        };
+        let actual_index = if index < 0 { len + index } else { index };
 
         if actual_index < 0 || actual_index >= len {
             return Err(PyIndexError::new_err("list index out of range"));
@@ -112,9 +100,10 @@ impl PyListConfig {
 
     /// Get the length
     fn __len__(&self) -> PyResult<usize> {
-        let cfg = self.inner.read().map_err(|e| {
-            PyRuntimeError::new_err(format!("Failed to lock ListConfig: {}", e))
-        })?;
+        let cfg = self
+            .inner
+            .read()
+            .map_err(|e| PyRuntimeError::new_err(format!("Failed to lock ListConfig: {}", e)))?;
         Ok(cfg.len())
     }
 
@@ -122,20 +111,24 @@ impl PyListConfig {
     fn append(&mut self, value: &Bound<PyAny>) -> PyResult<()> {
         let config_value = py_to_config_value(value)?;
         let node = config_value_to_node(config_value);
-        let mut cfg = self.inner.write().map_err(|e| {
-            PyRuntimeError::new_err(format!("Failed to lock ListConfig: {}", e))
-        })?;
-        cfg.append(node).map_err(|e| PyRuntimeError::new_err(format!("{}", e)))
+        let mut cfg = self
+            .inner
+            .write()
+            .map_err(|e| PyRuntimeError::new_err(format!("Failed to lock ListConfig: {}", e)))?;
+        cfg.append(node)
+            .map_err(|e| PyRuntimeError::new_err(format!("{}", e)))
     }
 
     /// Insert a value at index
     fn insert(&mut self, index: usize, value: &Bound<PyAny>) -> PyResult<()> {
         let config_value = py_to_config_value(value)?;
         let node = config_value_to_node(config_value);
-        let mut cfg = self.inner.write().map_err(|e| {
-            PyRuntimeError::new_err(format!("Failed to lock ListConfig: {}", e))
-        })?;
-        cfg.insert(index, node).map_err(|e| PyRuntimeError::new_err(format!("{}", e)))
+        let mut cfg = self
+            .inner
+            .write()
+            .map_err(|e| PyRuntimeError::new_err(format!("Failed to lock ListConfig: {}", e)))?;
+        cfg.insert(index, node)
+            .map_err(|e| PyRuntimeError::new_err(format!("{}", e)))
     }
 
     /// Pop and return the last element
@@ -154,17 +147,20 @@ impl PyListConfig {
 
     /// Clear the list
     fn clear(&mut self) -> PyResult<()> {
-        let mut cfg = self.inner.write().map_err(|e| {
-            PyRuntimeError::new_err(format!("Failed to lock ListConfig: {}", e))
-        })?;
-        cfg.clear().map_err(|e| PyRuntimeError::new_err(format!("{}", e)))
+        let mut cfg = self
+            .inner
+            .write()
+            .map_err(|e| PyRuntimeError::new_err(format!("Failed to lock ListConfig: {}", e)))?;
+        cfg.clear()
+            .map_err(|e| PyRuntimeError::new_err(format!("{}", e)))
     }
 
     /// String representation
     fn __repr__(&self) -> PyResult<String> {
-        let cfg = self.inner.read().map_err(|e| {
-            PyRuntimeError::new_err(format!("Failed to lock ListConfig: {}", e))
-        })?;
+        let cfg = self
+            .inner
+            .read()
+            .map_err(|e| PyRuntimeError::new_err(format!("Failed to lock ListConfig: {}", e)))?;
         Ok(format!("ListConfig([... {} items ...])", cfg.len()))
     }
 }

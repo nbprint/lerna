@@ -1,25 +1,19 @@
 // Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved
 //! PyO3 bindings for override parser
 
-use pyo3::prelude::*;
 use pyo3::exceptions::PyValueError;
+use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList, PySet};
 use std::sync::Arc;
 
 use lerna::{
-    OverrideParser as RustOverrideParser,
-    Override as RustOverride,
-    ParsedElement as RustParsedElement,
-    OverrideValue as RustOverrideValue,
-    ValueType as RustValueType,
-    ChoiceSweep as RustChoiceSweep,
-    RangeSweep as RustRangeSweep,
-    IntervalSweep as RustIntervalSweep,
-    FunctionCallback,
+    ChoiceSweep as RustChoiceSweep, FunctionCallback, IntervalSweep as RustIntervalSweep,
+    Override as RustOverride, OverrideParser as RustOverrideParser,
+    OverrideValue as RustOverrideValue, ParsedElement as RustParsedElement,
+    RangeSweep as RustRangeSweep, ValueType as RustValueType,
 };
 
-use crate::override_types::{PyKey, PyOverrideType, PyValueType, PyQuotedString};
-
+use crate::override_types::{PyKey, PyOverrideType, PyQuotedString, PyValueType};
 
 /// Wrapper around Python Functions object to call user-defined functions from Rust.
 ///
@@ -45,8 +39,19 @@ unsafe impl Sync for PyFunctionCallback {}
 /// Functions that the Rust parser handles natively.
 /// has_function returns False for these unless Python explicitly marks them as shadowed.
 const RUST_NATIVE_FUNCTIONS: &[&str] = &[
-    "choice", "range", "interval", "shuffle", "sort", "tag", "glob",
-    "int", "float", "str", "bool", "json_str", "extend_list",
+    "choice",
+    "range",
+    "interval",
+    "shuffle",
+    "sort",
+    "tag",
+    "glob",
+    "int",
+    "float",
+    "str",
+    "bool",
+    "json_str",
+    "extend_list",
 ];
 
 impl FunctionCallback for PyFunctionCallback {
@@ -91,7 +96,9 @@ impl FunctionCallback for PyFunctionCallback {
             let py_args = PyList::empty(py);
             for arg in &args {
                 match parsed_element_to_py(py, arg) {
-                    Ok(py_arg) => { py_args.append(py_arg).map_err(|e| e.to_string())?; }
+                    Ok(py_arg) => {
+                        py_args.append(py_arg).map_err(|e| e.to_string())?;
+                    }
                     Err(e) => return Err(e.to_string()),
                 }
             }
@@ -99,7 +106,9 @@ impl FunctionCallback for PyFunctionCallback {
             let py_kwargs = PyDict::new(py);
             for (key, val) in &kwargs {
                 match parsed_element_to_py(py, val) {
-                    Ok(py_val) => { py_kwargs.set_item(key, py_val).map_err(|e| e.to_string())?; }
+                    Ok(py_val) => {
+                        py_kwargs.set_item(key, py_val).map_err(|e| e.to_string())?;
+                    }
                     Err(e) => return Err(e.to_string()),
                 }
             }
@@ -109,11 +118,14 @@ impl FunctionCallback for PyFunctionCallback {
 
             // Call functions.eval() with a FunctionCall object
             // First we need to create a FunctionCall instance
-            let func_call_mod = py.import("lerna._internal.grammar.functions")
+            let func_call_mod = py
+                .import("lerna._internal.grammar.functions")
                 .map_err(|e| e.to_string())?;
-            let func_call_class = func_call_mod.getattr("FunctionCall")
+            let func_call_class = func_call_mod
+                .getattr("FunctionCall")
                 .map_err(|e| e.to_string())?;
-            let func_call = func_call_class.call1((name, py_args, py_kwargs.into_mapping()))
+            let func_call = func_call_class
+                .call1((name, py_args, py_kwargs.into_mapping()))
                 .map_err(|e| e.to_string())?;
 
             // Now call functions.eval(func_call)
@@ -126,7 +138,10 @@ impl FunctionCallback for PyFunctionCallback {
                     // Format TypeError errors specially for Hydra compatibility
                     if msg.contains("TypeError:") || msg.contains("TypeError(") {
                         let type_msg = msg.strip_prefix("TypeError: ").unwrap_or(&msg);
-                        Err(format!("TypeError while evaluating '{}': {}", call_str, type_msg))
+                        Err(format!(
+                            "TypeError while evaluating '{}': {}",
+                            call_str, type_msg
+                        ))
                     } else {
                         Err(msg)
                     }
@@ -159,11 +174,21 @@ fn build_function_call_string(
 fn elem_to_source(elem: &RustParsedElement) -> String {
     match elem {
         RustParsedElement::Null => "null".to_string(),
-        RustParsedElement::Bool(b) => if *b { "true".to_string() } else { "false".to_string() },
+        RustParsedElement::Bool(b) => {
+            if *b {
+                "true".to_string()
+            } else {
+                "false".to_string()
+            }
+        }
         RustParsedElement::Int(i) => i.to_string(),
         RustParsedElement::Float(f) => {
             let s = f.to_string();
-            if s.contains('.') { s } else { format!("{}.0", s) }
+            if s.contains('.') {
+                s
+            } else {
+                format!("{}.0", s)
+            }
         }
         RustParsedElement::String(s) => s.clone(),
         RustParsedElement::QuotedString(qs) => {
@@ -178,7 +203,8 @@ fn elem_to_source(elem: &RustParsedElement) -> String {
             format!("[{}]", parts.join(","))
         }
         RustParsedElement::Dict(pairs) => {
-            let parts: Vec<_> = pairs.iter()
+            let parts: Vec<_> = pairs
+                .iter()
                 .map(|(k, v)| format!("{}:{}", k, elem_to_source(v)))
                 .collect();
             format!("{{{}}}", parts.join(","))
@@ -187,7 +213,10 @@ fn elem_to_source(elem: &RustParsedElement) -> String {
 }
 
 /// Convert a Python object to a ParsedElement
-fn py_to_parsed_element(py: Python<'_>, obj: &Bound<'_, PyAny>) -> Result<RustParsedElement, String> {
+fn py_to_parsed_element(
+    py: Python<'_>,
+    obj: &Bound<'_, PyAny>,
+) -> Result<RustParsedElement, String> {
     // Check for None
     if obj.is_none() {
         return Ok(RustParsedElement::Null);
@@ -257,9 +286,11 @@ fn py_to_parsed_element(py: Python<'_>, obj: &Bound<'_, PyAny>) -> Result<RustPa
         return Ok(RustParsedElement::String(s));
     }
 
-    Err(format!("Cannot convert Python object to ParsedElement: {:?}", obj))
+    Err(format!(
+        "Cannot convert Python object to ParsedElement: {:?}",
+        obj
+    ))
 }
-
 
 /// Convert a ParsedElement to a Python object
 fn parsed_element_to_py(py: Python<'_>, elem: &RustParsedElement) -> PyResult<Py<PyAny>> {
@@ -317,7 +348,6 @@ fn value_type_to_py(value: &Option<RustOverrideValue>) -> PyValueType {
         None => PyValueType::Element, // Default for deletions
     }
 }
-
 
 /// Python-exposed Override
 #[pyclass(name = "Override")]
@@ -523,15 +553,9 @@ fn interval_sweep_to_py(py: Python<'_>, is: &RustIntervalSweep) -> PyResult<Py<P
 fn override_value_to_py(py: Python<'_>, value: &RustOverrideValue) -> PyResult<Py<PyAny>> {
     match value {
         RustOverrideValue::Element(elem) => parsed_element_to_py(py, elem),
-        RustOverrideValue::ChoiceSweep(cs) => {
-            Ok(choice_sweep_to_py(py, cs)?.into_any())
-        }
-        RustOverrideValue::RangeSweep(rs) => {
-            Ok(range_sweep_to_py(py, rs)?.into_any())
-        }
-        RustOverrideValue::IntervalSweep(is) => {
-            Ok(interval_sweep_to_py(py, is)?.into_any())
-        }
+        RustOverrideValue::ChoiceSweep(cs) => Ok(choice_sweep_to_py(py, cs)?.into_any()),
+        RustOverrideValue::RangeSweep(rs) => Ok(range_sweep_to_py(py, rs)?.into_any()),
+        RustOverrideValue::IntervalSweep(is) => Ok(interval_sweep_to_py(py, is)?.into_any()),
         RustOverrideValue::GlobChoiceSweep(glob) => {
             // Return glob info as dict
             let dict = PyDict::new(py);
@@ -562,7 +586,6 @@ fn override_value_to_py(py: Python<'_>, value: &RustOverrideValue) -> PyResult<P
     }
 }
 
-
 /// Python-exposed OverrideParser
 #[pyclass(name = "OverrideParser")]
 pub struct PyOverrideParser {
@@ -575,9 +598,8 @@ impl PyOverrideParser {
     #[new]
     #[pyo3(signature = (functions=None))]
     fn new(functions: Option<Py<PyAny>>) -> Self {
-        let callback = functions.map(|f| {
-            Arc::new(PyFunctionCallback::new(f)) as Arc<dyn FunctionCallback>
-        });
+        let callback =
+            functions.map(|f| Arc::new(PyFunctionCallback::new(f)) as Arc<dyn FunctionCallback>);
         Self { callback }
     }
 
@@ -599,7 +621,8 @@ impl PyOverrideParser {
             RustOverrideParser::parse_with_callback(s, callback.clone())
         } else {
             RustOverrideParser::parse(s)
-        }.map_err(|e| PyValueError::new_err(format!("{}", e)))?;
+        }
+        .map_err(|e| PyValueError::new_err(format!("{}", e)))?;
 
         let dict = PyDict::new(py);
 
@@ -651,7 +674,8 @@ impl PyOverrideParser {
             RustOverrideParser::parse_many_with_callback(&str_refs, callback.clone())
         } else {
             RustOverrideParser::parse_many(&str_refs)
-        }.map_err(|e| PyValueError::new_err(format!("{}", e)))?;
+        }
+        .map_err(|e| PyValueError::new_err(format!("{}", e)))?;
 
         let list = PyList::empty(py);
         for o in results {

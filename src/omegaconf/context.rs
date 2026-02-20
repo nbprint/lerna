@@ -6,8 +6,8 @@
 //! - read_write: Temporarily disable readonly flag
 //! - flag_override: Temporarily override any flag
 
-use pyo3::prelude::*;
 use pyo3::exceptions::PyRuntimeError;
+use pyo3::prelude::*;
 
 use lerna::omegaconf::Node;
 
@@ -63,13 +63,14 @@ impl PyOpenDict {
         let config_ref = self.config.bind(py);
         let config = config_ref.borrow_mut();
 
-        let mut inner = config.inner.write().map_err(|e| {
-            PyRuntimeError::new_err(format!("Failed to lock DictConfig: {}", e))
-        })?;
+        let mut inner = config
+            .inner
+            .write()
+            .map_err(|e| PyRuntimeError::new_err(format!("Failed to lock DictConfig: {}", e)))?;
 
         inner.set_flag("struct", self.previous_struct);
 
-        Ok(false)  // Don't suppress exceptions
+        Ok(false) // Don't suppress exceptions
     }
 }
 
@@ -123,13 +124,14 @@ impl PyReadWrite {
         let config_ref = self.config.bind(py);
         let config = config_ref.borrow_mut();
 
-        let mut inner = config.inner.write().map_err(|e| {
-            PyRuntimeError::new_err(format!("Failed to lock DictConfig: {}", e))
-        })?;
+        let mut inner = config
+            .inner
+            .write()
+            .map_err(|e| PyRuntimeError::new_err(format!("Failed to lock DictConfig: {}", e)))?;
 
         inner.set_flag("readonly", self.previous_readonly);
 
-        Ok(false)  // Don't suppress exceptions
+        Ok(false) // Don't suppress exceptions
     }
 }
 
@@ -148,14 +150,20 @@ pub struct PyFlagOverride {
 #[pymethods]
 impl PyFlagOverride {
     #[new]
-    fn new(config: Py<PyDictConfig>, flag_name: String, new_value: Option<bool>, py: Python) -> PyResult<Self> {
+    fn new(
+        config: Py<PyDictConfig>,
+        flag_name: String,
+        new_value: Option<bool>,
+        py: Python,
+    ) -> PyResult<Self> {
         // Get and store the current flag value
         let config_ref = config.bind(py);
         let config_borrow = config_ref.borrow();
 
-        let inner = config_borrow.inner.read().map_err(|e| {
-            PyRuntimeError::new_err(format!("Failed to lock DictConfig: {}", e))
-        })?;
+        let inner = config_borrow
+            .inner
+            .read()
+            .map_err(|e| PyRuntimeError::new_err(format!("Failed to lock DictConfig: {}", e)))?;
 
         let previous_value = inner.get_flag(&flag_name);
         drop(inner);
@@ -163,9 +171,10 @@ impl PyFlagOverride {
 
         // Set the new value
         let config_mut = config_ref.borrow_mut();
-        let mut inner = config_mut.inner.write().map_err(|e| {
-            PyRuntimeError::new_err(format!("Failed to lock DictConfig: {}", e))
-        })?;
+        let mut inner = config_mut
+            .inner
+            .write()
+            .map_err(|e| PyRuntimeError::new_err(format!("Failed to lock DictConfig: {}", e)))?;
         inner.set_flag(&flag_name, new_value);
 
         Ok(Self {
@@ -191,12 +200,13 @@ impl PyFlagOverride {
         let config_ref = self.config.bind(py);
         let config = config_ref.borrow_mut();
 
-        let mut inner = config.inner.write().map_err(|e| {
-            PyRuntimeError::new_err(format!("Failed to lock DictConfig: {}", e))
-        })?;
+        let mut inner = config
+            .inner
+            .write()
+            .map_err(|e| PyRuntimeError::new_err(format!("Failed to lock DictConfig: {}", e)))?;
 
         inner.set_flag(&self.flag_name, self.previous_value);
 
-        Ok(false)  // Don't suppress exceptions
+        Ok(false) // Don't suppress exceptions
     }
 }

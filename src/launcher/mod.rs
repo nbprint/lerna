@@ -72,7 +72,8 @@ pub struct PyLauncherWrapper {
 impl PyLauncherWrapper {
     pub fn new(py_launcher: Py<PyAny>) -> Self {
         let name = Python::attach(|py| {
-            py_launcher.bind(py)
+            py_launcher
+                .bind(py)
                 .getattr("__class__")
                 .and_then(|c| c.getattr("__name__"))
                 .and_then(|n| n.extract::<String>())
@@ -91,11 +92,7 @@ impl std::fmt::Debug for PyLauncherWrapper {
 }
 
 impl Launcher for PyLauncherWrapper {
-    fn setup(
-        &mut self,
-        _config: &ConfigDict,
-        _task_name: &str,
-    ) -> Result<(), LauncherError> {
+    fn setup(&mut self, _config: &ConfigDict, _task_name: &str) -> Result<(), LauncherError> {
         // Python launchers use setup() with different signature
         // They get HydraContext, task_function, config directly
         // This is a no-op since Python manages its own setup
@@ -113,42 +110,55 @@ impl Launcher for PyLauncherWrapper {
             // Convert overrides to Python list of lists
             let py_overrides = PyList::empty(py);
             for job_ov in job_overrides {
-                let job_list = PyList::new(py, job_ov)
-                    .map_err(|e| LauncherError::new(e.to_string()))?;
-                py_overrides.append(job_list)
+                let job_list =
+                    PyList::new(py, job_ov).map_err(|e| LauncherError::new(e.to_string()))?;
+                py_overrides
+                    .append(job_list)
                     .map_err(|e| LauncherError::new(e.to_string()))?;
             }
 
             // Call launch(job_overrides, initial_job_idx)
-            let result = launcher.call_method1("launch", (py_overrides, initial_job_idx))
+            let result = launcher
+                .call_method1("launch", (py_overrides, initial_job_idx))
                 .map_err(|e| LauncherError::new(e.to_string()))?;
 
             // Convert results to Vec<JobReturn>
-            let results_list = result.cast::<PyList>()
+            let results_list = result
+                .cast::<PyList>()
                 .map_err(|e| LauncherError::new(format!("launch must return list: {}", e)))?;
 
             let mut returns = Vec::new();
             for item in results_list.iter() {
                 // Extract JobReturn fields from Python object
-                let return_value = item.getattr("return_value").ok()
-                    .and_then(|v| if v.is_none() { None } else { Some(ConfigDict::new()) });
-                let working_dir: String = item.getattr("working_dir")
+                let return_value = item.getattr("return_value").ok().and_then(|v| {
+                    if v.is_none() {
+                        None
+                    } else {
+                        Some(ConfigDict::new())
+                    }
+                });
+                let working_dir: String = item
+                    .getattr("working_dir")
                     .and_then(|v| v.extract())
                     .unwrap_or_default();
-                let output_dir: String = item.getattr("hydra")
+                let output_dir: String = item
+                    .getattr("hydra")
                     .and_then(|h| h.getattr("run"))
                     .and_then(|r| r.getattr("dir"))
                     .and_then(|d| d.extract())
                     .unwrap_or_default();
-                let job_name: String = item.getattr("hydra")
+                let job_name: String = item
+                    .getattr("hydra")
                     .and_then(|h| h.getattr("job"))
                     .and_then(|j| j.getattr("name"))
                     .and_then(|n| n.extract())
                     .unwrap_or_default();
-                let task_name: String = item.getattr("task_name")
+                let task_name: String = item
+                    .getattr("task_name")
                     .and_then(|v| v.extract())
                     .unwrap_or_default();
-                let status_code: i32 = item.getattr("status")
+                let status_code: i32 = item
+                    .getattr("status")
                     .and_then(|s| s.getattr("value"))
                     .and_then(|v| v.extract())
                     .unwrap_or(0);
@@ -199,14 +209,21 @@ impl PyBasicLauncher {
     /// Setup the launcher
     fn setup(&mut self, config: Bound<'_, PyDict>, task_name: &str) -> PyResult<()> {
         let config_dict = py_dict_to_config_dict(&config)?;
-        self.inner.setup(&config_dict, task_name)
+        self.inner
+            .setup(&config_dict, task_name)
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.message))
     }
 
     /// Launch jobs
-    fn launch(&self, job_overrides: Bound<'_, PyList>, initial_job_idx: usize) -> PyResult<Vec<PyJobReturn>> {
+    fn launch(
+        &self,
+        job_overrides: Bound<'_, PyList>,
+        initial_job_idx: usize,
+    ) -> PyResult<Vec<PyJobReturn>> {
         let overrides = py_to_job_overrides(&job_overrides)?;
-        let results = self.inner.launch(&overrides, initial_job_idx)
+        let results = self
+            .inner
+            .launch(&overrides, initial_job_idx)
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.message))?;
 
         Ok(results.iter().map(|r| PyJobReturn::from(r)).collect())
@@ -235,7 +252,8 @@ impl PyLauncherManager {
 
     /// Add a Python launcher
     fn set_python_launcher(&mut self, launcher: Py<PyAny>) {
-        self.inner.set_launcher(Arc::new(PyLauncherWrapper::new(launcher)));
+        self.inner
+            .set_launcher(Arc::new(PyLauncherWrapper::new(launcher)));
     }
 
     /// Check if a launcher is configured
@@ -249,9 +267,15 @@ impl PyLauncherManager {
     }
 
     /// Launch jobs
-    fn launch(&self, job_overrides: Bound<'_, PyList>, initial_job_idx: usize) -> PyResult<Vec<PyJobReturn>> {
+    fn launch(
+        &self,
+        job_overrides: Bound<'_, PyList>,
+        initial_job_idx: usize,
+    ) -> PyResult<Vec<PyJobReturn>> {
         let overrides = py_to_job_overrides(&job_overrides)?;
-        let results = self.inner.launch(&overrides, initial_job_idx)
+        let results = self
+            .inner
+            .launch(&overrides, initial_job_idx)
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.message))?;
 
         Ok(results.iter().map(|r| PyJobReturn::from(r)).collect())

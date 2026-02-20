@@ -1,18 +1,13 @@
 // Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved
 //! PyO3 bindings for environment variable handling
 
-use pyo3::prelude::*;
-use pyo3::exceptions::PyValueError;
-use std::collections::HashMap;
 use lerna::env::{
+    find_env_refs, get_all_env, get_many_env, is_env_set, parse_env_ref, resolve_env_string,
     EnvResolver as RustEnvResolver,
-    parse_env_ref,
-    resolve_env_string,
-    find_env_refs,
-    get_all_env,
-    is_env_set,
-    get_many_env,
 };
+use pyo3::exceptions::PyValueError;
+use pyo3::prelude::*;
+use std::collections::HashMap;
 
 /// Environment variable resolver with caching and default value support
 #[pyclass(name = "EnvResolver")]
@@ -54,7 +49,8 @@ impl PyEnvResolver {
 
     /// Get an environment variable, raising an error if not found
     fn get_required(&mut self, key: &str) -> PyResult<String> {
-        self.inner.get_required(key)
+        self.inner
+            .get_required(key)
             .map_err(|e| PyValueError::new_err(e))
     }
 
@@ -70,11 +66,10 @@ impl PyEnvResolver {
 
     /// Resolve all environment variable references in a string
     fn resolve_string(&mut self, s: &str) -> PyResult<String> {
-        resolve_env_string(s, &mut self.inner)
-            .map_err(|e| PyValueError::new_err(e))
+        resolve_env_string(s, &mut self.inner).map_err(|e| PyValueError::new_err(e))
     }
 
-/// Enable/disable caching
+    /// Enable/disable caching
     fn enable_caching(&mut self, enabled: bool) {
         self.inner.enable_caching(enabled);
     }
@@ -111,8 +106,7 @@ fn py_resolve_env_string(s: &str, overrides: Option<HashMap<String, String>>) ->
         RustEnvResolver::new()
     };
 
-    resolve_env_string(s, &mut resolver)
-        .map_err(|e| PyValueError::new_err(e))
+    resolve_env_string(s, &mut resolver).map_err(|e| PyValueError::new_err(e))
 }
 
 /// Get all environment variables as a dict

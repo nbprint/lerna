@@ -7,10 +7,7 @@ use pyo3::types::{PyDict, PyList};
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 
-use lerna::omegaconf::{
-    DictConfig, OmegaConf,
-    ConfigValue as RustConfigValue,
-};
+use lerna::omegaconf::{ConfigValue as RustConfigValue, DictConfig, OmegaConf};
 
 use super::dictconfig::{py_to_config_value, PyDictConfig};
 use super::listconfig::PyListConfig;
@@ -21,13 +18,27 @@ use super::listconfig::PyListConfig;
 pub enum PyConfigValue {
     NoneValue {},
     Missing {},
-    Bool { value: bool },
-    Int { value: i64 },
-    Float { value: f64 },
-    String { value: String },
-    List { items: Vec<PyConfigValue> },
-    Dict { items: HashMap<String, PyConfigValue> },
-    Interpolation { expr: String },
+    Bool {
+        value: bool,
+    },
+    Int {
+        value: i64,
+    },
+    Float {
+        value: f64,
+    },
+    String {
+        value: String,
+    },
+    List {
+        items: Vec<PyConfigValue>,
+    },
+    Dict {
+        items: HashMap<String, PyConfigValue>,
+    },
+    Interpolation {
+        expr: String,
+    },
 }
 
 #[pymethods]
@@ -121,27 +132,30 @@ impl PyOmegaConf {
     /// Check if a value is MISSING
     #[staticmethod]
     fn is_missing(cfg: &PyDictConfig, key: &str) -> PyResult<bool> {
-        let inner = cfg.inner.read().map_err(|e| {
-            PyRuntimeError::new_err(format!("Failed to lock DictConfig: {}", e))
-        })?;
+        let inner = cfg
+            .inner
+            .read()
+            .map_err(|e| PyRuntimeError::new_err(format!("Failed to lock DictConfig: {}", e)))?;
         Ok(OmegaConf::is_missing_dict(&inner, key))
     }
 
     /// Check if a value is an interpolation
     #[staticmethod]
     fn is_interpolation(cfg: &PyDictConfig, key: &str) -> PyResult<bool> {
-        let inner = cfg.inner.read().map_err(|e| {
-            PyRuntimeError::new_err(format!("Failed to lock DictConfig: {}", e))
-        })?;
+        let inner = cfg
+            .inner
+            .read()
+            .map_err(|e| PyRuntimeError::new_err(format!("Failed to lock DictConfig: {}", e)))?;
         Ok(OmegaConf::is_interpolation_dict(&inner, key))
     }
 
     /// Set the readonly flag
     #[staticmethod]
     fn set_readonly(cfg: &mut PyDictConfig, value: Option<bool>) -> PyResult<()> {
-        let mut inner = cfg.inner.write().map_err(|e| {
-            PyRuntimeError::new_err(format!("Failed to lock DictConfig: {}", e))
-        })?;
+        let mut inner = cfg
+            .inner
+            .write()
+            .map_err(|e| PyRuntimeError::new_err(format!("Failed to lock DictConfig: {}", e)))?;
         OmegaConf::set_readonly_dict(&mut inner, value);
         Ok(())
     }
@@ -149,18 +163,20 @@ impl PyOmegaConf {
     /// Get the readonly flag
     #[staticmethod]
     fn is_readonly(cfg: &PyDictConfig) -> PyResult<Option<bool>> {
-        let inner = cfg.inner.read().map_err(|e| {
-            PyRuntimeError::new_err(format!("Failed to lock DictConfig: {}", e))
-        })?;
+        let inner = cfg
+            .inner
+            .read()
+            .map_err(|e| PyRuntimeError::new_err(format!("Failed to lock DictConfig: {}", e)))?;
         Ok(OmegaConf::is_readonly_dict(&inner))
     }
 
     /// Set the struct flag
     #[staticmethod]
     fn set_struct(cfg: &mut PyDictConfig, value: Option<bool>) -> PyResult<()> {
-        let mut inner = cfg.inner.write().map_err(|e| {
-            PyRuntimeError::new_err(format!("Failed to lock DictConfig: {}", e))
-        })?;
+        let mut inner = cfg
+            .inner
+            .write()
+            .map_err(|e| PyRuntimeError::new_err(format!("Failed to lock DictConfig: {}", e)))?;
         OmegaConf::set_struct_dict(&mut inner, value);
         Ok(())
     }
@@ -168,9 +184,10 @@ impl PyOmegaConf {
     /// Get the struct flag
     #[staticmethod]
     fn is_struct(cfg: &PyDictConfig) -> PyResult<Option<bool>> {
-        let inner = cfg.inner.read().map_err(|e| {
-            PyRuntimeError::new_err(format!("Failed to lock DictConfig: {}", e))
-        })?;
+        let inner = cfg
+            .inner
+            .read()
+            .map_err(|e| PyRuntimeError::new_err(format!("Failed to lock DictConfig: {}", e)))?;
         Ok(OmegaConf::is_struct_dict(&inner))
     }
 
@@ -183,9 +200,10 @@ impl PyOmegaConf {
         resolve: bool,
         throw_on_missing: bool,
     ) -> PyResult<Py<PyAny>> {
-        let inner = cfg.inner.read().map_err(|e| {
-            PyRuntimeError::new_err(format!("Failed to lock DictConfig: {}", e))
-        })?;
+        let inner = cfg
+            .inner
+            .read()
+            .map_err(|e| PyRuntimeError::new_err(format!("Failed to lock DictConfig: {}", e)))?;
         let container = OmegaConf::to_container_dict(&inner, resolve, throw_on_missing)
             .map_err(|e| PyRuntimeError::new_err(format!("{}", e)))?;
         rust_config_value_to_py(&RustConfigValue::Dict(container), py)
@@ -195,9 +213,10 @@ impl PyOmegaConf {
     #[staticmethod]
     #[pyo3(signature = (cfg, resolve=false, sort_keys=false))]
     fn to_yaml(cfg: &PyDictConfig, resolve: bool, sort_keys: bool) -> PyResult<String> {
-        let inner = cfg.inner.read().map_err(|e| {
-            PyRuntimeError::new_err(format!("Failed to lock DictConfig: {}", e))
-        })?;
+        let inner = cfg
+            .inner
+            .read()
+            .map_err(|e| PyRuntimeError::new_err(format!("Failed to lock DictConfig: {}", e)))?;
         OmegaConf::to_yaml_dict(&inner, resolve, sort_keys)
             .map_err(|e| PyRuntimeError::new_err(format!("{}", e)))
     }
@@ -268,9 +287,10 @@ impl PyOmegaConf {
         default: Option<&Bound<PyAny>>,
         throw_on_missing: bool,
     ) -> PyResult<Py<PyAny>> {
-        let inner = cfg.inner.read().map_err(|e| {
-            PyRuntimeError::new_err(format!("Failed to lock DictConfig: {}", e))
-        })?;
+        let inner = cfg
+            .inner
+            .read()
+            .map_err(|e| PyRuntimeError::new_err(format!("Failed to lock DictConfig: {}", e)))?;
 
         match OmegaConf::select_dict(&inner, key, throw_on_missing) {
             Ok(Some(value)) => rust_config_value_to_py(&value, py),
@@ -290,9 +310,10 @@ impl PyOmegaConf {
             Some(v) => py_to_config_value(v)?,
             None => RustConfigValue::None,
         };
-        let mut inner = cfg.inner.write().map_err(|e| {
-            PyRuntimeError::new_err(format!("Failed to lock DictConfig: {}", e))
-        })?;
+        let mut inner = cfg
+            .inner
+            .write()
+            .map_err(|e| PyRuntimeError::new_err(format!("Failed to lock DictConfig: {}", e)))?;
         OmegaConf::update_dict(&mut inner, key, config_value)
             .map_err(|e| PyRuntimeError::new_err(format!("{}", e)))
     }
@@ -301,11 +322,11 @@ impl PyOmegaConf {
     /// This replaces ${...} references with their actual values
     #[staticmethod]
     fn resolve(cfg: &mut PyDictConfig) -> PyResult<()> {
-        let mut inner = cfg.inner.write().map_err(|e| {
-            PyRuntimeError::new_err(format!("Failed to lock DictConfig: {}", e))
-        })?;
-        OmegaConf::resolve_dict(&mut inner)
-            .map_err(|e| PyRuntimeError::new_err(format!("{}", e)))
+        let mut inner = cfg
+            .inner
+            .write()
+            .map_err(|e| PyRuntimeError::new_err(format!("Failed to lock DictConfig: {}", e)))?;
+        OmegaConf::resolve_dict(&mut inner).map_err(|e| PyRuntimeError::new_err(format!("{}", e)))
     }
 
     /// Load a YAML file and return a DictConfig
@@ -313,8 +334,8 @@ impl PyOmegaConf {
     fn load(_py: Python, path: &str) -> PyResult<PyDictConfig> {
         use std::path::Path;
         let path = Path::new(path);
-        let dict_config = OmegaConf::load(path)
-            .map_err(|e| PyRuntimeError::new_err(format!("{}", e)))?;
+        let dict_config =
+            OmegaConf::load(path).map_err(|e| PyRuntimeError::new_err(format!("{}", e)))?;
 
         Ok(PyDictConfig {
             inner: Arc::new(RwLock::new(dict_config)),
@@ -324,8 +345,8 @@ impl PyOmegaConf {
     /// Create a DictConfig from YAML string
     #[staticmethod]
     fn from_yaml(_py: Python, yaml: &str) -> PyResult<PyDictConfig> {
-        let dict_config = OmegaConf::from_yaml(yaml)
-            .map_err(|e| PyRuntimeError::new_err(format!("{}", e)))?;
+        let dict_config =
+            OmegaConf::from_yaml(yaml).map_err(|e| PyRuntimeError::new_err(format!("{}", e)))?;
 
         Ok(PyDictConfig {
             inner: Arc::new(RwLock::new(dict_config)),

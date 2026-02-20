@@ -1,11 +1,9 @@
 // Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved
 //! PyO3 bindings for default element types
 
+use lerna::{ConfigDefault, GroupDefault, GroupValue, ResultDefault};
 use pyo3::prelude::*;
 use pyo3::types::PyList;
-use lerna::{
-    ResultDefault, ConfigDefault, GroupDefault, GroupValue
-};
 
 /// Result of resolving a default
 #[pyclass(name = "ResultDefault")]
@@ -234,12 +232,16 @@ impl PyConfigDefault {
     }
 
     fn update_parent(&mut self, parent_base_dir: Option<String>, parent_package: Option<String>) {
-        self.inner.base.update_parent(parent_base_dir, parent_package);
+        self.inner
+            .base
+            .update_parent(parent_base_dir, parent_package);
     }
 
     fn __repr__(&self) -> String {
-        format!("ConfigDefault(path={:?}, package={:?}, optional={}, deleted={})",
-            self.inner.path, self.inner.base.package, self.inner.optional, self.inner.deleted)
+        format!(
+            "ConfigDefault(path={:?}, package={:?}, optional={}, deleted={})",
+            self.inner.path, self.inner.base.package, self.inner.optional, self.inner.deleted
+        )
     }
 }
 
@@ -270,7 +272,8 @@ impl PyGroupDefault {
                 if let Ok(s) = v.extract::<String>(py) {
                     GroupValue::Single(s)
                 } else if let Ok(list) = v.cast_bound::<PyList>(py) {
-                    let values: Vec<String> = list.iter()
+                    let values: Vec<String> = list
+                        .iter()
                         .filter_map(|item| item.extract::<String>().ok())
                         .collect();
                     GroupValue::Multiple(values)
@@ -318,7 +321,8 @@ impl PyGroupDefault {
         if let Ok(s) = value.extract::<String>(py) {
             self.inner.value = GroupValue::Single(s);
         } else if let Ok(list) = value.cast_bound::<PyList>(py) {
-            let values: Vec<String> = list.iter()
+            let values: Vec<String> = list
+                .iter()
                 .filter_map(|item| item.extract::<String>().ok())
                 .collect();
             self.inner.value = GroupValue::Multiple(values);
@@ -439,13 +443,11 @@ impl PyGroupDefault {
     fn get_config_path(&self, value: Option<String>) -> String {
         match value {
             Some(v) => self.inner.get_config_path(&v),
-            None => {
-                match &self.inner.value {
-                    GroupValue::Single(v) => self.inner.get_config_path(v),
-                    GroupValue::Multiple(vs) if !vs.is_empty() => self.inner.get_config_path(&vs[0]),
-                    _ => self.inner.get_group_path(),
-                }
-            }
+            None => match &self.inner.value {
+                GroupValue::Single(v) => self.inner.get_config_path(v),
+                GroupValue::Multiple(vs) if !vs.is_empty() => self.inner.get_config_path(&vs[0]),
+                _ => self.inner.get_group_path(),
+            },
         }
     }
 
@@ -467,7 +469,9 @@ impl PyGroupDefault {
     }
 
     fn update_parent(&mut self, parent_base_dir: Option<String>, parent_package: Option<String>) {
-        self.inner.base.update_parent(parent_base_dir, parent_package);
+        self.inner
+            .base
+            .update_parent(parent_base_dir, parent_package);
     }
 
     fn __repr__(&self) -> String {
@@ -475,8 +479,14 @@ impl PyGroupDefault {
             GroupValue::Single(s) => format!("{:?}", s),
             GroupValue::Multiple(v) => format!("{:?}", v),
         };
-        format!("GroupDefault(group={:?}, value={}, package={:?}, optional={}, deleted={})",
-            self.inner.group, value_str, self.inner.base.package, self.inner.optional, self.inner.deleted)
+        format!(
+            "GroupDefault(group={:?}, value={}, package={:?}, optional={}, deleted={})",
+            self.inner.group,
+            value_str,
+            self.inner.base.package,
+            self.inner.optional,
+            self.inner.deleted
+        )
     }
 }
 

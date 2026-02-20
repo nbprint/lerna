@@ -3,8 +3,8 @@
 
 use lerna::config::{ConfigDict, ConfigValue};
 use lerna::interpolation::{
-    find_interpolations, parse_interpolation, resolve_config, resolve_string,
-    InterpolationType, ResolutionContext,
+    find_interpolations, parse_interpolation, resolve_config, resolve_string, InterpolationType,
+    ResolutionContext,
 };
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};
@@ -27,10 +27,8 @@ fn py_to_config_value(obj: &Bound<'_, PyAny>) -> PyResult<ConfigValue> {
         return Ok(ConfigValue::String(s));
     }
     if let Ok(list) = obj.cast::<PyList>() {
-        let items: PyResult<Vec<ConfigValue>> = list
-            .iter()
-            .map(|item| py_to_config_value(&item))
-            .collect();
+        let items: PyResult<Vec<ConfigValue>> =
+            list.iter().map(|item| py_to_config_value(&item)).collect();
         return Ok(ConfigValue::List(items?));
     }
     if let Ok(dict) = obj.cast::<PyDict>() {
@@ -64,7 +62,9 @@ fn config_value_to_py(py: Python<'_>, value: &ConfigValue) -> PyResult<Py<PyAny>
             }
             Ok(py_dict.into())
         }
-        ConfigValue::Interpolation(s) => Ok(s.as_str().into_pyobject(py)?.to_owned().into_any().unbind()),
+        ConfigValue::Interpolation(s) => {
+            Ok(s.as_str().into_pyobject(py)?.to_owned().into_any().unbind())
+        }
         ConfigValue::Missing => Ok(py.None()),
     }
 }
@@ -121,7 +121,10 @@ fn resolve_string_interpolations(
 
 /// Resolve all interpolations in a config dict
 #[pyfunction]
-fn resolve_config_interpolations(py: Python<'_>, config: &Bound<'_, PyDict>) -> PyResult<Py<PyAny>> {
+fn resolve_config_interpolations(
+    py: Python<'_>,
+    config: &Bound<'_, PyDict>,
+) -> PyResult<Py<PyAny>> {
     // Convert Python dict to ConfigDict
     let mut cfg = ConfigDict::new();
     for (key, val) in config.iter() {

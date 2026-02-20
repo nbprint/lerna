@@ -1,12 +1,11 @@
 // Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved
 //! PyO3 bindings for config search path management
 
-use pyo3::prelude::*;
 use lerna::search_path::{
-    ConfigSearchPath as RustConfigSearchPath,
-    SearchPathElement as RustSearchPathElement,
+    ConfigSearchPath as RustConfigSearchPath, SearchPathElement as RustSearchPathElement,
     SearchPathQuery as RustSearchPathQuery,
 };
+use pyo3::prelude::*;
 
 /// A single element in the config search path
 #[pyclass(name = "SearchPathElement")]
@@ -59,7 +58,10 @@ impl PySearchPathElement {
     }
 
     fn __repr__(&self) -> String {
-        format!("SearchPathElement(provider={}, path={})", self.inner.provider, self.inner.path)
+        format!(
+            "SearchPathElement(provider={}, path={})",
+            self.inner.provider, self.inner.path
+        )
     }
 
     fn __str__(&self) -> String {
@@ -80,10 +82,7 @@ impl PySearchPathQuery {
     #[pyo3(signature = (provider=None, path=None))]
     fn new(provider: Option<String>, path: Option<String>) -> Self {
         Self {
-            inner: RustSearchPathQuery {
-                provider,
-                path,
-            },
+            inner: RustSearchPathQuery { provider, path },
         }
     }
 
@@ -139,8 +138,7 @@ impl PySearchPathQuery {
     fn __repr__(&self) -> String {
         format!(
             "SearchPathQuery(provider={:?}, path={:?})",
-            self.inner.provider,
-            self.inner.path
+            self.inner.provider, self.inner.path
         )
     }
 }
@@ -194,7 +192,9 @@ impl PyConfigSearchPath {
 
     /// Get element at index
     fn get(&self, index: usize) -> Option<PySearchPathElement> {
-        self.inner.get(index).map(|e| PySearchPathElement { inner: e.clone() })
+        self.inner
+            .get(index)
+            .map(|e| PySearchPathElement { inner: e.clone() })
     }
 
     /// Find the first element matching the query

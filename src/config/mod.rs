@@ -1,14 +1,17 @@
 // Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved
 //! PyO3 bindings for configuration loading
 
+use pyo3::exceptions::PyRuntimeError;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};
-use pyo3::exceptions::PyRuntimeError;
 
-use lerna::config::{ConfigLoader as RustConfigLoader, SearchPathEntry as RustSearchPathEntry};
-use lerna::config::{ConfigRepository as RustConfigRepository, CachingConfigRepository, SearchPathElement as RustSearchPathElement};
-use lerna::config::value::{ConfigDict, ConfigValue};
 use lerna::config::interpolation::{resolve, ResolverContext};
+use lerna::config::value::{ConfigDict, ConfigValue};
+use lerna::config::{
+    CachingConfigRepository, ConfigRepository as RustConfigRepository,
+    SearchPathElement as RustSearchPathElement,
+};
+use lerna::config::{ConfigLoader as RustConfigLoader, SearchPathEntry as RustSearchPathEntry};
 use lerna::ObjectType;
 
 /// Convert ConfigValue to a Python object
@@ -19,7 +22,9 @@ fn config_value_to_py(py: Python, value: &ConfigValue) -> PyResult<Py<PyAny>> {
         ConfigValue::Int(i) => Ok((*i).into_pyobject(py)?.to_owned().into_any().unbind()),
         ConfigValue::Float(f) => Ok((*f).into_pyobject(py)?.to_owned().into_any().unbind()),
         ConfigValue::String(s) => Ok(s.as_str().into_pyobject(py)?.to_owned().into_any().unbind()),
-        ConfigValue::Interpolation(s) => Ok(s.as_str().into_pyobject(py)?.to_owned().into_any().unbind()),
+        ConfigValue::Interpolation(s) => {
+            Ok(s.as_str().into_pyobject(py)?.to_owned().into_any().unbind())
+        }
         ConfigValue::Missing => {
             // Return the string "???" to represent missing values
             Ok("???".into_pyobject(py)?.to_owned().into_any().unbind())
@@ -31,9 +36,7 @@ fn config_value_to_py(py: Python, value: &ConfigValue) -> PyResult<Py<PyAny>> {
             }
             Ok(list.into_any().unbind())
         }
-        ConfigValue::Dict(dict) => {
-            config_dict_to_py(py, dict)
-        }
+        ConfigValue::Dict(dict) => config_dict_to_py(py, dict),
     }
 }
 
@@ -109,7 +112,10 @@ impl PySearchPathEntry {
     }
 
     fn __repr__(&self) -> String {
-        format!("SearchPathEntry(provider='{}', path='{}')", self.provider, self.path)
+        format!(
+            "SearchPathEntry(provider='{}', path='{}')",
+            self.provider, self.path
+        )
     }
 }
 
@@ -130,14 +136,19 @@ impl PyConfigLoader {
     /// Create a new config loader from search paths
     #[new]
     #[pyo3(signature = (search_paths=None, config_dir=None))]
-    fn new(search_paths: Option<Vec<PySearchPathEntry>>, config_dir: Option<String>) -> PyResult<Self> {
+    fn new(
+        search_paths: Option<Vec<PySearchPathEntry>>,
+        config_dir: Option<String>,
+    ) -> PyResult<Self> {
         let loader = if let Some(dir) = config_dir {
             RustConfigLoader::from_config_dir(&dir)
         } else if let Some(paths) = search_paths {
             let rust_paths: Vec<RustSearchPathEntry> = paths.iter().map(|p| p.into()).collect();
             RustConfigLoader::new(rust_paths)
         } else {
-            return Err(PyRuntimeError::new_err("Either search_paths or config_dir must be provided"));
+            return Err(PyRuntimeError::new_err(
+                "Either search_paths or config_dir must be provided",
+            ));
         };
 
         Ok(Self { loader })
@@ -161,7 +172,9 @@ impl PyConfigLoader {
     ) -> PyResult<Py<PyAny>> {
         let overrides_ref: Vec<String> = overrides.unwrap_or_default();
 
-        let config = self.loader.load_config(config_name, &overrides_ref)
+        let config = self
+            .loader
+            .load_config(config_name, &overrides_ref)
             .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
 
         config_value_to_py(py, &config)
@@ -195,8 +208,8 @@ impl PyConfigLoader {
 /// Parse a YAML string into a Python dict
 #[pyfunction]
 fn parse_yaml(py: Python, content: &str) -> PyResult<Py<PyAny>> {
-    let config = lerna::config::parse_yaml(content)
-        .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
+    let config =
+        lerna::config::parse_yaml(content).map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
     config_value_to_py(py, &config)
 }
 
@@ -226,8 +239,8 @@ fn resolve_interpolations(py: Python, config: Bound<'_, PyAny>) -> PyResult<Py<P
 
     // Create resolver context and resolve
     let ctx = ResolverContext::new(&dict);
-    let resolved = resolve(&config_value, &ctx)
-        .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
+    let resolved =
+        resolve(&config_value, &ctx).map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
 
     config_value_to_py(py, &resolved)
 }
@@ -249,7 +262,8 @@ fn compose_config(
 
     // Load config with overrides
     let overrides_ref: Vec<String> = overrides.unwrap_or_default();
-    let config = loader.load_config(config_name, &overrides_ref)
+    let config = loader
+        .load_config(config_name, &overrides_ref)
         .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
 
     // Resolve interpolations
@@ -259,8 +273,7 @@ fn compose_config(
     };
 
     let ctx = ResolverContext::new(&dict);
-    let resolved = resolve(&config, &ctx)
-        .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
+    let resolved = resolve(&config, &ctx).map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
 
     config_value_to_py(py, &resolved)
 }
@@ -308,9 +321,7 @@ impl PyConfigRepository {
     /// Returns None if config doesn't exist
     fn load_config(&self, py: Python, config_path: &str) -> PyResult<Option<Py<PyAny>>> {
         match self.inner.load_config(config_path) {
-            Ok(Some(result)) => {
-                config_value_to_py(py, &result.config).map(Some)
-            }
+            Ok(Some(result)) => config_value_to_py(py, &result.config).map(Some),
             Ok(None) => Ok(None),
             Err(e) => Err(PyRuntimeError::new_err(e.to_string())),
         }
@@ -355,7 +366,7 @@ impl PyConfigRepository {
         let filter = match results_filter {
             Some("config") => Some(ObjectType::Config),
             Some("group") => Some(ObjectType::Group),
-            _ => Some(ObjectType::Config),  // default to config
+            _ => Some(ObjectType::Config), // default to config
         };
         self.inner.get_group_options(group_name, filter)
     }
@@ -399,9 +410,7 @@ impl PyCachingConfigRepository {
     /// Returns None if config doesn't exist
     fn load_config(&mut self, py: Python, config_path: &str) -> PyResult<Option<Py<PyAny>>> {
         match self.inner.load_config(config_path) {
-            Ok(Some(result)) => {
-                config_value_to_py(py, &result.config).map(Some)
-            }
+            Ok(Some(result)) => config_value_to_py(py, &result.config).map(Some),
             Ok(None) => Ok(None),
             Err(e) => Err(PyRuntimeError::new_err(e.to_string())),
         }
@@ -451,7 +460,9 @@ impl PyCachingConfigRepository {
     ) -> PyResult<Py<PyAny>> {
         let overrides_ref: Vec<String> = overrides.unwrap_or_default();
 
-        let result = self.inner.load_and_compose(config_name, &overrides_ref)
+        let result = self
+            .inner
+            .load_and_compose(config_name, &overrides_ref)
             .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
 
         // Build result dict
@@ -502,7 +513,6 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(extract_header_dict, m)?)?;
     Ok(())
 }
-
 
 /// Configuration repository that delegates pkg:// and structured:// to Python
 ///
@@ -725,7 +735,12 @@ impl PyHybridConfigRepository {
 
     /// Get available options for a config group
     #[pyo3(signature = (group_name, results_filter=None))]
-    fn get_group_options(&self, py: Python, group_name: &str, results_filter: Option<&str>) -> PyResult<Vec<String>> {
+    fn get_group_options(
+        &self,
+        py: Python,
+        group_name: &str,
+        results_filter: Option<&str>,
+    ) -> PyResult<Vec<String>> {
         let mut options = Vec::new();
 
         // Get from Rust file sources

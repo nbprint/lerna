@@ -55,7 +55,8 @@ impl PyJobConfig {
         item_sep: &str,
         exclude_keys: Option<Vec<String>>,
     ) -> String {
-        self.inner.get_override_dirname(kv_sep, item_sep, &exclude_keys.unwrap_or_default())
+        self.inner
+            .get_override_dirname(kv_sep, item_sep, &exclude_keys.unwrap_or_default())
     }
 }
 
@@ -100,7 +101,11 @@ fn compute_job_output_dir(
 
 /// Generate job configurations for a sweep
 #[pyfunction]
-fn generate_jobs(name: &str, sweep_overrides: Vec<Vec<String>>, base_dir: &str) -> Vec<PyJobConfig> {
+fn generate_jobs(
+    name: &str,
+    sweep_overrides: Vec<Vec<String>>,
+    base_dir: &str,
+) -> Vec<PyJobConfig> {
     generate_sweep_jobs(name, &sweep_overrides, base_dir)
         .into_iter()
         .map(|j| PyJobConfig { inner: j })

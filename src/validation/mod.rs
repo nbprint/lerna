@@ -4,8 +4,8 @@
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};
 
-use lerna::validation::{ConfigSchema, TypeSpec};
 use lerna::config::value::{ConfigDict, ConfigValue};
+use lerna::validation::{ConfigSchema, TypeSpec};
 
 /// Python wrapper for TypeSpec
 #[pyclass(name = "TypeSpec")]
@@ -25,31 +25,41 @@ impl PyTypeSpec {
     /// Create an Int type spec
     #[staticmethod]
     fn int() -> Self {
-        Self { inner: TypeSpec::Int }
+        Self {
+            inner: TypeSpec::Int,
+        }
     }
 
     /// Create a String type spec
     #[staticmethod]
     fn string() -> Self {
-        Self { inner: TypeSpec::String }
+        Self {
+            inner: TypeSpec::String,
+        }
     }
 
     /// Create a Bool type spec
     #[staticmethod]
     fn bool() -> Self {
-        Self { inner: TypeSpec::Bool }
+        Self {
+            inner: TypeSpec::Bool,
+        }
     }
 
     /// Create a Float type spec
     #[staticmethod]
     fn float() -> Self {
-        Self { inner: TypeSpec::Float }
+        Self {
+            inner: TypeSpec::Float,
+        }
     }
 
     /// Create an Any type spec
     #[staticmethod]
     fn any() -> Self {
-        Self { inner: TypeSpec::Any }
+        Self {
+            inner: TypeSpec::Any,
+        }
     }
 
     /// Create a List type spec
@@ -112,14 +122,18 @@ impl PyConfigSchema {
 
     /// Add a required field
     fn required(&mut self, name: &str, type_spec: &PyTypeSpec) {
-        self.inner.fields.insert(
-            name.to_string(),
-            (type_spec.inner.clone(), true, None),
-        );
+        self.inner
+            .fields
+            .insert(name.to_string(), (type_spec.inner.clone(), true, None));
     }
 
     /// Add an optional field with a default value
-    fn optional(&mut self, name: &str, type_spec: &PyTypeSpec, default: &Bound<'_, PyAny>) -> PyResult<()> {
+    fn optional(
+        &mut self,
+        name: &str,
+        type_spec: &PyTypeSpec,
+        default: &Bound<'_, PyAny>,
+    ) -> PyResult<()> {
         let default_value = py_to_config_value(default)?;
         self.inner.fields.insert(
             name.to_string(),

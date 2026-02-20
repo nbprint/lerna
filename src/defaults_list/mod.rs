@@ -4,8 +4,8 @@
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
-use lerna::defaults_list::{DefaultsListBuilder, DefaultsListResult, Overrides};
 use lerna::defaults::GroupDefault;
+use lerna::defaults_list::{DefaultsListBuilder, DefaultsListResult, Overrides};
 
 /// Python wrapper for Overrides
 #[pyclass(name = "RustOverrides")]
@@ -50,9 +50,13 @@ impl PyOverrides {
 
     /// Get appends as list of (group, value) tuples
     fn get_appends(&self) -> Vec<(String, String)> {
-        self.inner.appends.iter()
+        self.inner
+            .appends
+            .iter()
             .filter_map(|gd| {
-                gd.value.as_single().map(|v| (gd.group.clone(), v.to_string()))
+                gd.value
+                    .as_single()
+                    .map(|v| (gd.group.clone(), v.to_string()))
             })
             .collect()
     }
@@ -79,7 +83,9 @@ impl PyOverrides {
 
     /// Add a deletion
     fn add_deletion(&mut self, group: String) {
-        self.inner.deletions.insert(group, lerna::defaults_list::Deletion::default());
+        self.inner
+            .deletions
+            .insert(group, lerna::defaults_list::Deletion::default());
     }
 
     /// Add an append
@@ -90,7 +96,9 @@ impl PyOverrides {
     fn __repr__(&self) -> String {
         format!(
             "RustOverrides(choices={:?}, deletions={:?}, appends={})",
-            self.inner.choices, self.inner.deletions, self.inner.appends.len()
+            self.inner.choices,
+            self.inner.deletions,
+            self.inner.appends.len()
         )
     }
 }
@@ -154,7 +162,10 @@ impl PyDefaultsListResult {
     }
 
     fn __repr__(&self) -> String {
-        format!("RustDefaultsListResult({} defaults)", self.inner.defaults.len())
+        format!(
+            "RustDefaultsListResult({} defaults)",
+            self.inner.defaults.len()
+        )
     }
 }
 
@@ -172,7 +183,10 @@ pub fn build_defaults_list(
     let loader2 = config_loader.clone_ref(py);
     let loader3 = config_loader.clone_ref(py);
 
-    let config_loader_fn = move |path: &str| -> Result<lerna::config::value::ConfigDict, lerna::config::parser::ConfigLoadError> {
+    let config_loader_fn = move |path: &str| -> Result<
+        lerna::config::value::ConfigDict,
+        lerna::config::parser::ConfigLoadError,
+    > {
         Python::attach(|py| {
             let result = loader.call_method1(py, "load_config", (path,));
             match result {
@@ -181,7 +195,10 @@ pub fn build_defaults_list(
                     // Real implementation would convert Python dict to ConfigDict
                     Ok(lerna::config::value::ConfigDict::new())
                 }
-                Err(_) => Err(lerna::config::parser::ConfigLoadError::with_path("Config not found", path)),
+                Err(_) => Err(lerna::config::parser::ConfigLoadError::with_path(
+                    "Config not found",
+                    path,
+                )),
             }
         })
     };
@@ -213,7 +230,8 @@ pub fn build_defaults_list(
         &overrides,
     );
 
-    let result = builder.build(config_path)
+    let result = builder
+        .build(config_path)
         .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
 
     Ok(PyDefaultsListResult { inner: result })

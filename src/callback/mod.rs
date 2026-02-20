@@ -5,7 +5,9 @@ use pyo3::types::PyDict;
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use lerna::callback::{Callback, CallbackManager, CallbackResult, JobReturn, LoggingCallback, NoOpCallback};
+use lerna::callback::{
+    Callback, CallbackManager, CallbackResult, JobReturn, LoggingCallback, NoOpCallback,
+};
 use lerna::config::ConfigDict;
 use lerna::ConfigValue;
 
@@ -17,7 +19,10 @@ fn config_to_py<'py>(py: Python<'py>, config: &ConfigDict) -> PyResult<Bound<'py
     Ok(dict)
 }
 
-fn kwargs_to_py<'py>(py: Python<'py>, kwargs: &HashMap<String, String>) -> PyResult<Bound<'py, PyDict>> {
+fn kwargs_to_py<'py>(
+    py: Python<'py>,
+    kwargs: &HashMap<String, String>,
+) -> PyResult<Bound<'py, PyDict>> {
     let dict = PyDict::new(py);
     for (key, value) in kwargs {
         dict.set_item(key, value)?;
@@ -55,7 +60,14 @@ impl PyJobReturn {
         status_code: i32,
         return_value: Option<String>,
     ) -> Self {
-        Self { return_value, working_dir, output_dir, job_name, task_name, status_code }
+        Self {
+            return_value,
+            working_dir,
+            output_dir,
+            job_name,
+            task_name,
+            status_code,
+        }
     }
 
     fn is_success(&self) -> bool {
@@ -110,7 +122,9 @@ impl PyCallbackWrapper {
             let py_kwargs = kwargs_to_py(py, kwargs).map_err(|e| e.to_string())?;
             let callback = self.py_callback.bind(py);
             if callback.hasattr(method).map_err(|e| e.to_string())? {
-                callback.call_method1(method, (py_config, py_kwargs)).map_err(|e| e.to_string())?;
+                callback
+                    .call_method1(method, (py_config, py_kwargs))
+                    .map_err(|e| e.to_string())?;
             }
             Ok(())
         })
@@ -128,7 +142,9 @@ impl PyCallbackWrapper {
             let py_kwargs = kwargs_to_py(py, kwargs).map_err(|e| e.to_string())?;
             let callback = self.py_callback.bind(py);
             if callback.hasattr("on_job_end").map_err(|e| e.to_string())? {
-                callback.call_method1("on_job_end", (py_config, py_job_return, py_kwargs)).map_err(|e| e.to_string())?;
+                callback
+                    .call_method1("on_job_end", (py_config, py_job_return, py_kwargs))
+                    .map_err(|e| e.to_string())?;
             }
             Ok(())
         })
@@ -145,8 +161,16 @@ impl PyCallbackWrapper {
             let py_config_name = config_name.map(|s| s.to_string());
             let py_overrides: Vec<String> = overrides.to_vec();
             let callback = self.py_callback.bind(py);
-            if callback.hasattr("on_compose_config").map_err(|e| e.to_string())? {
-                callback.call_method1("on_compose_config", (py_config, py_config_name, py_overrides)).map_err(|e| e.to_string())?;
+            if callback
+                .hasattr("on_compose_config")
+                .map_err(|e| e.to_string())?
+            {
+                callback
+                    .call_method1(
+                        "on_compose_config",
+                        (py_config, py_config_name, py_overrides),
+                    )
+                    .map_err(|e| e.to_string())?;
             }
             Ok(())
         })
@@ -154,25 +178,55 @@ impl PyCallbackWrapper {
 }
 
 impl Callback for PyCallbackWrapper {
-    fn on_run_start(&self, config: &ConfigDict, kwargs: &HashMap<String, String>) -> CallbackResult<()> {
+    fn on_run_start(
+        &self,
+        config: &ConfigDict,
+        kwargs: &HashMap<String, String>,
+    ) -> CallbackResult<()> {
         self.call_method("on_run_start", config, kwargs)
     }
-    fn on_run_end(&self, config: &ConfigDict, kwargs: &HashMap<String, String>) -> CallbackResult<()> {
+    fn on_run_end(
+        &self,
+        config: &ConfigDict,
+        kwargs: &HashMap<String, String>,
+    ) -> CallbackResult<()> {
         self.call_method("on_run_end", config, kwargs)
     }
-    fn on_multirun_start(&self, config: &ConfigDict, kwargs: &HashMap<String, String>) -> CallbackResult<()> {
+    fn on_multirun_start(
+        &self,
+        config: &ConfigDict,
+        kwargs: &HashMap<String, String>,
+    ) -> CallbackResult<()> {
         self.call_method("on_multirun_start", config, kwargs)
     }
-    fn on_multirun_end(&self, config: &ConfigDict, kwargs: &HashMap<String, String>) -> CallbackResult<()> {
+    fn on_multirun_end(
+        &self,
+        config: &ConfigDict,
+        kwargs: &HashMap<String, String>,
+    ) -> CallbackResult<()> {
         self.call_method("on_multirun_end", config, kwargs)
     }
-    fn on_job_start(&self, config: &ConfigDict, kwargs: &HashMap<String, String>) -> CallbackResult<()> {
+    fn on_job_start(
+        &self,
+        config: &ConfigDict,
+        kwargs: &HashMap<String, String>,
+    ) -> CallbackResult<()> {
         self.call_method("on_job_start", config, kwargs)
     }
-    fn on_job_end(&self, config: &ConfigDict, job_return: &JobReturn, kwargs: &HashMap<String, String>) -> CallbackResult<()> {
+    fn on_job_end(
+        &self,
+        config: &ConfigDict,
+        job_return: &JobReturn,
+        kwargs: &HashMap<String, String>,
+    ) -> CallbackResult<()> {
         self.call_job_end(config, job_return, kwargs)
     }
-    fn on_compose_config(&self, config: &ConfigDict, config_name: Option<&str>, overrides: &[String]) -> CallbackResult<()> {
+    fn on_compose_config(
+        &self,
+        config: &ConfigDict,
+        config_name: Option<&str>,
+        overrides: &[String],
+    ) -> CallbackResult<()> {
         self.call_compose_config(config, config_name, overrides)
     }
 }
@@ -190,7 +244,9 @@ pub struct PyCallbackManager {
 impl PyCallbackManager {
     #[new]
     fn new() -> Self {
-        Self { inner: CallbackManager::new() }
+        Self {
+            inner: CallbackManager::new(),
+        }
     }
 
     /// Add a Python callback
@@ -211,21 +267,24 @@ impl PyCallbackManager {
     /// Trigger on_run_start for all callbacks
     fn on_run_start(&self, config: Bound<'_, PyDict>) -> PyResult<()> {
         let rust_config = py_dict_to_config(&config)?;
-        self.inner.on_run_start(&rust_config, &HashMap::new())
+        self.inner
+            .on_run_start(&rust_config, &HashMap::new())
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))
     }
 
     /// Trigger on_run_end for all callbacks
     fn on_run_end(&self, config: Bound<'_, PyDict>) -> PyResult<()> {
         let rust_config = py_dict_to_config(&config)?;
-        self.inner.on_run_end(&rust_config, &HashMap::new())
+        self.inner
+            .on_run_end(&rust_config, &HashMap::new())
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))
     }
 
     /// Trigger on_job_start for all callbacks
     fn on_job_start(&self, config: Bound<'_, PyDict>) -> PyResult<()> {
         let rust_config = py_dict_to_config(&config)?;
-        self.inner.on_job_start(&rust_config, &HashMap::new())
+        self.inner
+            .on_job_start(&rust_config, &HashMap::new())
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))
     }
 
@@ -233,7 +292,8 @@ impl PyCallbackManager {
     fn on_job_end(&self, config: Bound<'_, PyDict>, job_return: &PyJobReturn) -> PyResult<()> {
         let rust_config = py_dict_to_config(&config)?;
         let rust_jr = JobReturn::from(job_return);
-        self.inner.on_job_end(&rust_config, &rust_jr, &HashMap::new())
+        self.inner
+            .on_job_end(&rust_config, &rust_jr, &HashMap::new())
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))
     }
 

@@ -8,16 +8,20 @@ mod dictconfig;
 mod listconfig;
 mod omegaconf;
 
-pub use context::{PyOpenDict, PyReadWrite, PyFlagOverride};
+pub use context::{PyFlagOverride, PyOpenDict, PyReadWrite};
 pub use dictconfig::PyDictConfig;
 pub use listconfig::PyListConfig;
 pub use omegaconf::{PyConfigValue, PyOmegaConf};
 
-use pyo3::prelude::*;
 use pyo3::create_exception;
+use pyo3::prelude::*;
 
 // Create MissingMandatoryValue exception
-create_exception!(omegaconf, MissingMandatoryValue, pyo3::exceptions::PyException);
+create_exception!(
+    omegaconf,
+    MissingMandatoryValue,
+    pyo3::exceptions::PyException
+);
 
 /// Container base class for DictConfig and ListConfig
 /// This is used for type checking via isinstance(obj, Container)
@@ -53,7 +57,10 @@ pub fn register(m: &Bound<PyModule>) -> PyResult<()> {
     submod.add("MISSING", "???")?;
 
     // Add exceptions
-    submod.add("MissingMandatoryValue", m.py().get_type::<MissingMandatoryValue>())?;
+    submod.add(
+        "MissingMandatoryValue",
+        m.py().get_type::<MissingMandatoryValue>(),
+    )?;
 
     m.add_submodule(&submod)?;
 
@@ -72,7 +79,10 @@ pub fn register(m: &Bound<PyModule>) -> PyResult<()> {
     m.add("MISSING", "???")?;
 
     // Add exceptions at top level
-    m.add("MissingMandatoryValue", m.py().get_type::<MissingMandatoryValue>())?;
+    m.add(
+        "MissingMandatoryValue",
+        m.py().get_type::<MissingMandatoryValue>(),
+    )?;
 
     Ok(())
 }

@@ -4,16 +4,12 @@
 use pyo3::prelude::*;
 
 use lerna::{
-    escape_special_characters as rust_escape,
-    unescape_string as rust_unescape,
-    is_valid_key as rust_is_valid_key,
-    split_key as rust_split_key,
-    join_key as rust_join_key,
+    escape_special_characters as rust_escape, get_valid_filename as rust_get_valid_filename,
+    is_valid_key as rust_is_valid_key, join_key as rust_join_key,
     normalize_file_name as rust_normalize_file_name,
-    get_valid_filename as rust_get_valid_filename,
-    sanitize_path_component as rust_sanitize_path_component,
+    sanitize_path_component as rust_sanitize_path_component, split_key as rust_split_key,
+    unescape_string as rust_unescape,
 };
-
 
 /// Escape special characters in a string for use in configuration values
 #[pyfunction]
@@ -36,7 +32,10 @@ pub fn is_valid_key(key: &str) -> bool {
 /// Split a dotted key into parts
 #[pyfunction]
 pub fn split_key(key: &str) -> Vec<String> {
-    rust_split_key(key).into_iter().map(|s| s.to_string()).collect()
+    rust_split_key(key)
+        .into_iter()
+        .map(|s| s.to_string())
+        .collect()
 }
 
 /// Join key parts into a dotted key

@@ -1,8 +1,8 @@
 // Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved
 //! PyO3 bindings for glob pattern matching
 
-use pyo3::prelude::*;
 use lerna::Glob;
+use pyo3::prelude::*;
 
 /// A glob pattern for filtering names
 #[pyclass(name = "Glob")]
@@ -52,7 +52,10 @@ impl PyGlob {
     }
 
     fn __repr__(&self) -> String {
-        format!("Glob(include={:?}, exclude={:?})", self.inner.include, self.inner.exclude)
+        format!(
+            "Glob(include={:?}, exclude={:?})",
+            self.inner.include, self.inner.exclude
+        )
     }
 }
 

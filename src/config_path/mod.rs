@@ -4,17 +4,12 @@
 use pyo3::prelude::*;
 
 use lerna::{
-    normalize_config_path as rust_normalize,
-    get_parent_path as rust_get_parent,
-    get_basename as rust_get_basename,
-    join_config_paths as rust_join,
-    is_absolute_config_path as rust_is_absolute,
+    get_basename as rust_get_basename, get_parent_path as rust_get_parent,
+    get_scheme as rust_get_scheme, is_absolute_config_path as rust_is_absolute,
+    is_valid_config_name as rust_is_valid_config, is_valid_group_name as rust_is_valid_group,
+    join_config_paths as rust_join, normalize_config_path as rust_normalize,
     strip_scheme as rust_strip_scheme,
-    get_scheme as rust_get_scheme,
-    is_valid_group_name as rust_is_valid_group,
-    is_valid_config_name as rust_is_valid_config,
 };
-
 
 /// Normalize a configuration path by removing redundant separators and dots
 #[pyfunction]

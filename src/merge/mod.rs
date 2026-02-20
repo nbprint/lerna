@@ -31,10 +31,8 @@ fn py_to_config_value(obj: &Bound<'_, PyAny>) -> PyResult<ConfigValue> {
         return Ok(ConfigValue::String(s));
     }
     if let Ok(list) = obj.cast::<PyList>() {
-        let items: PyResult<Vec<ConfigValue>> = list
-            .iter()
-            .map(|item| py_to_config_value(&item))
-            .collect();
+        let items: PyResult<Vec<ConfigValue>> =
+            list.iter().map(|item| py_to_config_value(&item)).collect();
         return Ok(ConfigValue::List(items?));
     }
     if let Ok(dict) = obj.cast::<PyDict>() {
@@ -77,7 +75,11 @@ fn config_value_to_py(py: Python<'_>, value: &ConfigValue) -> PyResult<Py<PyAny>
 
 /// Merge two config dictionaries
 #[pyfunction]
-fn merge_config_dicts(py: Python<'_>, base: &Bound<'_, PyDict>, other: &Bound<'_, PyDict>) -> PyResult<Py<PyAny>> {
+fn merge_config_dicts(
+    py: Python<'_>,
+    base: &Bound<'_, PyDict>,
+    other: &Bound<'_, PyDict>,
+) -> PyResult<Py<PyAny>> {
     let base_val = py_to_config_value(&base.as_any())?;
     let other_val = py_to_config_value(&other.as_any())?;
 
@@ -106,7 +108,9 @@ fn merge_multiple_configs(py: Python<'_>, configs: &Bound<'_, PyList>) -> PyResu
         if let ConfigValue::Dict(d) = val {
             cfg_list.push(d);
         } else {
-            return Err(pyo3::exceptions::PyValueError::new_err("All items must be dicts"));
+            return Err(pyo3::exceptions::PyValueError::new_err(
+                "All items must be dicts",
+            ));
         }
     }
 
@@ -116,7 +120,11 @@ fn merge_multiple_configs(py: Python<'_>, configs: &Bound<'_, PyList>) -> PyResu
 
 /// Apply deletions to a config
 #[pyfunction]
-fn apply_config_deletions(py: Python<'_>, config: &Bound<'_, PyDict>, deletions: Vec<String>) -> PyResult<Py<PyAny>> {
+fn apply_config_deletions(
+    py: Python<'_>,
+    config: &Bound<'_, PyDict>,
+    deletions: Vec<String>,
+) -> PyResult<Py<PyAny>> {
     let val = py_to_config_value(&config.as_any())?;
     let mut dict = match val {
         ConfigValue::Dict(d) => d,
@@ -129,7 +137,12 @@ fn apply_config_deletions(py: Python<'_>, config: &Bound<'_, PyDict>, deletions:
 
 /// Apply an override to a config at a specific path
 #[pyfunction]
-fn apply_config_override(py: Python<'_>, config: &Bound<'_, PyDict>, path: &str, value: &Bound<'_, PyAny>) -> PyResult<Py<PyAny>> {
+fn apply_config_override(
+    py: Python<'_>,
+    config: &Bound<'_, PyDict>,
+    path: &str,
+    value: &Bound<'_, PyAny>,
+) -> PyResult<Py<PyAny>> {
     let cfg_val = py_to_config_value(&config.as_any())?;
     let mut dict = match cfg_val {
         ConfigValue::Dict(d) => d,
@@ -170,7 +183,10 @@ fn get_all_keys(config: &Bound<'_, PyDict>) -> PyResult<Vec<String>> {
 
 /// Find keys that differ between two configs
 #[pyfunction]
-fn get_diff_keys(config1: &Bound<'_, PyDict>, config2: &Bound<'_, PyDict>) -> PyResult<Vec<String>> {
+fn get_diff_keys(
+    config1: &Bound<'_, PyDict>,
+    config2: &Bound<'_, PyDict>,
+) -> PyResult<Vec<String>> {
     let val1 = py_to_config_value(&config1.as_any())?;
     let val2 = py_to_config_value(&config2.as_any())?;
 

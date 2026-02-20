@@ -63,7 +63,8 @@ pub struct PySweeperWrapper {
 impl PySweeperWrapper {
     pub fn new(py_sweeper: Py<PyAny>) -> Self {
         let name = Python::attach(|py| {
-            py_sweeper.bind(py)
+            py_sweeper
+                .bind(py)
                 .getattr("__class__")
                 .and_then(|c| c.getattr("__name__"))
                 .and_then(|n| n.extract::<String>())
@@ -98,39 +99,51 @@ impl Sweeper for PySweeperWrapper {
             let sweeper = self.py_sweeper.bind(py);
 
             // Convert arguments to Python list
-            let py_args = PyList::new(py, arguments)
-                .map_err(|e| SweeperError::new(e.to_string()))?;
+            let py_args =
+                PyList::new(py, arguments).map_err(|e| SweeperError::new(e.to_string()))?;
 
             // Call sweep(arguments)
-            let result = sweeper.call_method1("sweep", (py_args,))
+            let result = sweeper
+                .call_method1("sweep", (py_args,))
                 .map_err(|e| SweeperError::new(e.to_string()))?;
 
             // Convert results to Vec<JobReturn>
-            let results_list = result.cast::<PyList>()
+            let results_list = result
+                .cast::<PyList>()
                 .map_err(|e| SweeperError::new(format!("sweep must return list: {}", e)))?;
 
             let mut returns = Vec::new();
             for item in results_list.iter() {
                 // Extract JobReturn fields from Python object
-                let return_value = item.getattr("return_value").ok()
-                    .and_then(|v| if v.is_none() { None } else { Some(ConfigDict::new()) });
-                let working_dir: String = item.getattr("working_dir")
+                let return_value = item.getattr("return_value").ok().and_then(|v| {
+                    if v.is_none() {
+                        None
+                    } else {
+                        Some(ConfigDict::new())
+                    }
+                });
+                let working_dir: String = item
+                    .getattr("working_dir")
                     .and_then(|v| v.extract())
                     .unwrap_or_default();
-                let output_dir: String = item.getattr("hydra")
+                let output_dir: String = item
+                    .getattr("hydra")
                     .and_then(|h| h.getattr("run"))
                     .and_then(|r| r.getattr("dir"))
                     .and_then(|d| d.extract())
                     .unwrap_or_default();
-                let job_name: String = item.getattr("hydra")
+                let job_name: String = item
+                    .getattr("hydra")
                     .and_then(|h| h.getattr("job"))
                     .and_then(|j| j.getattr("name"))
                     .and_then(|n| n.extract())
                     .unwrap_or_default();
-                let task_name: String = item.getattr("task_name")
+                let task_name: String = item
+                    .getattr("task_name")
                     .and_then(|v| v.extract())
                     .unwrap_or_default();
-                let status_code: i32 = item.getattr("status")
+                let status_code: i32 = item
+                    .getattr("status")
                     .and_then(|s| s.getattr("value"))
                     .and_then(|v| v.extract())
                     .unwrap_or(0);
@@ -187,19 +200,23 @@ impl PyBasicSweeper {
 
         // Create a basic launcher for the sweeper
         let mut launcher = BasicLauncher::new();
-        launcher.setup(&config_dict, task_name)
+        launcher
+            .setup(&config_dict, task_name)
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.message))?;
 
         let launcher = Arc::new(launcher);
         self.launcher = Some(launcher.clone());
 
-        self.inner.setup(&config_dict, launcher)
+        self.inner
+            .setup(&config_dict, launcher)
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.message))
     }
 
     /// Execute sweep with arguments
     fn sweep(&self, arguments: Vec<String>) -> PyResult<Vec<PyJobReturn>> {
-        let results = self.inner.sweep(&arguments)
+        let results = self
+            .inner
+            .sweep(&arguments)
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.message))?;
 
         Ok(results.iter().map(|r| PyJobReturn::from(r)).collect())
@@ -229,7 +246,8 @@ impl PySweeperManager {
 
     /// Add a Python sweeper
     fn set_python_sweeper(&mut self, sweeper: Py<PyAny>) {
-        self.inner.set_sweeper(Arc::new(PySweeperWrapper::new(sweeper)));
+        self.inner
+            .set_sweeper(Arc::new(PySweeperWrapper::new(sweeper)));
     }
 
     /// Check if a sweeper is configured
@@ -244,7 +262,9 @@ impl PySweeperManager {
 
     /// Execute sweep
     fn sweep(&self, arguments: Vec<String>) -> PyResult<Vec<PyJobReturn>> {
-        let results = self.inner.sweep(&arguments)
+        let results = self
+            .inner
+            .sweep(&arguments)
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.message))?;
 
         Ok(results.iter().map(|r| PyJobReturn::from(r)).collect())

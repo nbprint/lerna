@@ -8,7 +8,7 @@ use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 
 use lerna::omegaconf::{
-    AnyNode, DictConfig, ListConfig, Node, NodeContent, NodeValue, NodeType, OmegaConf, ConfigValue,
+    AnyNode, ConfigValue, DictConfig, ListConfig, Node, NodeContent, NodeType, NodeValue, OmegaConf,
 };
 
 use crate::omegaconf::listconfig::PyListConfig;
@@ -60,50 +60,57 @@ impl PyDictConfig {
     fn __setitem__(&mut self, key: &str, value: &Bound<PyAny>) -> PyResult<()> {
         let config_value = py_to_config_value(value)?;
         let node = config_value_to_node(config_value);
-        let mut cfg = self.inner.write().map_err(|e| {
-            PyRuntimeError::new_err(format!("Failed to lock DictConfig: {}", e))
-        })?;
-        cfg.set(key, node).map_err(|e| PyRuntimeError::new_err(format!("{}", e)))
+        let mut cfg = self
+            .inner
+            .write()
+            .map_err(|e| PyRuntimeError::new_err(format!("Failed to lock DictConfig: {}", e)))?;
+        cfg.set(key, node)
+            .map_err(|e| PyRuntimeError::new_err(format!("{}", e)))
     }
 
     /// Delete a value by key
     fn __delitem__(&mut self, key: &str) -> PyResult<()> {
-        let mut cfg = self.inner.write().map_err(|e| {
-            PyRuntimeError::new_err(format!("Failed to lock DictConfig: {}", e))
-        })?;
+        let mut cfg = self
+            .inner
+            .write()
+            .map_err(|e| PyRuntimeError::new_err(format!("Failed to lock DictConfig: {}", e)))?;
         let _ = cfg.remove(key);
         Ok(())
     }
 
     /// Check if a key exists
     fn __contains__(&self, key: &str) -> PyResult<bool> {
-        let cfg = self.inner.read().map_err(|e| {
-            PyRuntimeError::new_err(format!("Failed to lock DictConfig: {}", e))
-        })?;
+        let cfg = self
+            .inner
+            .read()
+            .map_err(|e| PyRuntimeError::new_err(format!("Failed to lock DictConfig: {}", e)))?;
         Ok(cfg.contains_key(key))
     }
 
     /// Get the number of keys
     fn __len__(&self) -> PyResult<usize> {
-        let cfg = self.inner.read().map_err(|e| {
-            PyRuntimeError::new_err(format!("Failed to lock DictConfig: {}", e))
-        })?;
+        let cfg = self
+            .inner
+            .read()
+            .map_err(|e| PyRuntimeError::new_err(format!("Failed to lock DictConfig: {}", e)))?;
         Ok(cfg.len_internal())
     }
 
     /// Get all keys
     fn keys(&self) -> PyResult<Vec<String>> {
-        let cfg = self.inner.read().map_err(|e| {
-            PyRuntimeError::new_err(format!("Failed to lock DictConfig: {}", e))
-        })?;
+        let cfg = self
+            .inner
+            .read()
+            .map_err(|e| PyRuntimeError::new_err(format!("Failed to lock DictConfig: {}", e)))?;
         Ok(cfg.keys_iter().cloned().collect())
     }
 
     /// Get all values
     fn values(&self, py: Python) -> PyResult<Vec<Py<PyAny>>> {
-        let cfg = self.inner.read().map_err(|e| {
-            PyRuntimeError::new_err(format!("Failed to lock DictConfig: {}", e))
-        })?;
+        let cfg = self
+            .inner
+            .read()
+            .map_err(|e| PyRuntimeError::new_err(format!("Failed to lock DictConfig: {}", e)))?;
         let mut result = Vec::new();
         for key in cfg.keys_iter() {
             if let Some(node) = cfg.get(key) {
@@ -115,9 +122,10 @@ impl PyDictConfig {
 
     /// Get all items as (key, value) pairs
     fn items(&self, py: Python) -> PyResult<Vec<(String, Py<PyAny>)>> {
-        let cfg = self.inner.read().map_err(|e| {
-            PyRuntimeError::new_err(format!("Failed to lock DictConfig: {}", e))
-        })?;
+        let cfg = self
+            .inner
+            .read()
+            .map_err(|e| PyRuntimeError::new_err(format!("Failed to lock DictConfig: {}", e)))?;
         let mut result = Vec::new();
         for key in cfg.keys_iter() {
             if let Some(node) = cfg.get(key) {
@@ -131,9 +139,10 @@ impl PyDictConfig {
     /// Get a value with a default
     #[pyo3(signature = (key, default=None))]
     fn get(&self, py: Python, key: &str, default: Option<&Bound<PyAny>>) -> PyResult<Py<PyAny>> {
-        let cfg = self.inner.read().map_err(|e| {
-            PyRuntimeError::new_err(format!("Failed to lock DictConfig: {}", e))
-        })?;
+        let cfg = self
+            .inner
+            .read()
+            .map_err(|e| PyRuntimeError::new_err(format!("Failed to lock DictConfig: {}", e)))?;
         match cfg.get(key) {
             Some(node) => node_arc_to_py(node, py),
             None => match default {
@@ -145,43 +154,48 @@ impl PyDictConfig {
 
     /// String representation
     fn __repr__(&self) -> PyResult<String> {
-        let cfg = self.inner.read().map_err(|e| {
-            PyRuntimeError::new_err(format!("Failed to lock DictConfig: {}", e))
-        })?;
+        let cfg = self
+            .inner
+            .read()
+            .map_err(|e| PyRuntimeError::new_err(format!("Failed to lock DictConfig: {}", e)))?;
         let keys: Vec<String> = cfg.keys_iter().cloned().collect();
         Ok(format!("DictConfig({{{}}})", keys.join(", ")))
     }
 
     /// Get the value of a flag (struct, readonly)
     fn _get_flag(&self, flag: &str) -> PyResult<Option<bool>> {
-        let cfg = self.inner.read().map_err(|e| {
-            PyRuntimeError::new_err(format!("Failed to lock DictConfig: {}", e))
-        })?;
+        let cfg = self
+            .inner
+            .read()
+            .map_err(|e| PyRuntimeError::new_err(format!("Failed to lock DictConfig: {}", e)))?;
         Ok(cfg.get_flag(flag))
     }
 
     /// Set the value of a flag (struct, readonly)
     fn _set_flag(&mut self, flag: &str, value: Option<bool>) -> PyResult<()> {
-        let mut cfg = self.inner.write().map_err(|e| {
-            PyRuntimeError::new_err(format!("Failed to lock DictConfig: {}", e))
-        })?;
+        let mut cfg = self
+            .inner
+            .write()
+            .map_err(|e| PyRuntimeError::new_err(format!("Failed to lock DictConfig: {}", e)))?;
         cfg.set_flag(flag, value);
         Ok(())
     }
 
     /// Check if this is a struct (frozen schema)
     fn _is_struct(&self) -> PyResult<bool> {
-        let cfg = self.inner.read().map_err(|e| {
-            PyRuntimeError::new_err(format!("Failed to lock DictConfig: {}", e))
-        })?;
+        let cfg = self
+            .inner
+            .read()
+            .map_err(|e| PyRuntimeError::new_err(format!("Failed to lock DictConfig: {}", e)))?;
         Ok(cfg.is_struct())
     }
 
     /// Check if this is readonly
     fn _is_readonly(&self) -> PyResult<bool> {
-        let cfg = self.inner.read().map_err(|e| {
-            PyRuntimeError::new_err(format!("Failed to lock DictConfig: {}", e))
-        })?;
+        let cfg = self
+            .inner
+            .read()
+            .map_err(|e| PyRuntimeError::new_err(format!("Failed to lock DictConfig: {}", e)))?;
         Ok(cfg.is_readonly())
     }
 }
@@ -240,9 +254,9 @@ pub fn py_to_config_value(obj: &Bound<PyAny>) -> PyResult<ConfigValue> {
 /// Convert an Arc<RwLock<dyn Node>> to a Python object
 /// This handles both value nodes and container nodes (DictConfig, ListConfig)
 pub fn node_arc_to_py(node: Arc<RwLock<dyn Node>>, py: Python) -> PyResult<Py<PyAny>> {
-    let guard = node.read().map_err(|e| {
-        PyRuntimeError::new_err(format!("Failed to lock node: {}", e))
-    })?;
+    let guard = node
+        .read()
+        .map_err(|e| PyRuntimeError::new_err(format!("Failed to lock node: {}", e)))?;
 
     // Check the node type first
     match guard.node_type() {
@@ -280,9 +294,13 @@ pub fn node_arc_to_py(node: Arc<RwLock<dyn Node>>, py: Python) -> PyResult<Py<Py
                 NodeContent::Missing => Ok("???".into_pyobject(py)?.into_any().unbind()),
                 NodeContent::Interpolation(s) => Ok(s.into_pyobject(py)?.into_any().unbind()),
                 NodeContent::Value(v) => match v {
-                    NodeValue::Bool(b) => Ok((*b).into_pyobject(py)?.to_owned().into_any().unbind()),
+                    NodeValue::Bool(b) => {
+                        Ok((*b).into_pyobject(py)?.to_owned().into_any().unbind())
+                    }
                     NodeValue::Int(i) => Ok((*i).into_pyobject(py)?.to_owned().into_any().unbind()),
-                    NodeValue::Float(f) => Ok((*f).into_pyobject(py)?.to_owned().into_any().unbind()),
+                    NodeValue::Float(f) => {
+                        Ok((*f).into_pyobject(py)?.to_owned().into_any().unbind())
+                    }
                     NodeValue::String(s) => Ok(s.into_pyobject(py)?.into_any().unbind()),
                     NodeValue::Bytes(b) => Ok(b.clone().into_pyobject(py)?.into_any().unbind()),
                 },
