@@ -239,7 +239,13 @@ class TestRunAndReport:
     )
     def test_failure(self, demo_func: Any, expected_traceback_regex: str) -> None:
         mock_stderr = io.StringIO()
-        with raises(SystemExit, match="1"), patch("sys.stderr", new=mock_stderr):
+        # Patch is_under_debugger to return False so the test works even when
+        # running with coverage (which sets sys.gettrace)
+        with (
+            raises(SystemExit, match="1"),
+            patch("sys.stderr", new=mock_stderr),
+            patch("lerna._internal.utils.is_under_debugger", return_value=False),
+        ):
             run_and_report(demo_func)
         mock_stderr.seek(0)
         stderr_output = mock_stderr.read()
@@ -263,7 +269,13 @@ class TestRunAndReport:
             """
         )
         mock_stderr = io.StringIO()
-        with raises(SystemExit, match="1"), patch("sys.stderr", new=mock_stderr):
+        # Patch is_under_debugger to return False so the test works even when
+        # running with coverage (which sets sys.gettrace)
+        with (
+            raises(SystemExit, match="1"),
+            patch("sys.stderr", new=mock_stderr),
+            patch("lerna._internal.utils.is_under_debugger", return_value=False),
+        ):
             # Patch `inspect.getmodule` so that it will return None. This simulates a
             # situation where a python module cannot be identified from a traceback
             # stack frame. This can occur when python extension modules or
@@ -291,9 +303,12 @@ class TestRunAndReport:
             """
         )
         mock_stderr = io.StringIO()
+        # Patch is_under_debugger to return False so the test works even when
+        # running with coverage (which sets sys.gettrace)
         with (
             raises(AssertionError, match="nested_err"),
             patch("sys.stderr", new=mock_stderr),
+            patch("lerna._internal.utils.is_under_debugger", return_value=False),
         ):
             # patch `traceback.print_exception` so that an exception will occur
             # in the simplified traceback logic:
