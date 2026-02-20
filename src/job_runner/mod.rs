@@ -183,9 +183,10 @@ impl PyJobContext {
 #[pyfunction]
 #[pyo3(signature = (job_dir_value, job_subdir_value=None))]
 fn compute_output_dir(job_dir_value: &str, job_subdir_value: Option<&str>) -> String {
+    // Normalize path separators to forward slashes for cross-platform consistency
     rust_compute_output_dir(job_dir_value, job_subdir_value)
         .to_string_lossy()
-        .to_string()
+        .replace('\\', "/")
 }
 
 /// Create output directories
@@ -193,7 +194,7 @@ fn compute_output_dir(job_dir_value: &str, job_subdir_value: Option<&str>) -> St
 #[pyo3(signature = (output_dir, subdir=None))]
 fn create_output_dirs(output_dir: &str, subdir: Option<&str>) -> PyResult<String> {
     rust_create_output_dirs(&PathBuf::from(output_dir), subdir)
-        .map(|p| p.to_string_lossy().to_string())
+        .map(|p| p.to_string_lossy().replace('\\', "/"))
         .map_err(|e| PyIOError::new_err(e.to_string()))
 }
 
@@ -202,7 +203,7 @@ fn create_output_dirs(output_dir: &str, subdir: Option<&str>) -> PyResult<String
 fn save_config(py: Python, config: &Bound<'_, PyAny>, filename: &str, output_dir: &str) -> PyResult<String> {
     let config_dict = py_to_config_dict(py, config)?;
     rust_save_config_file(&config_dict, filename, &PathBuf::from(output_dir))
-        .map(|p| p.to_string_lossy().to_string())
+        .map(|p| p.to_string_lossy().replace('\\', "/"))
         .map_err(|e| PyIOError::new_err(e.to_string()))
 }
 

@@ -75,7 +75,7 @@ def test_job_name_with_config_override(tmpdir: Path) -> None:
 def test_job_override_dirname(tmpdir: Path) -> None:
     cmd = [
         "examples/configure_hydra/job_override_dirname/my_app.py",
-        "hydra.sweep.dir=" + str(tmpdir),
+        f"hydra.sweep.dir=\"{str(tmpdir).replace(chr(92), chr(47))}\"",
         "hydra.job.chdir=True",
         "learning_rate=0.1,0.01",
         "batch_size=32",

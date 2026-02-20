@@ -43,7 +43,8 @@ impl PyJobConfig {
 
     #[getter]
     fn output_dir(&self) -> String {
-        self.inner.output_dir.to_string_lossy().to_string()
+        // Normalize path separators to forward slashes for cross-platform consistency
+        self.inner.output_dir.to_string_lossy().replace('\\', "/")
     }
 
     /// Get the override dirname for directory naming
@@ -92,9 +93,9 @@ fn compute_job_output_dir(
     overrides: Vec<String>,
     use_override_dirname: bool,
 ) -> String {
-    compute_output_dir(base_dir, job_idx, &overrides, use_override_dirname)
-        .to_string_lossy()
-        .to_string()
+    let path = compute_output_dir(base_dir, job_idx, &overrides, use_override_dirname);
+    // Normalize path separators to forward slashes for cross-platform consistency
+    path.to_string_lossy().replace('\\', "/")
 }
 
 /// Generate job configurations for a sweep

@@ -135,7 +135,10 @@ class SweepTaskFunction:
             Path(self.temp_dir).mkdir(parents=True, exist_ok=True)
         else:
             self.temp_dir = tempfile.mkdtemp()
-        overrides.append(f"hydra.sweep.dir={self.temp_dir}")
+        # Normalize path separators to forward slashes for cross-platform consistency
+        # and quote the path to handle special characters
+        normalized_temp_dir = self.temp_dir.replace("\\", "/")
+        overrides.append(f'hydra.sweep.dir="{normalized_temp_dir}"')
 
         try:
             validate_config_path(self.config_path)
