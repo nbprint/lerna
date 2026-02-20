@@ -1,0 +1,2 @@
+recursive-include lerna *.py
+recursive-include lerna *.yaml
