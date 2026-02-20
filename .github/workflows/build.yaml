@@ -29,7 +29,7 @@ jobs:
 
     strategy:
       matrix:
-        os: [ubuntu-latest]
+        os: [ubuntu-latest, macos-latest, windows-latest]
         python-version: ["3.11"]
 
     steps:
@@ -39,6 +39,8 @@ jobs:
       with:
         version: ${{ matrix.python-version }}
 
+    - uses: actions-ext/rust/setup@main
+
     - name: Install dependencies
       run: make develop
 
@@ -47,39 +49,55 @@ jobs:
 
     - name: Checks
       run: make checks
+      if: matrix.os == 'ubuntu-latest'
 
     - name: Build
       run: make build
 
     - name: Test
       run: make coverage
-      if: ${{ matrix.python-version == '3.11' }}
 
     - name: Upload test results (Python)
       uses: actions/upload-artifact@v6
       with:
         name: test-results-${{ matrix.os }}-${{ matrix.python-version }}
-        path: junit.xml
-      if: ${{ matrix.python-version == '3.11' }}
+        path: '**/junit.xml'
+      if: ${{ always() }}
 
     - name: Publish Unit Test Results
       uses: EnricoMi/publish-unit-test-result-action@v2
       with:
         files: '**/junit.xml'
-      if: ${{ matrix.python-version == '3.11' }}
+      if: matrix.os == 'ubuntu-latest'
 
     - name: Upload coverage
       uses: codecov/codecov-action@v5
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
-      if: ${{ matrix.python-version == '3.11' }}
+
+    - name: Set up QEMU
+      uses: docker/setup-qemu-action@v3
+      with:
+        platforms: all
+      if: runner.os == 'Linux' && runner.arch == 'X64'
 
     - name: Make dist
-      run: make dist
-      if: ${{ matrix.python-version == '3.11' }}
+      run: |
+        make dist-rs
+        make dist-py-sdist
+        make dist-py-wheel
+        make dist-check
+      if: matrix.os == 'ubuntu-latest'
+
+    - name: Make dist
+      run: |
+        make dist-py-wheel
+        make dist-check
+      env:
+        CIBW_ENVIRONMENT_MACOS: MACOSX_DEPLOYMENT_TARGET=11.0
+      if: matrix.os != 'ubuntu-latest'
 
     - uses: actions/upload-artifact@v6
       with:
         name: dist-${{matrix.os}}
         path: dist
-      if: ${{ matrix.python-version == '3.11' }}

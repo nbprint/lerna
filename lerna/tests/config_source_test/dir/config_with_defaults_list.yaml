@@ -1,0 +1,4 @@
+defaults:
+  - dataset: imagenet
+
+key: value

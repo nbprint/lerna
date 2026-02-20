@@ -1,0 +1,37 @@
+# Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved
+from pytest import mark, param
+
+from lerna import initialize
+from lerna._internal.core_plugins.importlib_resources_config_source import (
+    ImportlibResourcesConfigSource,
+)
+from lerna.core.global_hydra import GlobalHydra
+from lerna.test_utils.config_source_common_tests import ConfigSourceTestSuite
+from lerna.test_utils.test_utils import chdir_plugin_root
+
+chdir_plugin_root()
+
+
+@mark.parametrize(
+    "type_, path",
+    [
+        param(
+            ImportlibResourcesConfigSource,
+            "pkg://some_namespace.namespace_test.dir",
+            id="pkg_in_namespace",
+        ),
+    ],
+)
+class TestCoreConfigSources(ConfigSourceTestSuite):
+    pass
+
+
+def test_config_in_dir() -> None:
+    with initialize(version_base=None, config_path="../some_namespace/namespace_test/dir"):
+        config_loader = GlobalHydra.instance().config_loader()
+        assert "cifar10" in config_loader.get_group_options("dataset")
+        assert "imagenet" in config_loader.get_group_options("dataset")
+        assert "level1" in config_loader.list_groups("")
+        assert "level2" in config_loader.list_groups("level1")
+        assert "nested1" in config_loader.get_group_options("level1/level2")
+        assert "nested2" in config_loader.get_group_options("level1/level2")

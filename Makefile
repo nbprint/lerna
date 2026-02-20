@@ -1,46 +1,74 @@
 #########
 # BUILD #
 #########
-.PHONY: develop build install
-
-develop:  ## install dependencies and build library
+.PHONY: develop-py develop-rs develop
+develop-py:
 	uv pip install -e .[develop]
 
-requirements:  ## install prerequisite python build requirements
+develop-rs:
+	make -C rust develop
+
+develop: develop-rs develop-py  ## setup project for development
+
+.PHONY: requirements-py requirements-rs requirements
+requirements-py:  ## install prerequisite python build requirements
 	python -m pip install --upgrade pip toml
 	python -m pip install `python -c 'import toml; c = toml.load("pyproject.toml"); print("\n".join(c["build-system"]["requires"]))'`
 	python -m pip install `python -c 'import toml; c = toml.load("pyproject.toml"); print(" ".join(c["project"]["optional-dependencies"]["develop"]))'`
 
-build:  ## build the python library
-	python -m build -n
+requirements-rs:  ## install prerequisite rust build requirements
+	make -C rust requirements
 
-install:  ## install library
+requirements: requirements-rs requirements-py  ## setup project for development
+
+.PHONY: build-py build-rs build
+build-py:
+	python -m build -w -n
+
+build-rs:
+	make -C rust build
+
+build: build-rs build-py  ## build the project
+
+.PHONY: install
+install:  ## install python library
 	uv pip install .
 
 #########
 # LINTS #
 #########
-.PHONY: lint-py lint-docs fix-py fix-docs lint lints fix format
-
-lint-py:  ## lint python with ruff
+.PHONY: lint-py lint-rs lint-docs lint lints
+lint-py:  ## run python linter with ruff
 	python -m ruff check lerna
 	python -m ruff format --check lerna
+
+lint-rs:  ## run rust linter
+	make -C rust lint
 
 lint-docs:  ## lint docs with mdformat and codespell
 	python -m mdformat --check README.md 
 	python -m codespell_lib README.md 
 
-fix-py:  ## autoformat python code with ruff
+lint: lint-rs lint-py lint-docs  ## run project linters
+
+# alias
+lints: lint
+
+.PHONY: fix-py fix-rs fix-docs fix format
+fix-py:  ## fix python formatting with ruff
 	python -m ruff check --fix lerna
 	python -m ruff format lerna
+
+fix-rs:  ## fix rust formatting
+	make -C rust fix
 
 fix-docs:  ## autoformat docs with mdformat and codespell
 	python -m mdformat README.md 
 	python -m codespell_lib --write README.md 
 
-lint: lint-py lint-docs  ## run all linters
-lints: lint
-fix: fix-py fix-docs  ## run all autoformatters
+fix: fix-rs fix-py fix-docs  ## run project autoformatters
+
+# alias
 format: fix
 
 ################
@@ -53,21 +81,37 @@ check-manifest:  ## check python sdist manifest with check-manifest
 
 checks: check-manifest
 
-# Alias
+# alias
 check: checks
 
 #########
 # TESTS #
 #########
-.PHONY: test coverage tests
-
-test:  ## run python tests
+.PHONY: test-py tests-py coverage-py
+test-py:  ## run python tests
 	python -m pytest -v lerna/tests
 
-coverage:  ## run tests and collect test coverage
+# alias
+tests-py: test-py
+
+coverage-py:  ## run python tests and collect test coverage
 	python -m pytest -v lerna/tests --cov=lerna --cov-report term-missing --cov-report xml
 
-# Alias
+.PHONY: test-rs tests-rs coverage-rs
+test-rs:  ## run rust tests
+	make -C rust test
+
+# alias
+tests-rs: test-rs
+
+coverage-rs:  ## run rust tests and collect test coverage
+	make -C rust coverage
+
+.PHONY: test coverage tests
+test: test-py test-rs  ## run all tests
+coverage: coverage-py coverage-rs  ## run all tests and collect test coverage
+
+# alias
 tests: test
 
 ###########
@@ -90,15 +134,21 @@ major:  ## bump a major version
 ########
 # DIST #
 ########
-.PHONY: dist dist-build dist-sdist dist-local-wheel publish
+.PHONY: dist-py-wheel dist-py-sdist dist-rs dist-check dist publish
 
-dist-build:  # build python dists
-	python -m build -w -s
+dist-py-wheel:  ## build python wheel
+	python -m cibuildwheel --output-dir dist
+
+dist-py-sdist:  ## build python sdist
+	python -m build --sdist -o dist
+
+dist-rs:  ## build rust dists
+	make -C rust dist
 
 dist-check:  ## run python dist checker with twine
 	python -m twine check dist/*
 
-dist: clean dist-build dist-check  ## build all dists
+dist: clean build dist-rs dist-py-wheel dist-py-sdist dist-check  ## build all dists
 
 publish: dist  ## publish python assets
 

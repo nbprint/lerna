@@ -1,23 +1,20 @@
 [build-system]
-requires = [
-    "hatchling",
-]
+requires = ["hatchling", "hatch-rs>=0.1.4"]
 build-backend="hatchling.build"
 
 [project]
 name = "lerna"
-authors = [
-    {name = "the lerna authors", email = "t.paine154@gmail.com"},
-]
-description = "lerna is a collection of plugins and extensions for hydra"
+authors = [{name = "the lerna authors", email = "dev@1kbgz.com"}]
+description = "Lerna is a framework for elegantly configuring complex applications"
 readme = "README.md"
 license = { text = "Apache-2.0" }
-version = "1.1.0"
+version = "0.1.0"
 requires-python = ">=3.10"
 keywords = []
 
 classifiers = [
     "Development Status :: 3 - Alpha",
+    "Programming Language :: Rust",
     "Programming Language :: Python",
     "Programming Language :: Python :: Implementation :: CPython",
     "Programming Language :: Python :: Implementation :: PyPy",
@@ -30,8 +27,8 @@ classifiers = [
 ]
 
 dependencies = [
-    "hydra-core",
-    "importlib-metadata;python_version<'3.10'",
+    "omegaconf>=2.2.3,<2.4",
+    "packaging",
 ]
 
 [project.optional-dependencies]
@@ -39,7 +36,9 @@ develop = [
     "build",
     "bump-my-version",
     "check-manifest",
+    "cibuildwheel",
     "codespell>=2.4,<2.5",
+    "hatch-rs",
     "hatchling",
     "mdformat>=0.7.22,<1.1",
     "mdformat-tables>=1",
@@ -47,19 +46,17 @@ develop = [
     "pytest-cov",
     "ruff>=0.9,<0.15",
     "twine",
-    "ty",
-    "uv",
     "wheel",
 ]
 
 [project.scripts]
 
 [project.urls]
-Repository = "https://github.com/nbprint/lerna"
-Homepage = "https://github.com/nbprint/lerna"
+Repository = "https://github.com/1kbgz/lerna"
+Homepage = "https://github.com/1kbgz/lerna"
 
 [tool.bumpversion]
-current_version = "1.1.0"
+current_version = "0.1.0"
 commit = true
 tag = true
 commit_args = "-s"
@@ -74,14 +71,55 @@ filename = "pyproject.toml"
 search = 'version = "{current_version}"'
 replace = 'version = "{new_version}"'
 
+[[tool.bumpversion.files]]
+filename = "Cargo.toml"
+search = 'version = "{current_version}"'
+replace = 'version = "{new_version}"'
+
+[[tool.bumpversion.files]]
+filename = "rust/Cargo.toml"
+search = 'version = "{current_version}"'
+replace = 'version = "{new_version}"'
+
 [tool.check-manifest]
 ignore = [
     ".copier-answers.yaml",
+    "Cargo.toml",
+    "Cargo.lock",
     "Makefile",
     "docs/**/*",
+    "examples/**/*",
+    "rust/**/*",
+    "src/**/*",
 ]
 
+[tool.cibuildwheel]
+build = "cp310-*"
+# Run a simple import test to verify the wheel is installable
+# Full tests are run by `make tests` separately
+test-command = "python -c 'import lerna; print(lerna.__version__)'"
+test-requires = []
+
+[tool.cibuildwheel.linux]
+before-all = """
+curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain=stable --profile=minimal -y
+rustup target add aarch64-unknown-linux-gnu
+rustup target add x86_64-unknown-linux-gnu
+rustup show
+"""
+environment = {PATH="$HOME/.cargo/bin:$PATH", CARGO_TERM_COLOR="always"}
+skip = "*i686* *musllinux*"
+
+[tool.cibuildwheel.macos]
+environment = {PATH="$HOME/.cargo/bin:$PATH", CARGO_TERM_COLOR="always", MACOS_DEPLOYMENT_TARGET=11.0}
+archs = "arm64"
+
+[tool.cibuildwheel.windows]
+environment = {PATH="$UserProfile\\.cargo\bin;$PATH", CARGO_TERM_COLOR="always"}
+skip = "*win32 *arm_64"
+
 [tool.coverage.run]
+branch = true
 omit = [
     "lerna/tests/integration/",
 ]
@@ -95,56 +133,67 @@ ignore_errors = true
 fail_under = 50
 
 [tool.hatch.build]
-artifacts = []
+artifacts = [
+    "project/*.dll",
+    "project/*.dylib",
+    "project/*.so",
+]
 
 [tool.hatch.build.sources]
 src = "/"
 
+[tool.hatch.build.hooks.hatch-rs]
+verbose = true
+module = "lerna"
+path = "."
+
 [tool.hatch.build.targets.sdist]
 packages = [
     "lerna",
-    "hydra_plugins",
+]
+include = [
+    "rust",
+    "src"
+]
+exclude = [
+    "examples",
+    "target",
 ]
 
 [tool.hatch.build.targets.wheel]
 packages = [
-    "lerna",
-    "hydra_plugins",
+    "lerna"
 ]
-
-[tool.hatch.build.targets.wheel.shared-data]
+exclude = [
+    "examples",
+    "rust",
+    "src",
+    "lerna/tests"
+]
 
 [tool.pytest.ini_options]
-addopts = [
-    "-vvv",
-    "--junitxml=junit.xml",
-]
+addopts = ["-vvv", "--junitxml=junit.xml", "-p", "lerna.extra.pytest_plugin"]
 testpaths = "lerna/tests"
+norecursedirs = ["standalone_apps"]
+filterwarnings = [
+    "error",
+    "ignore:.*pkg_resources is deprecated.*",
+    "ignore:.*Future Hydra versions will no longer change working directory.*:UserWarning",
+    "ignore:[\\s\\S]*validated against ConfigStore schema[\\s\\S]*:UserWarning",
+    "ignore:[\\s\\S]*behavior is deprecated in Hydra[\\s\\S]*:UserWarning",
+]
 
 [tool.ruff]
 line-length = 150
 
 [tool.ruff.lint]
-extend-select = [
-    "I",
-]
+extend-select = ["I"]
 
 [tool.ruff.lint.isort]
 combine-as-imports = true
 default-section = "third-party"
-known-first-party = [
-    "lerna",
-]
-section-order = [
-    "future",
-    "standard-library",
-    "third-party",
-    "first-party",
-    "local-folder",
-]
+known-first-party = ["lerna"]
+section-order = ["future", "standard-library", "third-party", "first-party", "local-folder"]
 
 [tool.ruff.lint.per-file-ignores]
-"__init__.py" = [
-    "F401",
-    "F403",
-]
+"__init__.py" = ["F401", "F403"]

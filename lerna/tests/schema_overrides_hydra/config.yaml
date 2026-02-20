@@ -1,0 +1,11 @@
+age: 7
+name: James Bond
+
+hydra:
+  job:
+    name: test
+
+defaults:
+  - config_schema
+  - _self_
+  - group: a
