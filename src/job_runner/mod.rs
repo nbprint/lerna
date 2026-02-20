@@ -134,17 +134,17 @@ impl PyJobContext {
 
     #[getter]
     fn output_dir(&self) -> String {
-        self.inner.output_dir.to_string_lossy().to_string()
+        self.inner.output_dir.to_string_lossy().replace('\\', "/")
     }
 
     #[getter]
     fn working_dir(&self) -> String {
-        self.inner.working_dir.to_string_lossy().to_string()
+        self.inner.working_dir.to_string_lossy().replace('\\', "/")
     }
 
     #[getter]
     fn original_cwd(&self) -> String {
-        self.inner.original_cwd.to_string_lossy().to_string()
+        self.inner.original_cwd.to_string_lossy().replace('\\', "/")
     }
 
     #[getter]
@@ -215,7 +215,7 @@ fn save_config(
 #[pyfunction]
 fn save_overrides(overrides: Vec<String>, filename: &str, output_dir: &str) -> PyResult<String> {
     rust_save_overrides_file(&overrides, filename, &PathBuf::from(output_dir))
-        .map(|p| p.to_string_lossy().to_string())
+        .map(|p| p.to_string_lossy().replace('\\', "/"))
         .map_err(|e| PyIOError::new_err(e.to_string()))
 }
 
@@ -240,7 +240,7 @@ fn setup_job_environment(
         &hydra_dict,
         &overrides,
     )
-    .map(|p| p.to_string_lossy().to_string())
+    .map(|p| p.to_string_lossy().replace('\\', "/"))
     .map_err(|e| PyIOError::new_err(e.to_string()))
 }
 
