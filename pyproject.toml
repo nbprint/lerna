@@ -162,7 +162,7 @@ packages = [
     "lerna",
     "hydra_plugins",
     "rust",
-    "src"
+    "src",
     "Cargo.toml",
     "Cargo.lock",
 ]
