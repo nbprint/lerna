@@ -1,5 +1,0 @@
-defaults:
-  - optimizer: nesterov
-  - _self_
-
-optimizer_option: ${hydra:runtime.choices.optimizer}
