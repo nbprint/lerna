@@ -186,7 +186,7 @@ def chdir_hydra_root(subdir: Optional[str] = None) -> None:
     Change the cwd to the root of the hydra project.
     used from unit tests to make them runnable from anywhere in the tree.
     """
-    _chdir_to_dir_containing(target="ATTRIBUTION")
+    _chdir_to_dir_containing(target="pyproject.toml")
 
     if subdir is not None:
         os.chdir(subdir)
