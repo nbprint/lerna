@@ -11,8 +11,8 @@ work with hydra-core installations.
 """
 
 import sys
+import warnings
 from importlib import import_module
-from logging import getLogger
 
 from hydra.core.config_search_path import ConfigSearchPath
 from hydra.core.config_store import ConfigStore
@@ -23,12 +23,11 @@ if sys.version_info < (3, 10):
 else:
     from importlib.metadata import entry_points
 
-_log = getLogger("lerna")
-
 # NOTE: use `lernaplugins` instead of `plugins`
 # for https://github.com/facebookresearch/hydra/pull/3052
 _discovered_plugins = entry_points(group="hydra.lernaplugins")
 _searchpaths_pkg = {}
+_discovered_plugin_names = []
 for entry_point in _discovered_plugins:
     if entry_point.value.startswith(("pkg:", "file:")):
         # This is a package style entry point
@@ -39,14 +38,15 @@ for entry_point in _discovered_plugins:
     try:
         mod = import_module(entry_point.value)
     except ImportError as e:
-        _log.warning(f"Failed to import entry point {entry_point.name} from {entry_point.value}: {e}")
+        # Use warnings instead of logging during module import to avoid
+        # issues with logging handlers that may be in an invalid state
+        warnings.warn(f"Failed to import entry point {entry_point.name} from {entry_point.value}: {e}")
         continue
     for attr in dir(mod):
         thing = getattr(mod, attr)
         if isinstance(thing, type) and issubclass(thing, SearchPathPlugin):
-            _log.info(f"Discovered search path plugin: {thing.__name__}")
+            _discovered_plugin_names.append(thing.__name__)
             globals()[thing.__name__] = thing
-    # search_path.append(provider=entry_point.name, path=entry_point.value)
 
 
 class LernaGenericSearchPathPlugin(SearchPathPlugin):
