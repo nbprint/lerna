@@ -1186,7 +1186,7 @@ class TestVariousRuns:
             "hydra.sweep.dir=" + str(tmpdir),
             "hydra.job.chdir=True",
             "--config-name=unspecified_mandatory_default",
-            "--config-path=../../test_utils/configs",
+            "--config-path=../../../test_utils/configs",
         ]
         if sweep:
             cmd.append("-m")
@@ -1236,7 +1236,7 @@ bar: 20"""
             "hydra.job.chdir=True",
             "group1=file1,file2",
             "--multirun",
-            "--config-path=../../test_utils/configs",
+            "--config-path=../../../test_utils/configs",
             "--config-name=compose",
         ]
         expected = """foo: 10
