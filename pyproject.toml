@@ -98,27 +98,17 @@ ignore = [
     "Cargo.lock",
     "Makefile",
     "docs/**/*",
-<<<<<<< before updating
     "examples/**/*",
     "rust/**/*",
     "src/**/*"
-=======
-    "rust/**/*",
-    "src/**/*",
->>>>>>> after updating
 ]
 
 [tool.cibuildwheel]
 build = "cp310-*"
-<<<<<<< before updating
 # Run a simple import test to verify the wheel is installable
 # Full tests are run by `make tests` separately
 test-command = "python -c 'import lerna; print(lerna.__version__)'"
-test-requires = []
-=======
-test-command = "pytest -vvv {project}/lerna/tests"
 test-extras = "develop"
->>>>>>> after updating
 
 [tool.cibuildwheel.linux]
 before-all = """
@@ -170,46 +160,24 @@ path = "."
 [tool.hatch.build.targets.sdist]
 packages = [
     "lerna",
-<<<<<<< before updating
     "hydra_plugins",
-]
-include = [
     "rust",
     "src"
-]
-exclude = [
-    "examples",
-=======
-]
-include = [
-    "rust",
-    "src",
     "Cargo.toml",
     "Cargo.lock",
 ]
 exclude = [
->>>>>>> after updating
+    "examples",
     "target",
 ]
 
 [tool.hatch.build.targets.wheel]
 packages = [
     "lerna",
-<<<<<<< before updating
     "hydra_plugins",
 ]
 exclude = [
     "examples",
-    "rust",
-    "src",
-    "lerna/tests"
-]
-
-[tool.pytest.ini_options]
-addopts = ["-vvv", "--junitxml=junit.xml", "-p", "lerna.extra.pytest_plugin"]
-=======
-]
-exclude = [
     "rust",
     "src",
 ]
@@ -218,8 +186,10 @@ exclude = [
 addopts = [
     "-vvv",
     "--junitxml=junit.xml",
+    "-p",
+    "lerna.extra.pytest_plugin",
 ]
->>>>>>> after updating
+
 testpaths = "lerna/tests"
 norecursedirs = ["standalone_apps"]
 filterwarnings = [
