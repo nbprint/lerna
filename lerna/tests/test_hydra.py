@@ -1285,9 +1285,9 @@ def test_app_with_error_exception_sanitized(tmpdir: Any, monkeypatch: Any) -> No
             r"""
         Error executing job with overrides: \[\]
         Traceback \(most recent call last\):
-          File ".*my_app\.py", line 13, in my_app
+          File ".*my_app\.py", line 12, in my_app
             {traceback_line}
-          File ".*my_app\.py", line 8, in foo
+          File ".*my_app\.py", line 7, in foo
             cfg\.foo = "bar"  # does not exist in the config(\n    \^+)?
         omegaconf\.errors\.ConfigAttributeError: Key 'foo' is not in struct
             full_key: foo
@@ -1466,12 +1466,12 @@ def test_hydra_main_without_config_path(tmpdir: Path) -> None:
 
     expected = dedent(
         f"""
-        .*my_app.py:7: UserWarning:
+        .*my_app.py:6: UserWarning:
         The version_base parameter is not specified.
         Please specify a compatibility version level, or None.
         Will assume defaults for version {version.__compat_version__}
           @lerna.main().*
-        .*my_app.py:7: UserWarning:
+        .*my_app.py:6: UserWarning:
         config_path is not specified in @hydra.main().
         See https://hydra.cc/docs/1.2/upgrades/1.0_to_1.1/changes_to_hydra_main_config_path for more information.
           @lerna.main().*
@@ -1545,7 +1545,7 @@ def test_frozen_primary_config(tmpdir: Path, overrides: List[str], expected: str
     [
         param(
             False,
-            r"^\S*[/\\]my_app\.py:10: UserWarning: Feature FooBar is deprecated$",
+            r"^\S*[/\\]my_app\.py:9: UserWarning: Feature FooBar is deprecated$",
             id="deprecation_warning",
         ),
         param(
@@ -1554,7 +1554,7 @@ def test_frozen_primary_config(tmpdir: Path, overrides: List[str], expected: str
                 r"""
                 ^Error executing job with overrides: \[\]\n?
                 Traceback \(most recent call last\):
-                  File "\S*[/\\]my_app.py", line 10, in my_app
+                  File "\S*[/\\]my_app.py", line 9, in my_app
                     deprecation_warning\("Feature FooBar is deprecated"\)(\n    [~\^]+)?
                   File "\S*\.py", line 11, in deprecation_warning
                     raise HydraDeprecationError\(.*\)
