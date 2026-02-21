@@ -10,6 +10,7 @@ try:
     from _pytest.python_api import RaisesContext
 except ImportError:
     from _pytest.raises import RaisesExc as RaisesContext  # type: ignore
+from omegaconf import DictConfig, OmegaConf
 from pytest import mark, raises
 
 from lerna.test_utils.test_utils import (
@@ -20,7 +21,6 @@ from lerna.test_utils.test_utils import (
     run_python_script,
     verify_dir_outputs,
 )
-from omegaconf import DictConfig, OmegaConf
 
 chdir_hydra_root()
 

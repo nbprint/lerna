@@ -5,10 +5,11 @@ from dataclasses import dataclass, field
 from functools import partial
 from typing import Any, Dict, List, NoReturn, Optional, Tuple
 
+from omegaconf import MISSING, DictConfig, ListConfig
+
 from lerna.tests.instantiate.module_shadowed_by_function import a_function
 from lerna.types import TargetConf
 from lerna.utils import instantiate
-from omegaconf import MISSING, DictConfig, ListConfig
 
 module_shadowed_by_function = a_function
 

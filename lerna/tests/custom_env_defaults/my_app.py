@@ -2,8 +2,9 @@
 import logging
 import os
 
-import lerna
 from omegaconf import DictConfig
+
+import lerna
 
 log = logging.getLogger(__name__)
 

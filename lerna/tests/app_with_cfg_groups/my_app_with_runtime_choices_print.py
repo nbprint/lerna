@@ -1,8 +1,9 @@
 # Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved
 from typing import Any
 
-import lerna
 from omegaconf import DictConfig
+
+import lerna
 
 
 @lerna.main(version_base=None, config_path="conf", config_name="config_with_runtime_option")

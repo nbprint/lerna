@@ -2,9 +2,10 @@
 import logging
 from typing import Any, List, Optional
 
+from omegaconf import DictConfig
+
 from lerna.core.utils import JobReturn
 from lerna.types import TaskFunction
-from omegaconf import DictConfig
 
 logger = logging.getLogger(__name__)
 

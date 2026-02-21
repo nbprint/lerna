@@ -8,6 +8,7 @@ from textwrap import dedent
 from typing import Any, NoReturn, Optional
 from unittest.mock import patch
 
+from omegaconf import DictConfig, OmegaConf
 from pytest import mark, param, raises, warns
 
 from lerna import utils
@@ -21,7 +22,6 @@ from lerna.test_utils.test_utils import (
     assert_multiline_regex_search,
     assert_regex_match,
 )
-from omegaconf import DictConfig, OmegaConf
 
 
 def test_get_original_cwd(hydra_restore_singletons: Any) -> None:

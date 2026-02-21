@@ -9,6 +9,7 @@ import re
 from pathlib import Path
 from typing import Any, Callable, List, Optional, Set
 
+from omegaconf import DictConfig, OmegaConf
 from pytest import mark, param, raises
 
 from lerna import TaskFunction
@@ -18,7 +19,6 @@ from lerna.test_utils.test_utils import (
     integration_test,
     verify_dir_outputs,
 )
-from omegaconf import DictConfig, OmegaConf
 
 
 @mark.usefixtures("hydra_restore_singletons")

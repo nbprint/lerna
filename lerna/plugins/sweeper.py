@@ -6,8 +6,9 @@ Sweeper plugin interface
 from abc import abstractmethod
 from typing import Any, List, Optional, Sequence
 
-from lerna.types import HydraContext, TaskFunction
 from omegaconf import DictConfig
+
+from lerna.types import HydraContext, TaskFunction
 
 from .launcher import Launcher
 from .plugin import Plugin

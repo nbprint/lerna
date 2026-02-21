@@ -4,13 +4,14 @@ from abc import abstractmethod
 from dataclasses import dataclass
 from typing import Dict, List, Optional
 
+from omegaconf import Container
+
 from lerna import version
 from lerna._internal.deprecation_warning import deprecation_warning
 from lerna.core.default_element import InputDefault
 from lerna.core.object_type import ObjectType
 from lerna.errors import HydraException
 from lerna.plugins.plugin import Plugin
-from omegaconf import Container
 
 try:
     import lerna.lerna as _rs

@@ -2,9 +2,10 @@
 from dataclasses import dataclass
 from typing import List, Optional
 
+from omegaconf import DictConfig
+
 import lerna
 from lerna.core.config_store import ConfigStore
-from omegaconf import DictConfig
 
 
 @dataclass

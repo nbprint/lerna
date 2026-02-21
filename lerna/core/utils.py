@@ -13,12 +13,13 @@ from pathlib import Path
 from textwrap import dedent
 from typing import Any, Dict, Optional, Sequence, Union, cast
 
+from omegaconf import DictConfig, OmegaConf, open_dict, read_write
+
 from lerna import version
 from lerna._internal.deprecation_warning import deprecation_warning
 from lerna.core.hydra_config import HydraConfig
 from lerna.core.singleton import Singleton
 from lerna.types import HydraContext, TaskFunction
-from omegaconf import DictConfig, OmegaConf, open_dict, read_write
 
 try:
     import lerna.lerna as _rs

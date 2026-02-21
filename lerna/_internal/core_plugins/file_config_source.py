@@ -3,10 +3,10 @@ import os
 from typing import List, Optional
 
 import yaml
+from omegaconf import OmegaConf
 
 from lerna.core.object_type import ObjectType
 from lerna.plugins.config_source import ConfigLoadError, ConfigResult, ConfigSource
-from omegaconf import OmegaConf
 
 # Try to import Rust module for fast YAML parsing
 try:

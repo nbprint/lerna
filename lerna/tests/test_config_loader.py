@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 from textwrap import dedent
 from typing import Any, List
 
+from omegaconf import MISSING, OmegaConf, ValidationError, open_dict
 from pytest import mark, param, raises, warns
 
 from lerna import version
@@ -20,7 +21,6 @@ from lerna.errors import (
 from lerna.test_utils.test_utils import chdir_hydra_root
 from lerna.tests.instantiate import UserGroup
 from lerna.types import RunMode
-from omegaconf import MISSING, OmegaConf, ValidationError, open_dict
 
 chdir_hydra_root()
 

@@ -8,6 +8,7 @@ from pathlib import Path
 from textwrap import dedent
 from typing import Any, List, Optional, Set
 
+from omegaconf import DictConfig, OmegaConf
 from pytest import mark, param, raises
 
 from lerna import MissingConfigException, version
@@ -25,7 +26,6 @@ from lerna.test_utils.test_utils import (
     run_with_error,
     verify_dir_outputs,
 )
-from omegaconf import DictConfig, OmegaConf
 
 chdir_hydra_root()
 

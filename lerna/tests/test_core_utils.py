@@ -2,12 +2,13 @@
 import sys
 from typing import Any
 
+from omegaconf import OmegaConf, open_dict
+
 from lerna._internal.config_loader_impl import ConfigLoaderImpl
 from lerna._internal.utils import create_config_search_path
 from lerna.core import utils
 from lerna.core.hydra_config import HydraConfig
 from lerna.types import RunMode
-from omegaconf import OmegaConf, open_dict
 
 
 def test_accessing_hydra_config(hydra_restore_singletons: Any) -> Any:

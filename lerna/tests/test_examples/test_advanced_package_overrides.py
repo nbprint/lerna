@@ -1,8 +1,9 @@
 # Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved
 from pathlib import Path
 
-from lerna.test_utils.test_utils import chdir_hydra_root, normalize_path_for_override, run_python_script
 from omegaconf import OmegaConf
+
+from lerna.test_utils.test_utils import chdir_hydra_root, normalize_path_for_override, run_python_script
 
 chdir_hydra_root()
 

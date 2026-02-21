@@ -2,9 +2,10 @@
 import warnings
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
+from omegaconf import DictConfig, OmegaConf
+
 from lerna.core.singleton import Singleton
 from lerna.types import TaskFunction
-from omegaconf import DictConfig, OmegaConf
 
 if TYPE_CHECKING:
     from lerna.core.utils import JobReturn

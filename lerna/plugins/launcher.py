@@ -6,9 +6,10 @@ Launcher plugin interface
 from abc import abstractmethod
 from typing import Sequence
 
+from omegaconf import DictConfig
+
 from lerna.core.utils import JobReturn
 from lerna.types import HydraContext, TaskFunction
-from omegaconf import DictConfig
 
 from .plugin import Plugin
 

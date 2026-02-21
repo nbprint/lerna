@@ -1,7 +1,8 @@
 # Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved
+from omegaconf import DictConfig
+
 import lerna
 from lerna.core.hydra_config import HydraConfig
-from omegaconf import DictConfig
 
 
 class MyCallable:

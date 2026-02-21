@@ -7,6 +7,7 @@ import warnings
 from textwrap import dedent
 from typing import Any, List, MutableSequence, Optional, Tuple
 
+from omegaconf import Container, DictConfig, OmegaConf, flag_override, open_dict
 from omegaconf.errors import (
     ConfigAttributeError,
     ConfigKeyError,
@@ -30,7 +31,6 @@ from lerna.core.utils import JobRuntime
 from lerna.errors import ConfigCompositionException, MissingConfigException
 from lerna.plugins.config_source import ConfigLoadError, ConfigResult, ConfigSource
 from lerna.types import RunMode
-from omegaconf import Container, DictConfig, OmegaConf, flag_override, open_dict
 
 from .deprecation_warning import deprecation_warning
 

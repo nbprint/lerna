@@ -7,6 +7,7 @@ from functools import partial
 from textwrap import dedent
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
+from omegaconf import MISSING, DictConfig, ListConfig, MissingMandatoryValue, OmegaConf
 from pytest import fixture, mark, param, raises, warns
 
 import lerna
@@ -54,7 +55,6 @@ from lerna.tests.instantiate import (
     recisinstance,
 )
 from lerna.types import ConvertMode, TargetConf
-from omegaconf import MISSING, DictConfig, ListConfig, MissingMandatoryValue, OmegaConf
 
 
 @fixture(

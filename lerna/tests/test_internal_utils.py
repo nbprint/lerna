@@ -1,11 +1,11 @@
 # Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved
 from typing import Any, Callable, Optional
 
+from omegaconf import DictConfig, OmegaConf
 from pytest import mark, param
 
 from lerna._internal import utils
 from lerna.tests import data
-from omegaconf import DictConfig, OmegaConf
 
 
 @mark.parametrize(

@@ -10,13 +10,13 @@ These tests verify fixes for:
 from typing import Any
 
 import pytest
+from omegaconf import OmegaConf
 
 from lerna.core.default_element import (
     ConfigDefault,
     GroupDefault,
     _normalize_path,
 )
-from omegaconf import OmegaConf
 
 
 class TestNormalizePath:

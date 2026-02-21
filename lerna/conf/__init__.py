@@ -2,9 +2,10 @@
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
+from omegaconf import MISSING
+
 from lerna.core.config_store import ConfigStore
 from lerna.types import RunMode
-from omegaconf import MISSING
 
 
 @dataclass

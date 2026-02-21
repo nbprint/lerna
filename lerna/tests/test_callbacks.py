@@ -7,6 +7,7 @@ from pathlib import Path
 from textwrap import dedent
 from typing import Any, List
 
+from omegaconf import open_dict, read_write
 from pytest import mark, param
 
 from lerna.core.utils import JobReturn, JobStatus
@@ -17,7 +18,6 @@ from lerna.test_utils.test_utils import (
     run_process,
     run_python_script,
 )
-from omegaconf import open_dict, read_write
 
 chdir_hydra_root()
 

@@ -2,10 +2,11 @@
 from dataclasses import dataclass
 from typing import Dict
 
+from omegaconf import MISSING
+
 import lerna
 from lerna.core.config_store import ConfigStore
 from lerna.core.hydra_config import HydraConfig
-from omegaconf import MISSING
 
 
 @dataclass

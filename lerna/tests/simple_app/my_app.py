@@ -1,6 +1,7 @@
 # Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved
-import lerna
 from omegaconf import DictConfig, OmegaConf
+
+import lerna
 
 
 @lerna.main(version_base=None)

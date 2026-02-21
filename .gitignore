@@ -99,7 +99,7 @@ celerybeat.pid
 .env
 .venv
 env/
-!src/env/
+!rust/python/env
 !lerna/**/env/
 venv/
 ENV/
@@ -159,10 +159,5 @@ lerna/labextension
 target
 
 # Hydra
-<<<<<<< before updating
-multirun/
-outputs/
-=======
 outputs/
 multirun/
->>>>>>> after updating

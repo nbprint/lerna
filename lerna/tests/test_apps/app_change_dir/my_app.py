@@ -2,9 +2,10 @@
 import os
 from pathlib import Path
 
+from omegaconf import DictConfig
+
 import lerna
 from lerna.core.hydra_config import HydraConfig
-from omegaconf import DictConfig
 
 
 @lerna.main(version_base=None)

@@ -8,6 +8,7 @@ from random import shuffle
 from textwrap import dedent
 from typing import Any, Callable, Dict, Iterator, List, Optional, Set, Union, cast
 
+from omegaconf import OmegaConf
 from omegaconf._utils import is_structured_config
 
 from lerna import version
@@ -16,7 +17,6 @@ from lerna._internal.grammar.utils import _ESC_QUOTED_STR, escape_special_charac
 from lerna.core.config_loader import ConfigLoader
 from lerna.core.object_type import ObjectType
 from lerna.errors import HydraException
-from omegaconf import OmegaConf
 
 try:
     import lerna.lerna as _rs

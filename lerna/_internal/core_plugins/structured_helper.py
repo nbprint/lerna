@@ -8,9 +8,10 @@ from Python's ConfigStore singleton.
 
 from typing import Any, Dict, List, Optional
 
+from omegaconf import OmegaConf
+
 from lerna.core.config_store import ConfigStore
 from lerna.core.object_type import ObjectType
-from omegaconf import OmegaConf
 
 
 def load_structured_config(config_path: str) -> Optional[Dict[str, Any]]:

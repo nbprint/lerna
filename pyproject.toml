@@ -90,21 +90,6 @@ filename = "rust/Cargo.toml"
 search = 'version = "{current_version}"'
 replace = 'version = "{new_version}"'
 
-<<<<<<< before updating
-[tool.check-manifest]
-ignore = [
-    ".copier-answers.yaml",
-    "Cargo.toml",
-    "Cargo.lock",
-    "Makefile",
-    "docs/**/*",
-    "examples/**/*",
-    "rust/**/*",
-    "src/**/*"
-]
-
-=======
->>>>>>> after updating
 [tool.cibuildwheel]
 build = "cp310-*"
 # Run a simple import test to verify the wheel is installable
@@ -162,21 +147,14 @@ path = "."
 [tool.hatch.build.targets.sdist]
 packages = [
     "lerna",
-<<<<<<< before updating
     "hydra_plugins",
-=======
->>>>>>> after updating
     "rust",
-    "src",
     "Cargo.toml",
     "Cargo.lock",
 ]
 exclude = [
-<<<<<<< before updating
     "examples",
-=======
     "rust/Makefile",
->>>>>>> after updating
     "target",
 ]
 

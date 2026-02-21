@@ -4,6 +4,7 @@ from textwrap import dedent
 from typing import Any, List, Sequence, Union
 from unittest.mock import Mock
 
+from omegaconf import DictConfig, OmegaConf
 from pytest import mark, raises
 
 from lerna import TaskFunction
@@ -17,7 +18,6 @@ from lerna.plugins.launcher import Launcher
 from lerna.plugins.sweeper import Sweeper
 from lerna.test_utils.test_utils import chdir_hydra_root
 from lerna.types import HydraContext
-from omegaconf import DictConfig, OmegaConf
 
 chdir_hydra_root()
 
