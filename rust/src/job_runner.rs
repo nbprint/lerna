@@ -294,17 +294,36 @@ mod tests {
         assert_eq!(ctx.id, "abc123");
         assert_eq!(ctx.num, 0);
         assert!(ctx.chdir);
-        assert_eq!(ctx.output_dir, PathBuf::from("/output/test"));
+        // Normalize path separators for cross-platform comparison
+        // On Windows, "/output/test" may become "D:/output/test" (current drive root)
+        let output_dir_str = ctx.output_dir.to_string_lossy().replace('\\', "/");
+        assert!(
+            output_dir_str.ends_with("/output/test"),
+            "Expected path to end with /output/test, got: {}",
+            output_dir_str
+        );
         assert_eq!(ctx.overrides.len(), 1);
     }
 
     #[test]
     fn test_compute_output_dir() {
         let dir = compute_output_dir("/output/run", None);
-        assert_eq!(dir, PathBuf::from("/output/run"));
+        // Normalize path separators for cross-platform comparison
+        // On Windows, "/output/run" becomes "D:/output/run" (current drive root)
+        let dir_str = dir.to_string_lossy().replace('\\', "/");
+        assert!(
+            dir_str.ends_with("/output/run"),
+            "Expected path to end with /output/run, got: {}",
+            dir_str
+        );
 
         let dir = compute_output_dir("/output/sweep", Some("0"));
-        assert_eq!(dir, PathBuf::from("/output/sweep/0"));
+        let dir_str = dir.to_string_lossy().replace('\\', "/");
+        assert!(
+            dir_str.ends_with("/output/sweep/0"),
+            "Expected path to end with /output/sweep/0, got: {}",
+            dir_str
+        );
     }
 
     #[test]
