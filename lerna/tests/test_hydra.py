@@ -1385,7 +1385,7 @@ class TestTaskRunnerLogging:
             r"""
             Error executing job with overrides: \[\]
             Traceback \(most recent call last\):
-              File ".*my_app\.py", line 9, in my_app
+              File ".*my_app\.py", line 8, in my_app
                 1 / 0(
                 ~~\^~~)?
             ZeroDivisionError: division by zero
