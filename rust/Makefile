@@ -3,8 +3,8 @@
 requirements:  ## install required dev dependencies
 	rustup component add rustfmt
 	rustup component add clippy
-	cargo install cargo-nextest --version 0.9.126 --locked
-	cargo install cargo-llvm-cov
+	cargo install cargo-nextest --locked --force
+	cargo install cargo-llvm-cov --force
 
 develop: requirements  ## install required dev dependencies
 
