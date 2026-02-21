@@ -1643,13 +1643,13 @@ def test_hydra_resolver_in_output_dir(tmpdir: Path, multirun: bool) -> None:
 
     subdir = "dir" + "${hydra:runtime.version}"
 
-    output_dir = str(Path(tmpdir) / subdir)
+    output_dir = normalize_path_for_override(Path(tmpdir) / subdir)
 
     cmd = [
         "lerna/tests/test_apps/hydra_resolver_in_output_dir/my_app.py",
         f"hydra.run.dir='{output_dir}'",
         f"hydra.sweep.subdir='{subdir}'",
-        f"hydra.sweep.dir={str(Path(tmpdir))}",
+        f"hydra.sweep.dir={normalize_path_for_override(tmpdir)}",
         "hydra.job.chdir=False",
     ]
 

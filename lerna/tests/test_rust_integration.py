@@ -364,7 +364,8 @@ class TestRustJobIntegration:
 
         # Without override dirname
         dir1 = rs.job.compute_job_output_dir("/output", 0, [], False)
-        assert dir1 == "/output/0"
+        # Normalize separators for cross-platform comparison
+        assert dir1.replace("\\", "/") == "/output/0"
 
         # With override dirname
         dir2 = rs.job.compute_job_output_dir("/output", 0, ["db=mysql"], True)
