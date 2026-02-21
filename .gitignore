@@ -143,14 +143,12 @@ js/node_modules
 js/test-results
 js/playwright-report
 js/*.tgz
-lerna/extension
 
 # Jupyter
 .ipynb_checkpoints
 .autoversion
 Untitled*.ipynb
-!lerna/extension/lerna.json
-!lerna/extension/install.json
+lerna/extension
 lerna/nbextension
 lerna/labextension
 
@@ -161,5 +159,10 @@ lerna/labextension
 target
 
 # Hydra
+<<<<<<< before updating
 multirun/
 outputs/
+=======
+outputs/
+multirun/
+>>>>>>> after updating
