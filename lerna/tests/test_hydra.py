@@ -49,8 +49,8 @@ def test_missing_conf_dir(
 @mark.parametrize(
     "calling_file, calling_module",
     [
-        ("tests/test_apps/app_without_config/my_app.py", None),
-        (None, "tests.test_apps.app_without_config.my_app"),
+        ("lerna/tests/test_apps/app_without_config/my_app.py", None),
+        (None, "lerna.tests.test_apps.app_without_config.my_app"),
     ],
 )
 def test_missing_conf_file(
@@ -70,14 +70,14 @@ def test_missing_conf_file(
 
 
 def test_run_dir() -> None:
-    run_python_script(["tests/test_apps/run_dir_test/my_app.py", "hydra.job.chdir=True"])
+    run_python_script(["lerna/tests/test_apps/run_dir_test/my_app.py", "hydra.job.chdir=True"])
 
 
 @mark.parametrize(
     "calling_file, calling_module",
     [
-        ("tests/test_apps/app_without_config/my_app.py", None),
-        (None, "tests.test_apps.app_without_config.my_app"),
+        ("lerna/tests/test_apps/app_without_config/my_app.py", None),
+        (None, "lerna.tests.test_apps.app_without_config.my_app"),
     ],
 )
 def test_app_without_config___no_overrides(
@@ -99,8 +99,8 @@ def test_app_without_config___no_overrides(
 @mark.parametrize(
     "calling_file, calling_module",
     [
-        ("tests/test_apps/hydra_main_rerun/my_app.py", None),
-        (None, "tests.test_apps.hydra_main_rerun.my_app"),
+        ("lerna/tests/test_apps/hydra_main_rerun/my_app.py", None),
+        (None, "lerna.tests.test_apps.hydra_main_rerun.my_app"),
     ],
 )
 def test_hydra_main_rerun(
@@ -122,8 +122,8 @@ def test_hydra_main_rerun(
 @mark.parametrize(
     "calling_file, calling_module",
     [
-        ("tests/test_apps/app_without_config/my_app.py", None),
-        (None, "tests.test_apps.app_without_config.my_app"),
+        ("lerna/tests/test_apps/app_without_config/my_app.py", None),
+        (None, "lerna.tests.test_apps.app_without_config.my_app"),
     ],
 )
 def test_app_without_config__with_append(
@@ -147,8 +147,8 @@ def test_app_without_config__with_append(
 @mark.parametrize(
     "calling_file, calling_module",
     [
-        ("tests/test_apps/app_with_cfg/my_app.py", None),
-        (None, "tests.test_apps.app_with_cfg.my_app"),
+        ("lerna/tests/test_apps/app_with_cfg/my_app.py", None),
+        (None, "lerna.tests.test_apps.app_with_cfg.my_app"),
     ],
 )
 def test_app_with_config_file__no_overrides(
@@ -173,8 +173,8 @@ def test_app_with_config_file__no_overrides(
 @mark.parametrize(
     "calling_file, calling_module",
     [
-        ("tests/test_apps/app_with_cfg_groups/my_app.py", None),
-        (None, "tests.test_apps.app_with_cfg_groups.my_app"),
+        ("lerna/tests/test_apps/app_with_cfg_groups/my_app.py", None),
+        (None, "lerna.tests.test_apps.app_with_cfg_groups.my_app"),
     ],
 )
 def test_app_with_config_path_backward_compatibility(
@@ -206,8 +206,8 @@ def test_app_with_config_path_backward_compatibility(
 @mark.parametrize(
     "calling_file, calling_module",
     [
-        ("tests/test_apps/app_with_cfg/my_app.py", None),
-        (None, "tests.test_apps.app_with_cfg.my_app"),
+        ("lerna/tests/test_apps/app_with_cfg/my_app.py", None),
+        (None, "lerna.tests.test_apps.app_with_cfg.my_app"),
     ],
 )
 def test_app_with_config_file__with_override(
@@ -231,8 +231,8 @@ def test_app_with_config_file__with_override(
 @mark.parametrize(
     "calling_file, calling_module",
     [
-        ("tests/test_apps/app_with_cfg_decorated/my_app.py", None),
-        (None, "tests.test_apps.app_with_cfg_decorated.my_app"),
+        ("lerna/tests/test_apps/app_with_cfg_decorated/my_app.py", None),
+        (None, "lerna.tests.test_apps.app_with_cfg_decorated.my_app"),
     ],
 )
 def test_app_with_config_file__with_decorators(
@@ -255,8 +255,8 @@ def test_app_with_config_file__with_decorators(
 @mark.parametrize(
     "calling_file, calling_module",
     [
-        ("tests/test_apps/app_with_split_cfg/my_app.py", None),
-        (None, "tests.test_apps.app_with_split_cfg.my_app"),
+        ("lerna/tests/test_apps/app_with_split_cfg/my_app.py", None),
+        (None, "lerna.tests.test_apps.app_with_split_cfg.my_app"),
     ],
 )
 def test_app_with_split_config(
@@ -282,8 +282,8 @@ def test_app_with_split_config(
 @mark.parametrize(
     "calling_file, calling_module",
     [
-        ("tests/test_apps/app_with_cfg_groups/my_app.py", None),
-        (None, "tests.test_apps.app_with_cfg_groups.my_app"),
+        ("lerna/tests/test_apps/app_with_cfg_groups/my_app.py", None),
+        (None, "lerna.tests.test_apps.app_with_cfg_groups.my_app"),
     ],
 )
 def test_app_with_config_groups__override_dataset__wrong(
@@ -307,8 +307,8 @@ def test_app_with_config_groups__override_dataset__wrong(
 @mark.parametrize(
     "calling_file, calling_module",
     [
-        ("tests/test_apps/app_with_cfg_groups/my_app.py", None),
-        (None, "tests.test_apps.app_with_cfg_groups.my_app"),
+        ("lerna/tests/test_apps/app_with_cfg_groups/my_app.py", None),
+        (None, "lerna.tests.test_apps.app_with_cfg_groups.my_app"),
     ],
 )
 def test_app_with_config_groups__override_all_configs(
@@ -332,8 +332,8 @@ def test_app_with_config_groups__override_all_configs(
 @mark.parametrize(
     "calling_file, calling_module",
     [
-        ("tests/test_apps/app_with_custom_launcher/my_app.py", None),
-        (None, "tests.test_apps.app_with_custom_launcher.my_app"),
+        ("lerna/tests/test_apps/app_with_custom_launcher/my_app.py", None),
+        (None, "lerna.tests.test_apps.app_with_custom_launcher.my_app"),
     ],
 )
 def test_app_with_sweep_cfg__override_to_basic_launcher(
@@ -474,7 +474,7 @@ def test_cfg_with_package(tmpdir: Path, flags: List[str], resolve: bool, expecte
     "script,resolve,flags,expected",
     [
         param(
-            "tests/test_apps/simple_interpolation/my_app.py",
+            "lerna/tests/test_apps/simple_interpolation/my_app.py",
             False,
             [],
             dedent(
@@ -486,7 +486,7 @@ def test_cfg_with_package(tmpdir: Path, flags: List[str], resolve: bool, expecte
             id="cfg",
         ),
         param(
-            "tests/test_apps/simple_interpolation/my_app.py",
+            "lerna/tests/test_apps/simple_interpolation/my_app.py",
             True,
             [],
             dedent(
@@ -498,11 +498,11 @@ def test_cfg_with_package(tmpdir: Path, flags: List[str], resolve: bool, expecte
             id="resolve",
         ),
         param(
-            "tests/test_apps/simple_app/my_app.py",
+            "lerna/tests/test_apps/simple_app/my_app.py",
             True,
             [
                 "--config-name=interp_to_hydra",
-                "--config-dir=tests/test_apps/simple_app",
+                "--config-dir=lerna/tests/test_apps/simple_app",
             ],
             dedent(
                 """\
@@ -531,7 +531,7 @@ def test_cfg_resolve_interpolation(tmpdir: Path, script: str, resolve: bool, fla
     "script,expected",
     [
         param(
-            "tests/test_apps/passes_callable_class_to_hydra_main/my_app.py",
+            "lerna/tests/test_apps/passes_callable_class_to_hydra_main/my_app.py",
             dedent(
                 """\
                 123
@@ -574,8 +574,8 @@ def test_resolve_flag_errmsg(tmpdir: Path, other_flag: Optional[str]) -> None:
 @mark.parametrize(
     "calling_file, calling_module",
     [
-        ("tests/test_apps/app_with_config_with_free_group/my_app.py", None),
-        (None, "tests.test_apps.app_with_config_with_free_group.my_app"),
+        ("lerna/tests/test_apps/app_with_config_with_free_group/my_app.py", None),
+        (None, "lerna.tests.test_apps.app_with_config_with_free_group.my_app"),
     ],
 )
 @mark.parametrize("overrides", [["+free_group=opt1,opt2"]])
@@ -605,8 +605,8 @@ def test_multirun_with_free_override(
 @mark.parametrize(
     "calling_file, calling_module",
     [
-        param("tests/test_apps/sweep_complex_defaults/my_app.py", None, id="file_path"),
-        param(None, "tests.test_apps.sweep_complex_defaults.my_app", id="pkg_path"),
+        param("lerna/tests/test_apps/sweep_complex_defaults/my_app.py", None, id="file_path"),
+        param(None, "lerna.tests.test_apps.sweep_complex_defaults.my_app", id="pkg_path"),
     ],
 )
 def test_sweep_complex_defaults(
@@ -674,7 +674,7 @@ def test_sweep_complex_defaults(
             id="overriding_help_template:$CONFIG,interp,yes_resolve",
         ),
         param(
-            "tests/test_apps/app_with_cfg/my_app.py",
+            "lerna/tests/test_apps/app_with_cfg/my_app.py",
             ["--help", "--resolve"],
             ["hydra.help.template=$CONFIG", "dataset.name=${hydra:job.name}"],
             dedent(
@@ -861,8 +861,8 @@ def test_searchpath_config(tmpdir: Path, overrides: List[str], expected: str) ->
 @mark.parametrize(
     "calling_file, calling_module",
     [
-        ("tests/test_apps/interpolating_dir_hydra_to_app/my_app.py", None),
-        (None, "tests.test_apps.interpolating_dir_hydra_to_app.my_app"),
+        ("lerna/tests/test_apps/interpolating_dir_hydra_to_app/my_app.py", None),
+        (None, "lerna.tests.test_apps.interpolating_dir_hydra_to_app.my_app"),
     ],
 )
 def test_interpolating_dir_hydra_to_app(
@@ -888,7 +888,7 @@ def test_sys_exit(tmpdir: Path) -> None:
     cmd = [
         sys.executable,
         "-Werror",
-        "tests/test_apps/sys_exit/my_app.py",
+        "lerna/tests/test_apps/sys_exit/my_app.py",
         f'hydra.run.dir="{str(tmpdir)}"',
         "hydra.job.chdir=True",
     ]
@@ -1027,13 +1027,13 @@ def test_override_with_invalid_group_choice(
     [
         "dir1",
         "dir2",
-        os.path.abspath("tests/test_apps/app_with_multiple_config_dirs/dir2"),
+        os.path.abspath("lerna/tests/test_apps/app_with_multiple_config_dirs/dir2"),
     ],
 )
 @mark.parametrize("config_name", ["cfg1", "cfg2"])
 def test_config_name_and_path_overrides(tmpdir: Path, config_path: str, config_name: str) -> None:
     cmd = [
-        "tests/test_apps/app_with_multiple_config_dirs/my_app.py",
+        "lerna/tests/test_apps/app_with_multiple_config_dirs/my_app.py",
         f'hydra.run.dir="{str(tmpdir)}"',
         "hydra.job.chdir=True",
         f"--config-name={config_name}",
@@ -1056,8 +1056,8 @@ def test_config_name_and_path_overrides(tmpdir: Path, config_path: str, config_n
 @mark.parametrize(
     "calling_file, calling_module",
     [
-        ("tests/test_apps/app_with_cfg/my_app.py", None),
-        (None, "tests.test_apps.app_with_cfg.my_app"),
+        ("lerna/tests/test_apps/app_with_cfg/my_app.py", None),
+        (None, "lerna.tests.test_apps.app_with_cfg.my_app"),
     ],
 )
 def test_hydra_output_dir(
@@ -1085,14 +1085,14 @@ def test_hydra_output_dir(
     "directory,file,module, error",
     [
         (
-            "tests/test_apps/run_as_module_1",
+            "lerna/tests/test_apps/run_as_module_1",
             "my_app.py",
             "my_app",
             "Primary config module is empty",
         ),
-        ("tests/test_apps/run_as_module_2", "my_app.py", "my_app", None),
-        ("tests/test_apps/run_as_module_3", "module/my_app.py", "module.my_app", None),
-        ("tests/test_apps/run_as_module_4", "module/my_app.py", "module.my_app", None),
+        ("lerna/tests/test_apps/run_as_module_2", "my_app.py", "my_app", None),
+        ("lerna/tests/test_apps/run_as_module_3", "module/my_app.py", "module.my_app", None),
+        ("lerna/tests/test_apps/run_as_module_4", "module/my_app.py", "module.my_app", None),
     ],
 )
 def test_module_run(tmpdir: Any, directory: str, file: str, module: str, error: Optional[str]) -> None:
@@ -1150,7 +1150,7 @@ def test_module_run(tmpdir: Any, directory: str, file: str, module: str, error: 
 )
 def test_multirun_structured_conflict(tmpdir: Any, overrides: List[str], error: bool, expected: Any) -> None:
     cmd = [
-        "tests/test_apps/multirun_structured_conflict/my_app.py",
+        "lerna/tests/test_apps/multirun_structured_conflict/my_app.py",
         "hydra.sweep.dir=" + str(tmpdir),
         "hydra.job.chdir=True",
     ]
@@ -1171,7 +1171,7 @@ def test_multirun_structured_conflict(tmpdir: Any, overrides: List[str], error: 
 
 @mark.parametrize(
     "cmd_base",
-    [(["tests/test_apps/simple_app/my_app.py", "hydra/hydra_logging=disabled"])],
+    [(["lerna/tests/test_apps/simple_app/my_app.py", "hydra/hydra_logging=disabled"])],
 )
 class TestVariousRuns:
     @mark.parametrize(
@@ -1186,7 +1186,7 @@ class TestVariousRuns:
             "hydra.sweep.dir=" + str(tmpdir),
             "hydra.job.chdir=True",
             "--config-name=unspecified_mandatory_default",
-            "--config-path=../../../lerna/test_utils/configs",
+            "--config-path=../../test_utils/configs",
         ]
         if sweep:
             cmd.append("-m")
@@ -1236,7 +1236,7 @@ bar: 20"""
             "hydra.job.chdir=True",
             "group1=file1,file2",
             "--multirun",
-            "--config-path=../../../lerna/test_utils/configs",
+            "--config-path=../../test_utils/configs",
             "--config-name=compose",
         ]
         expected = """foo: 10
@@ -1260,7 +1260,7 @@ bar: 100"""
 
 def test_app_with_error_exception_sanitized(tmpdir: Any, monkeypatch: Any) -> None:
     cmd = [
-        "tests/test_apps/app_with_runtime_config_error/my_app.py",
+        "lerna/tests/test_apps/app_with_runtime_config_error/my_app.py",
         f"hydra.sweep.dir={tmpdir}",
         "hydra.job.chdir=True",
     ]
@@ -1306,7 +1306,7 @@ def test_app_with_error_exception_sanitized(tmpdir: Any, monkeypatch: Any) -> No
 
 def test_hydra_to_job_config_interpolation(tmpdir: Any) -> Any:
     cmd = [
-        "tests/test_apps/hydra_to_cfg_interpolation/my_app.py",
+        "lerna/tests/test_apps/hydra_to_cfg_interpolation/my_app.py",
         "hydra.sweep.dir=" + str(tmpdir),
         "hydra.job.chdir=True",
         "b=${a}",
@@ -1329,7 +1329,7 @@ def test_hydra_to_job_config_interpolation(tmpdir: Any) -> Any:
     ],
 )
 def test_config_dir_argument(monkeypatch: Any, tmpdir: Path, overrides: List[str], expected: DictConfig) -> None:
-    monkeypatch.chdir("tests/test_apps/user-config-dir")
+    monkeypatch.chdir("lerna/tests/test_apps/user-config-dir")
     cmd = [
         "my_app.py",
         f'hydra.run.dir="{str(tmpdir)}"',
@@ -1341,7 +1341,7 @@ def test_config_dir_argument(monkeypatch: Any, tmpdir: Path, overrides: List[str
 
 
 def test_schema_overrides_hydra(monkeypatch: Any, tmpdir: Path) -> None:
-    monkeypatch.chdir("tests/test_apps/schema_overrides_hydra")
+    monkeypatch.chdir("lerna/tests/test_apps/schema_overrides_hydra")
     cmd = [
         "my_app.py",
         f'hydra.run.dir="{str(tmpdir)}"',
@@ -1352,7 +1352,7 @@ def test_schema_overrides_hydra(monkeypatch: Any, tmpdir: Path) -> None:
 
 
 def test_defaults_pkg_with_dot(monkeypatch: Any, tmpdir: Path) -> None:
-    monkeypatch.chdir("tests/test_apps/defaults_pkg_with_dot")
+    monkeypatch.chdir("lerna/tests/test_apps/defaults_pkg_with_dot")
     cmd = [
         "my_app.py",
         f'hydra.run.dir="{str(tmpdir)}"',
@@ -1366,7 +1366,7 @@ class TestTaskRunnerLogging:
     def test_1(self, hydra_restore_singletons: Any, hydra_task_runner: TTaskRunner) -> None:
         with hydra_task_runner(
             calling_file=None,
-            calling_module="tests.test_apps.app_without_config.my_app",
+            calling_module="lerna.tests.test_apps.app_without_config.my_app",
             config_path=None,
             config_name=None,
         ):
@@ -1401,7 +1401,7 @@ def test_job_exception(
 ) -> None:
     ret = run_with_error(
         [
-            "tests/test_apps/app_exception/my_app.py",
+            "lerna/tests/test_apps/app_exception/my_app.py",
             f'hydra.run.dir="{tmpdir}"',
             "hydra.job.chdir=True",
         ]
@@ -1412,7 +1412,7 @@ def test_job_exception(
 def test_job_exception_full_error(tmpdir: Any) -> None:
     ret = run_with_error(
         [
-            "tests/test_apps/app_exception/my_app.py",
+            "lerna/tests/test_apps/app_exception/my_app.py",
             f'hydra.run.dir="{tmpdir}"',
             "hydra.job.chdir=True",
         ],
@@ -1424,7 +1424,7 @@ def test_job_exception_full_error(tmpdir: Any) -> None:
 
 
 def test_structured_with_none_list(monkeypatch: Any, tmpdir: Path) -> None:
-    monkeypatch.chdir("tests/test_apps/structured_with_none_list")
+    monkeypatch.chdir("lerna/tests/test_apps/structured_with_none_list")
     cmd = [
         "my_app.py",
         f'hydra.run.dir="{str(tmpdir)}"',
@@ -1458,7 +1458,7 @@ def test_job_id_and_num_in_sweep(tmpdir: Path) -> None:
 
 def test_hydra_main_without_config_path(tmpdir: Path) -> None:
     cmd = [
-        "tests/test_apps/hydra_main_without_config_path/my_app.py",
+        "lerna/tests/test_apps/hydra_main_without_config_path/my_app.py",
         f'hydra.run.dir="{tmpdir}"',
         "hydra.job.chdir=True",
     ]
@@ -1487,7 +1487,7 @@ def test_hydra_main_without_config_path(tmpdir: Path) -> None:
 
 def test_job_chdir_not_specified(tmpdir: Path) -> None:
     cmd = [
-        "tests/test_apps/app_with_no_chdir_override/my_app.py",
+        "lerna/tests/test_apps/app_with_no_chdir_override/my_app.py",
         f'hydra.run.dir="{tmpdir}"',
     ]
     out, err = run_python_script(cmd, allow_warnings=True)
@@ -1509,7 +1509,7 @@ def test_job_chdir_not_specified(tmpdir: Path) -> None:
 
 def test_app_with_unicode_config(tmpdir: Path) -> None:
     cmd = [
-        "tests/test_apps/app_with_unicode_in_config/my_app.py",
+        "lerna/tests/test_apps/app_with_unicode_in_config/my_app.py",
         f'hydra.run.dir="{tmpdir}"',
         "hydra.job.chdir=True",
     ]
@@ -1569,7 +1569,7 @@ def test_frozen_primary_config(tmpdir: Path, overrides: List[str], expected: str
 )
 def test_hydra_deprecation_warning(env_deprecation_err: bool, expected: str, tmpdir: Path) -> None:
     cmd = [
-        "tests/test_apps/deprecation_warning/my_app.py",
+        "lerna/tests/test_apps/deprecation_warning/my_app.py",
         f'hydra.run.dir="{tmpdir}"',
         "hydra.job.chdir=True",
     ]
@@ -1609,7 +1609,7 @@ def test_disable_chdir(tmpdir: Path, multirun: bool, expected: List[str]) -> Non
 )
 def test_disable_chdir_with_app_chdir(tmpdir: Path, chdir: bool) -> None:
     cmd = [
-        "tests/test_apps/app_change_dir/my_app.py",
+        "lerna/tests/test_apps/app_change_dir/my_app.py",
         f'hydra.run.dir="{tmpdir}"',
         f"hydra.job.chdir={chdir}",
     ]
@@ -1624,7 +1624,7 @@ def test_disable_chdir_with_app_chdir(tmpdir: Path, chdir: bool) -> None:
 )
 def test_hydra_verbose_1897(tmpdir: Path, multirun: bool) -> None:
     cmd = [
-        "tests/test_apps/hydra_verbose/my_app.py",
+        "lerna/tests/test_apps/hydra_verbose/my_app.py",
         f'hydra.run.dir="{tmpdir}"',
         "hydra.job.chdir=False",
     ]
@@ -1645,7 +1645,7 @@ def test_hydra_resolver_in_output_dir(tmpdir: Path, multirun: bool) -> None:
     output_dir = str(Path(tmpdir) / subdir)
 
     cmd = [
-        "tests/test_apps/hydra_resolver_in_output_dir/my_app.py",
+        "lerna/tests/test_apps/hydra_resolver_in_output_dir/my_app.py",
         f"hydra.run.dir='{output_dir}'",
         f"hydra.sweep.subdir='{subdir}'",
         f"hydra.sweep.dir={str(Path(tmpdir))}",
@@ -1793,7 +1793,7 @@ def test_hydra_mode(
     warning_msg: Optional[str],
 ) -> None:
     cmd = [
-        "tests/test_apps/app_print_hydra_mode/my_app.py",
+        "lerna/tests/test_apps/app_print_hydra_mode/my_app.py",
     ]
     cmd.extend(overrides)
     cmd.extend(
@@ -1841,7 +1841,7 @@ def test_hydra_mode(
 
 def test_hydra_runtime_choice_1882(tmpdir: Path) -> None:
     cmd = [
-        "tests/test_apps/app_with_cfg_groups/my_app_with_runtime_choices_print.py",
+        "lerna/tests/test_apps/app_with_cfg_groups/my_app_with_runtime_choices_print.py",
         "--multirun",
         f"hydra.sweep.dir={tmpdir}",
         "hydra.hydra_logging.formatters.simple.format='[HYDRA] %(message)s'",

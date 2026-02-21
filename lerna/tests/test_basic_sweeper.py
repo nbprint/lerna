@@ -63,7 +63,7 @@ def test_partial_failure(
     cmd = [
         sys.executable,
         "-Werror",
-        "tests/test_apps/app_can_fail/my_app.py",
+        "lerna/tests/test_apps/app_can_fail/my_app.py",
         "--multirun",
         "+divisor=1,0",
         f'hydra.run.dir="{str(tmpdir)}"',

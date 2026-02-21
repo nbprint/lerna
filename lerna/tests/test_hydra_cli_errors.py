@@ -90,7 +90,7 @@ def test_cli_error(
     override: Any,
     expected_substrings: List[str],
 ) -> None:
-    monkeypatch.chdir("tests/test_apps/app_without_config/")
+    monkeypatch.chdir("lerna/tests/test_apps/app_without_config/")
     if isinstance(override, str):
         override = [override]
     cmd = ["my_app.py", "hydra.sweep.dir=" + str(tmpdir)] + override

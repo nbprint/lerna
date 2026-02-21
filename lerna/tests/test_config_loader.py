@@ -540,7 +540,7 @@ def test_job_env_copy() -> None:
     ],
 )
 def test_complex_defaults(overrides: Any, expected: Any) -> None:
-    config_loader = ConfigLoaderImpl(config_search_path=create_config_search_path("tests/test_apps/sweep_complex_defaults/conf"))
+    config_loader = ConfigLoaderImpl(config_search_path=create_config_search_path("lerna/tests/test_apps/sweep_complex_defaults/conf"))
 
     cfg = config_loader.load_configuration(config_name="config", overrides=overrides, run_mode=RunMode.RUN)
     with open_dict(cfg):
@@ -715,7 +715,7 @@ def test_apply_overrides_to_config(input_cfg: Any, overrides: List[str], expecte
 )
 def test_overriding_with_dict(config: str, overrides: Any, expected: Any) -> None:
     config_loader = ConfigLoaderImpl(
-        config_search_path=create_config_search_path("tests/test_apps/app_with_cfg_groups/conf"),
+        config_search_path=create_config_search_path("lerna/tests/test_apps/app_with_cfg_groups/conf"),
     )
 
     cfg = config_loader.load_configuration(config_name=config, overrides=overrides, run_mode=RunMode.RUN)
@@ -765,7 +765,7 @@ def test_overriding_with_dict(config: str, overrides: Any, expected: Any) -> Non
 )
 def test_hydra_choices(config: str, overrides: Any, expected_choices: Any) -> None:
     config_loader = ConfigLoaderImpl(
-        config_search_path=create_config_search_path("tests/test_apps/app_with_cfg_groups/conf"),
+        config_search_path=create_config_search_path("lerna/tests/test_apps/app_with_cfg_groups/conf"),
     )
 
     cfg = config_loader.load_configuration(config_name=config, overrides=overrides, run_mode=RunMode.RUN)

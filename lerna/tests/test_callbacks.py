@@ -25,7 +25,7 @@ chdir_hydra_root()
     "app_path,args,expected",
     [
         param(
-            "tests/test_apps/app_with_callbacks/custom_callback/my_app.py",
+            "lerna/tests/test_apps/app_with_callbacks/custom_callback/my_app.py",
             [],
             dedent(
                 """\
@@ -40,7 +40,7 @@ chdir_hydra_root()
             id="custom_callback",
         ),
         param(
-            "tests/test_apps/app_with_callbacks/custom_callback/my_app.py",
+            "lerna/tests/test_apps/app_with_callbacks/custom_callback/my_app.py",
             [
                 "foo=bar",
                 "-m",
@@ -60,7 +60,7 @@ chdir_hydra_root()
             id="custom_callback_multirun",
         ),
         param(
-            "tests/test_apps/app_with_callbacks/custom_callback/my_app.py",
+            "lerna/tests/test_apps/app_with_callbacks/custom_callback/my_app.py",
             [
                 "--config-name",
                 "config_with_two_callbacks",
@@ -83,13 +83,13 @@ chdir_hydra_root()
             id="two_custom_callbacks",
         ),
         param(
-            "tests/test_apps/app_with_callbacks/on_job_start_accepts_task_function/my_app.py",
+            "lerna/tests/test_apps/app_with_callbacks/on_job_start_accepts_task_function/my_app.py",
             [],
             r"\[JOB\] on_job_start task_function: <function my_app at 0x[0-9a-fA-F]+>",
             id="on_job_start_task_function",
         ),
         param(
-            "tests/test_apps/app_with_callbacks/app_with_log_compose_callback/my_app.py",
+            "lerna/tests/test_apps/app_with_callbacks/app_with_log_compose_callback/my_app.py",
             ["age=10"],
             dedent(
                 """\
@@ -137,7 +137,7 @@ def test_app_with_callbacks(
 
 @mark.parametrize("multirun", [True, False])
 def test_experimental_save_job_info_callback(tmpdir: Path, multirun: bool) -> None:
-    app_path = "tests/test_apps/app_with_pickle_job_info_callback/my_app.py"
+    app_path = "lerna/tests/test_apps/app_with_pickle_job_info_callback/my_app.py"
 
     cmd = [
         app_path,
@@ -182,7 +182,7 @@ def test_experimental_save_job_info_callback(tmpdir: Path, multirun: bool) -> No
 
 @mark.parametrize("multirun", [True, False])
 def test_save_job_return_callback(tmpdir: Path, multirun: bool) -> None:
-    app_path = "tests/test_apps/app_with_log_jobreturn_callback/my_app.py"
+    app_path = "lerna/tests/test_apps/app_with_log_jobreturn_callback/my_app.py"
     cmd = [
         sys.executable,
         app_path,
@@ -215,7 +215,7 @@ def test_save_job_return_callback(tmpdir: Path, multirun: bool) -> None:
     ],
 )
 def test_experimental_rerun(tmpdir: Path, warning_msg: str, overrides: List[str]) -> None:
-    app_path = "tests/test_apps/app_with_pickle_job_info_callback/my_app.py"
+    app_path = "lerna/tests/test_apps/app_with_pickle_job_info_callback/my_app.py"
 
     cmd = [
         app_path,
