@@ -26,6 +26,17 @@ from lerna.types import TaskFunction
 from omegaconf import Container, DictConfig, OmegaConf
 
 
+def normalize_path_for_override(path: Union[str, Path]) -> str:
+    """
+    Normalize a path for use in Hydra overrides.
+
+    On Windows, backslashes in paths like C:\\Users\\runneradmin\\Temp can be
+    misinterpreted as escape sequences (\\r = carriage return, \\t = tab).
+    Using forward slashes avoids this issue and works on all platforms.
+    """
+    return str(path).replace("\\", "/")
+
+
 @contextmanager
 def does_not_raise(enter_result: Any = None) -> Iterator[Any]:
     yield enter_result
@@ -135,7 +146,7 @@ class SweepTaskFunction:
             Path(self.temp_dir).mkdir(parents=True, exist_ok=True)
         else:
             self.temp_dir = tempfile.mkdtemp()
-        overrides.append(f"hydra.sweep.dir={self.temp_dir}")
+        overrides.append(f"hydra.sweep.dir={normalize_path_for_override(self.temp_dir)}")
 
         try:
             validate_config_path(self.config_path)

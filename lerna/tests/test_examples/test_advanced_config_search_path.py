@@ -7,6 +7,7 @@ from pytest import mark
 
 from lerna.test_utils.test_utils import (
     chdir_hydra_root,
+    normalize_path_for_override,
     run_python_script,
     run_with_error,
 )
@@ -34,7 +35,7 @@ chdir_hydra_root()
 def test_config_search_path(args: List[str], expected: str, tmpdir: Path, error: Optional[str]) -> None:
     cmd = [
         "examples/advanced/config_search_path/my_app.py",
-        f'hydra.run.dir="{str(tmpdir)}"',
+        f'hydra.run.dir="{normalize_path_for_override(tmpdir)}"',
         "hydra.job.chdir=True",
     ]
     cmd.extend(args)

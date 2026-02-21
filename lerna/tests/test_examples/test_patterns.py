@@ -9,6 +9,7 @@ from lerna.test_utils.test_utils import (
     TTaskRunner,
     assert_text_same,
     chdir_hydra_root,
+    normalize_path_for_override,
     run_python_script,
     run_with_error,
     verify_dir_outputs,
@@ -37,7 +38,7 @@ def test_specializing_config_example(hydra_restore_singletons: Any, hydra_task_r
 def test_write_protect_config_node(tmpdir: Any) -> None:
     cmd = [
         "examples/patterns/write_protect_config_node/frozen.py",
-        f'hydra.run.dir="{str(tmpdir)}"',
+        f'hydra.run.dir="{normalize_path_for_override(tmpdir)}"',
         "hydra.job.chdir=True",
         "data_bits=10",
     ]
@@ -67,7 +68,7 @@ def test_extending_configs(monkeypatch: Any, tmpdir: Path, overrides: List[str])
     monkeypatch.chdir("examples/patterns/extending_configs")
     cmd = [
         "my_app.py",
-        f'hydra.run.dir="{str(tmpdir)}"',
+        f'hydra.run.dir="{normalize_path_for_override(tmpdir)}"',
         "hydra.job.chdir=True",
     ] + overrides
     result, _err = run_python_script(cmd)
@@ -106,7 +107,7 @@ def test_configuring_experiments(monkeypatch: Any, tmpdir: Path, overrides: List
     monkeypatch.chdir("examples/patterns/configuring_experiments")
     cmd = [
         "my_app.py",
-        f'hydra.run.dir="{str(tmpdir)}"',
+        f'hydra.run.dir="{normalize_path_for_override(tmpdir)}"',
         "hydra.job.chdir=True",
     ] + overrides
     result, _err = run_python_script(cmd)
@@ -175,7 +176,7 @@ def test_multi_select(monkeypatch: Any, tmpdir: Path, overrides: List[str], expe
     monkeypatch.chdir("examples/patterns/multi-select")
     cmd = [
         "my_app.py",
-        f'hydra.run.dir="{str(tmpdir)}"',
+        f'hydra.run.dir="{normalize_path_for_override(tmpdir)}"',
         "hydra.job.chdir=True",
     ] + overrides
     result, _err = run_python_script(cmd)
