@@ -6,7 +6,7 @@ publish = false
 
 [lib]
 name = "lerna"
-path = "src/lib.rs"
+path = "rust/python/lib.rs"
 crate-type = ["cdylib"]
 
 [dependencies]
