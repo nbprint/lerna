@@ -1,0 +1,8 @@
+[project]
+name = "fake-package2"
+version = "0.0.0"
+requires-python = ">=3.9"
+dependencies = []
+
+[project.entry-points."hydra.lernaplugins"]
+fake-package2 = "pkg:fake_package2.hydra"

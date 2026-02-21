@@ -221,6 +221,34 @@ defaults:
 
 Hydra breaks with importlib-resources 6.2+ due to `OrphanPath` objects not having `is_file()`/`is_dir()` methods. Lerna handles this gracefully.
 
+### Plugin Registration Compatible with Hydra
+
+Lerna provides a bridge that allows plugins registered via lerna to work with hydra-core. This enables you to write plugins once and have them work with both frameworks.
+
+#### Registering Plugins via Entry Points
+
+Add your plugin to `pyproject.toml` using the `hydra.lernaplugins` entry point group:
+
+```toml
+# For SearchPathPlugin modules:
+[project.entry-points."hydra.lernaplugins"]
+my-plugin = "my_package.plugin_module"
+
+# For package-style config directories:
+[project.entry-points."hydra.lernaplugins"]
+my-plugin = "pkg:my_package.hydra"
+```
+
+**Module-style entry points** (like `my_package.plugin_module`) are imported and scanned for `SearchPathPlugin` subclasses.
+
+**Package-style entry points** (like `pkg:my_package.hydra`) register config search paths directly.
+
+#### How It Works
+
+When hydra-core is used, lerna's `LernaGenericSearchPathPlugin` (installed in the `hydra_plugins` namespace) discovers all plugins registered under `hydra.lernaplugins` and makes them available to hydra's plugin system.
+
+This enables gradual migration: you can write plugins for lerna and they'll automatically work with existing hydra-core installations.
+
 ### Third-Party Plugins
 
 Hydra's plugin ecosystem (Optuna, Ray, Submitit, etc.) references `hydra` internally. To use them with Lerna:
