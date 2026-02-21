@@ -47,6 +47,8 @@ develop = [
     "ruff>=0.9,<0.15",
     "twine",
     "wheel",
+    # Testing
+    "hydra-core",
 ]
 
 [project.scripts]
@@ -150,6 +152,7 @@ path = "."
 [tool.hatch.build.targets.sdist]
 packages = [
     "lerna",
+    "hydra_plugins",
 ]
 include = [
     "rust",
@@ -162,7 +165,8 @@ exclude = [
 
 [tool.hatch.build.targets.wheel]
 packages = [
-    "lerna"
+    "lerna",
+    "hydra_plugins",
 ]
 exclude = [
     "examples",
