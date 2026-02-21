@@ -573,14 +573,20 @@ fn override_value_to_py(py: Python<'_>, value: &RustOverrideValue) -> PyResult<P
             Ok(dict.unbind().into_any())
         }
         RustOverrideValue::ListExtension(ext) => {
-            // Return list extension info as dict with list of values
+            // Return list extension info as dict with operation, values, and index
             let dict = PyDict::new(py);
             dict.set_item("type", "list_extension")?;
+            dict.set_item("operation", ext.operation.to_string())?;
             let values = PyList::empty(py);
             for elem in &ext.values {
                 values.append(parsed_element_to_py(py, elem)?)?;
             }
             dict.set_item("values", values)?;
+            if let Some(idx) = ext.index {
+                dict.set_item("index", idx)?;
+            } else {
+                dict.set_item("index", py.None())?;
+            }
             Ok(dict.unbind().into_any())
         }
     }

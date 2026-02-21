@@ -195,11 +195,11 @@ class TestRunAndReport:
                     Traceback \(most recent call last\):
                       File "[^"]+", line \d+, in run_and_report
                         return func\(\)(
-                    [^\n]*)?
+                               \^+)?
                       File "[^"]+", line \d+, in simple_error
-                        assert False, "simple_err_msg"(
-                    [^\n]*)?
+                        assert False, "simple_err_msg"
                     AssertionError: simple_err_msg
+                    assert False
                     """
                 ).strip(),
                 id="simple_failure_full_traceback",
@@ -210,11 +210,10 @@ class TestRunAndReport:
                     r"""
                     Traceback \(most recent call last\):
                       File "[^"]+", line \d+, in nested_error
-                        assert False, "nested_err"(
-                    [^\n]*)?
+                        assert False, "nested_err"
                     AssertionError: nested_err
-                    (assert False
-                    )?
+                    assert False
+
                     Set the environment variable HYDRA_FULL_ERROR=1 for a complete stack trace\.
                     """
                 ).strip(),
@@ -226,8 +225,7 @@ class TestRunAndReport:
                     r"""
                     Traceback \(most recent call last\):
                       File "[^"]+", line \d+, in job_calling_omconf
-                        OmegaConf.resolve\(123\)  # type: ignore(
-                    [^\n]*)?
+                        OmegaConf.resolve\(123\)  # type: ignore(\n    [~\^]+)?
                     ValueError: Invalid config type \(int\), expected an OmegaConf Container
 
                     Set the environment variable HYDRA_FULL_ERROR=1 for a complete stack trace\.
@@ -239,14 +237,9 @@ class TestRunAndReport:
     )
     def test_failure(self, demo_func: Any, expected_traceback_regex: str) -> None:
         mock_stderr = io.StringIO()
-        # Patch is_under_debugger to return False so the test works even when
-        # running with coverage (which sets sys.gettrace)
-        with (
-            raises(SystemExit, match="1"),
-            patch("sys.stderr", new=mock_stderr),
-            patch("lerna._internal.utils.is_under_debugger", return_value=False),
-        ):
-            run_and_report(demo_func)
+        with patch("lerna._internal.utils.is_under_debugger", return_value=False):
+            with raises(SystemExit, match="1"), patch("sys.stderr", new=mock_stderr):
+                run_and_report(demo_func)
         mock_stderr.seek(0)
         stderr_output = mock_stderr.read()
         assert_multiline_regex_search(expected_traceback_regex, stderr_output)
@@ -262,26 +255,21 @@ class TestRunAndReport:
             r"""
             Traceback \(most recent call last\):$
               File "[^"]+", line \d+, in nested_error$
-                assert False, "nested_err"([^\n]*)?$
+                assert False, "nested_err"$
             AssertionError: nested_err$
-            (assert False$)?
+            assert False$
             Set the environment variable HYDRA_FULL_ERROR=1 for a complete stack trace\.$
             """
         )
         mock_stderr = io.StringIO()
-        # Patch is_under_debugger to return False so the test works even when
-        # running with coverage (which sets sys.gettrace)
-        with (
-            raises(SystemExit, match="1"),
-            patch("sys.stderr", new=mock_stderr),
-            patch("lerna._internal.utils.is_under_debugger", return_value=False),
-        ):
-            # Patch `inspect.getmodule` so that it will return None. This simulates a
-            # situation where a python module cannot be identified from a traceback
-            # stack frame. This can occur when python extension modules or
-            # multithreading are involved.
-            with patch("inspect.getmodule", new=lambda *args: None):
-                run_and_report(demo_func)
+        with patch("lerna._internal.utils.is_under_debugger", return_value=False):
+            with raises(SystemExit, match="1"), patch("sys.stderr", new=mock_stderr):
+                # Patch `inspect.getmodule` so that it will return None. This simulates a
+                # situation where a python module cannot be identified from a traceback
+                # stack frame. This can occur when python extension modules or
+                # multithreading are involved.
+                with patch("inspect.getmodule", new=lambda *args: None):
+                    run_and_report(demo_func)
         mock_stderr.seek(0)
         stderr_output = mock_stderr.read()
         assert_regex_match(expected_traceback_regex, stderr_output)
@@ -303,17 +291,15 @@ class TestRunAndReport:
             """
         )
         mock_stderr = io.StringIO()
-        # Patch is_under_debugger to return False so the test works even when
-        # running with coverage (which sets sys.gettrace)
-        with (
-            raises(AssertionError, match="nested_err"),
-            patch("sys.stderr", new=mock_stderr),
-            patch("lerna._internal.utils.is_under_debugger", return_value=False),
-        ):
-            # patch `traceback.print_exception` so that an exception will occur
-            # in the simplified traceback logic:
-            with patch("traceback.print_exception", new=throws):
-                run_and_report(demo_func)
+        with patch("lerna._internal.utils.is_under_debugger", return_value=False):
+            with (
+                raises(AssertionError, match="nested_err"),
+                patch("sys.stderr", new=mock_stderr),
+            ):
+                # patch `traceback.print_exception` so that an exception will occur
+                # in the simplified traceback logic:
+                with patch("traceback.print_exception", new=throws):
+                    run_and_report(demo_func)
         mock_stderr.seek(0)
         stderr_output = mock_stderr.read()
         assert_regex_match(expected_traceback_regex, stderr_output)

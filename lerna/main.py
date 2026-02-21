@@ -46,6 +46,7 @@ def main(
     config_path: Optional[str] = _UNSPECIFIED_,
     config_name: Optional[str] = None,
     version_base: Optional[str] = _UNSPECIFIED_,
+    overrides: Optional[List[str]] = None,
 ) -> Callable[[TaskFunction], Any]:
     """
     :param config_path: The config path, a directory where Hydra will search for
@@ -55,6 +56,9 @@ def main(
                         a python package to add to the searchpath.
                         If config_path is None no directory is added to the Config search path.
     :param config_name: The name of the config (usually the file name without the .yaml extension)
+    :param overrides: Default overrides to apply. CLI overrides take precedence over these.
+                      This is useful for setting defaults that can still be overridden from CLI.
+                      (Lerna extension - fixes Hydra issue #2459)
     """
 
     version.setbase(version_base)
@@ -84,6 +88,13 @@ def main(
             else:
                 args_parser = get_args_parser()
                 args = args_parser.parse_args()
+
+                # Merge decorator overrides with CLI overrides (CLI takes precedence)
+                # This implements Hydra issue #2459
+                if overrides:
+                    # Decorator overrides come first, CLI overrides can override them
+                    args.overrides = list(overrides) + args.overrides
+
                 if args.experimental_rerun is not None:
                     cfg = _get_rerun_conf(args.experimental_rerun, args.overrides)
                     task_function(cfg)

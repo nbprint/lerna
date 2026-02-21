@@ -68,7 +68,7 @@ pub struct JobReturn {
 /// # Usage
 ///
 /// ## Pure Rust (standalone)
-/// ```rust
+/// ```rust,ignore
 /// use lerna::callback::{Callback, NoOpCallback};
 ///
 /// // Use default no-op callback

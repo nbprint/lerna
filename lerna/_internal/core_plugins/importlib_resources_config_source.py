@@ -29,6 +29,30 @@ class ImportlibResourcesConfigSource(ConfigSource):
     def scheme() -> str:
         return "pkg"
 
+    @staticmethod
+    def _safe_is_file(res: Any) -> bool:
+        """Safely check if resource is a file.
+
+        Works around importlib-resources 6.2+ OrphanPath issue (Hydra #2870).
+        OrphanPath objects may not have is_file/is_dir/exists methods.
+        """
+        try:
+            return res.is_file()
+        except AttributeError:
+            # OrphanPath or similar object without is_file method
+            return False
+
+    @staticmethod
+    def _safe_is_dir(res: Any) -> bool:
+        """Safely check if resource is a directory.
+
+        Works around importlib-resources 6.2+ OrphanPath issue (Hydra #2870).
+        """
+        try:
+            return res.is_dir()
+        except AttributeError:
+            return False
+
     def _read_config(self, res: Any) -> ConfigResult:
         try:
             if isinstance(res, zipfile.Path):
@@ -80,7 +104,7 @@ class ImportlibResourcesConfigSource(ConfigSource):
     def load_config(self, config_path: str) -> ConfigResult:
         normalized_config_path = self._normalize_file_name(config_path)
         res = resources.files(self.path).joinpath(normalized_config_path)
-        if not (res.is_file() or res.is_dir()):
+        if not (self._safe_is_file(res) or self._safe_is_dir(res)):
             raise ConfigLoadError(f"Config not found : {normalized_config_path}")
 
         return self._read_config(res)
@@ -90,7 +114,7 @@ class ImportlibResourcesConfigSource(ConfigSource):
             files = resources.files(self.path)
         except (ValueError, ModuleNotFoundError, TypeError):
             return False
-        return any(f.name == "__init__.py" and f.is_file() for f in files.iterdir())
+        return any(f.name == "__init__.py" and self._safe_is_file(f) for f in files.iterdir())
 
     def is_group(self, config_path: str) -> bool:
         try:
@@ -99,9 +123,7 @@ class ImportlibResourcesConfigSource(ConfigSource):
             return False
 
         res = files.joinpath(config_path)
-        ret = res.is_dir()
-        assert isinstance(ret, bool)
-        return ret
+        return self._safe_is_dir(res)
 
     def is_config(self, config_path: str) -> bool:
         config_path = self._normalize_file_name(config_path)
@@ -110,9 +132,7 @@ class ImportlibResourcesConfigSource(ConfigSource):
         except (ValueError, ModuleNotFoundError, TypeError):
             return False
         res = files.joinpath(config_path)
-        ret = res.is_file()
-        assert isinstance(ret, bool)
-        return ret
+        return self._safe_is_file(res)
 
     def list(self, config_path: str, results_filter: Optional[ObjectType]) -> List[str]:
         files: List[str] = []

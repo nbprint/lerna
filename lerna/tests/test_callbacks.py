@@ -13,6 +13,7 @@ from lerna.core.utils import JobReturn, JobStatus
 from lerna.test_utils.test_utils import (
     assert_regex_match,
     chdir_hydra_root,
+    normalize_path_for_override,
     run_process,
     run_python_script,
 )
@@ -119,7 +120,7 @@ def test_app_with_callbacks(
 ) -> None:
     cmd = [
         app_path,
-        f'hydra.run.dir="{str(tmpdir)}"',
+        f'hydra.run.dir="{normalize_path_for_override(tmpdir)}"',
         "hydra.job.chdir=True",
         "hydra.hydra_logging.formatters.simple.format='[HYDRA] %(message)s'",
         "hydra.job_logging.formatters.simple.format='[JOB] %(message)s'",
@@ -141,8 +142,8 @@ def test_experimental_save_job_info_callback(tmpdir: Path, multirun: bool) -> No
 
     cmd = [
         app_path,
-        f'hydra.run.dir="{str(tmpdir)}"',
-        f'hydra.sweep.dir="{str(tmpdir).replace(chr(92), chr(47))}"',
+        f'hydra.run.dir="{normalize_path_for_override(tmpdir)}"',
+        "hydra.sweep.dir=" + normalize_path_for_override(tmpdir),
         "hydra.job.chdir=True",
     ]
     if multirun:
@@ -186,8 +187,8 @@ def test_save_job_return_callback(tmpdir: Path, multirun: bool) -> None:
     cmd = [
         sys.executable,
         app_path,
-        f'hydra.run.dir="{str(tmpdir)}"',
-        f'hydra.sweep.dir="{str(tmpdir).replace(chr(92), chr(47))}"',
+        f'hydra.run.dir="{normalize_path_for_override(tmpdir)}"',
+        "hydra.sweep.dir=" + normalize_path_for_override(tmpdir),
         "hydra.job.chdir=True",
     ]
     if multirun:
@@ -219,8 +220,8 @@ def test_experimental_rerun(tmpdir: Path, warning_msg: str, overrides: List[str]
 
     cmd = [
         app_path,
-        f'hydra.run.dir="{str(tmpdir)}"',
-        f'hydra.sweep.dir="{str(tmpdir).replace(chr(92), chr(47))}"',
+        f'hydra.run.dir="{normalize_path_for_override(tmpdir)}"',
+        "hydra.sweep.dir=" + normalize_path_for_override(tmpdir),
         "hydra.job.chdir=False",
         "hydra.hydra_logging.formatters.simple.format='[HYDRA] %(message)s'",
         "hydra.job_logging.formatters.simple.format='[JOB] %(message)s'",

@@ -2,8 +2,8 @@
 //! Override parser for configuration overrides.
 
 use crate::core::{
-    ChoiceSweep, IntervalSweep, Key, ListExtension, Override, OverrideType, OverrideValue,
-    ParsedElement, Quote, QuotedString, RangeSweep,
+    ChoiceSweep, IntervalSweep, Key, ListExtension, ListOperationType, Override, OverrideType,
+    OverrideValue, ParsedElement, Quote, QuotedString, RangeSweep,
 };
 use rand::seq::SliceRandom;
 use std::sync::Arc;
@@ -1415,7 +1415,13 @@ impl OverrideParser {
             "tag" => self.build_tagged_sweep(args),
             "shuffle" => self.build_shuffle(args, &kwargs), // won't reach here, handled above
             "sort" => self.build_sort(args, &kwargs),       // won't reach here, handled above
-            "extend_list" => self.build_extend_list(args),
+            "extend_list" => self.build_list_append(args),
+            "append" => self.build_list_append(args),
+            "prepend" => self.build_list_prepend(args),
+            "insert" => self.build_list_insert(args),
+            "remove_at" => self.build_list_remove_at(args),
+            "remove_value" => self.build_list_remove_value(args),
+            "list_clear" => self.build_list_clear(args),
             "int" | "float" | "str" | "bool" | "json_str" => {
                 if args.is_empty() {
                     return Err(ParseError {
@@ -2356,8 +2362,110 @@ impl OverrideParser {
         }))
     }
 
-    fn build_extend_list(&self, args: Vec<ParsedElement>) -> ParseResult<OverrideValue> {
-        Ok(OverrideValue::ListExtension(ListExtension { values: args }))
+    fn build_list_append(&self, args: Vec<ParsedElement>) -> ParseResult<OverrideValue> {
+        Ok(OverrideValue::ListExtension(ListExtension {
+            operation: ListOperationType::Append,
+            values: args,
+            index: None,
+        }))
+    }
+
+    fn build_list_prepend(&self, args: Vec<ParsedElement>) -> ParseResult<OverrideValue> {
+        Ok(OverrideValue::ListExtension(ListExtension {
+            operation: ListOperationType::Prepend,
+            values: args,
+            index: None,
+        }))
+    }
+
+    fn build_list_insert(&self, args: Vec<ParsedElement>) -> ParseResult<OverrideValue> {
+        // insert(index, value) - requires at least 2 arguments
+        if args.len() < 2 {
+            return Err(ParseError {
+                message: "insert() requires at least 2 arguments: insert(index, value, ...)"
+                    .to_string(),
+                position: self.pos,
+            });
+        }
+
+        // First argument must be an integer index
+        let index = match &args[0] {
+            ParsedElement::Int(i) => *i,
+            _ => {
+                return Err(ParseError {
+                    message: "insert() first argument must be an integer index".to_string(),
+                    position: self.pos,
+                })
+            }
+        };
+
+        // Remaining arguments are values to insert
+        let values = args.into_iter().skip(1).collect();
+
+        Ok(OverrideValue::ListExtension(ListExtension {
+            operation: ListOperationType::Insert,
+            values,
+            index: Some(index),
+        }))
+    }
+
+    fn build_list_remove_at(&self, args: Vec<ParsedElement>) -> ParseResult<OverrideValue> {
+        // remove_at(index) - requires exactly 1 argument
+        if args.len() != 1 {
+            return Err(ParseError {
+                message: "remove_at() requires exactly 1 argument: remove_at(index)".to_string(),
+                position: self.pos,
+            });
+        }
+
+        // Argument must be an integer index
+        let index = match &args[0] {
+            ParsedElement::Int(i) => *i,
+            _ => {
+                return Err(ParseError {
+                    message: "remove_at() argument must be an integer index".to_string(),
+                    position: self.pos,
+                })
+            }
+        };
+
+        Ok(OverrideValue::ListExtension(ListExtension {
+            operation: ListOperationType::RemoveAt,
+            values: vec![],
+            index: Some(index),
+        }))
+    }
+
+    fn build_list_remove_value(&self, args: Vec<ParsedElement>) -> ParseResult<OverrideValue> {
+        // remove_value(value) - requires at least 1 argument
+        if args.is_empty() {
+            return Err(ParseError {
+                message: "remove_value() requires at least 1 argument".to_string(),
+                position: self.pos,
+            });
+        }
+
+        Ok(OverrideValue::ListExtension(ListExtension {
+            operation: ListOperationType::RemoveValue,
+            values: args,
+            index: None,
+        }))
+    }
+
+    fn build_list_clear(&self, args: Vec<ParsedElement>) -> ParseResult<OverrideValue> {
+        // list_clear() - no arguments
+        if !args.is_empty() {
+            return Err(ParseError {
+                message: "list_clear() takes no arguments".to_string(),
+                position: self.pos,
+            });
+        }
+
+        Ok(OverrideValue::ListExtension(ListExtension {
+            operation: ListOperationType::Clear,
+            values: vec![],
+            index: None,
+        }))
     }
 
     /// Convert a ParsedElement to its source representation for error messages

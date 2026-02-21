@@ -8,6 +8,7 @@ from pytest import mark, param
 from lerna.test_utils.test_utils import (
     assert_text_same,
     chdir_hydra_root,
+    normalize_path_for_override,
     run_python_script,
 )
 
@@ -24,7 +25,7 @@ chdir_hydra_root()
 def test_instantiate_object(tmpdir: Path, overrides: List[str], output: str) -> None:
     cmd = [
         "examples/instantiate/object/my_app.py",
-        f'hydra.run.dir="{tmpdir}"',
+        f'hydra.run.dir="{normalize_path_for_override(tmpdir)}"',
         "hydra.job.chdir=True",
     ] + overrides
     result, _err = run_python_script(cmd)
@@ -44,7 +45,7 @@ def test_instantiate_object(tmpdir: Path, overrides: List[str], output: str) -> 
 def test_instantiate_object_recursive(tmpdir: Path, overrides: List[str], output: str) -> None:
     cmd = [
         "examples/instantiate/object_recursive/my_app.py",
-        f'hydra.run.dir="{str(tmpdir)}"',
+        f'hydra.run.dir="{normalize_path_for_override(tmpdir)}"',
         "hydra.job.chdir=True",
     ] + overrides
     result, _err = run_python_script(cmd)
@@ -54,7 +55,7 @@ def test_instantiate_object_recursive(tmpdir: Path, overrides: List[str], output
 def test_instantiate_object_partial(tmpdir: Path) -> None:
     cmd = [
         "examples/instantiate/partial/my_app.py",
-        f'hydra.run.dir="{str(tmpdir)}"',
+        f'hydra.run.dir="{normalize_path_for_override(tmpdir)}"',
         "hydra.job.chdir=True",
     ]
     result, _err = run_python_script(cmd)
@@ -71,7 +72,7 @@ def test_instantiate_object_partial(tmpdir: Path) -> None:
 def test_instantiate_schema(tmpdir: Path, overrides: List[str], output: str) -> None:
     cmd = [
         "examples/instantiate/schema/my_app.py",
-        f'hydra.run.dir="{str(tmpdir)}"',
+        f'hydra.run.dir="{normalize_path_for_override(tmpdir)}"',
         "hydra.job.chdir=True",
     ] + overrides
     result, _err = run_python_script(cmd)
@@ -98,7 +99,7 @@ def test_instantiate_schema(tmpdir: Path, overrides: List[str], output: str) -> 
 def test_instantiate_schema_recursive(tmpdir: Path, overrides: List[str], expected: str) -> None:
     cmd = [
         "examples/instantiate/schema_recursive/my_app.py",
-        f'hydra.run.dir="{tmpdir}"',
+        f'hydra.run.dir="{normalize_path_for_override(tmpdir)}"',
         "hydra.job.chdir=True",
     ] + overrides
     result, _err = run_python_script(cmd)
@@ -135,7 +136,7 @@ def test_instantiate_schema_recursive(tmpdir: Path, overrides: List[str], expect
 def test_instantiate_docs_example(tmpdir: Path, overrides: List[str], expected: str) -> None:
     cmd = [
         "examples/instantiate/docs_example/my_app.py",
-        f'hydra.run.dir="{tmpdir}"',
+        f'hydra.run.dir="{normalize_path_for_override(tmpdir)}"',
         "hydra.job.chdir=True",
     ] + overrides
     result, _err = run_python_script(cmd)

@@ -8,6 +8,7 @@ from textwrap import dedent
 from typing import Any, Callable, Dict, List, Sequence, Tuple, Union
 
 from omegaconf._utils import is_structured_config
+from omegaconf.errors import OmegaConfBaseException
 
 from lerna._internal.utils import _locate
 from lerna.errors import InstantiationException
@@ -69,6 +70,119 @@ class _Keys(str, Enum):
     RECURSIVE = "_recursive_"
     ARGS = "_args_"
     PARTIAL = "_partial_"
+
+
+def _enhance_omegaconf_error(e: OmegaConfBaseException, cfg: Any) -> None:
+    """Enhance OmegaConf error with full_key and object_type if missing.
+
+    This fixes Hydra #2235 where OmegaConf.resolve() doesn't provide
+    full_key and object_type context in errors.
+    """
+    # Only enhance if object_type is missing/None
+    if hasattr(e, "object_type") and e.object_type is None:
+        if OmegaConf.is_config(cfg):
+            obj_type = cfg._metadata.object_type
+            if obj_type is not None:
+                object.__setattr__(e, "object_type", obj_type)
+
+    # Only enhance if full_key is missing/None
+    if hasattr(e, "full_key") and e.full_key is None:
+        # Try to get the key from the error if available
+        if hasattr(e, "key") and e.key is not None:
+            object.__setattr__(e, "full_key", str(e.key))
+
+
+def _format_enhanced_error_message(e: OmegaConfBaseException) -> None:
+    """Update the error message to include full_key and object_type context.
+
+    OmegaConf errors store their base message in args[0], and __str__
+    may just return the args without the full_key/object_type info
+    when those were initially None.
+    """
+    if not hasattr(e, "full_key") or not hasattr(e, "object_type"):
+        return
+
+    full_key = e.full_key
+    obj_type = e.object_type
+
+    # Get the base message
+    if e.args:
+        base_msg = str(e.args[0])
+    else:
+        base_msg = str(e)
+
+    # Don't add context if already present
+    if "full_key:" in base_msg or "object_type=" in base_msg:
+        return
+
+    # Format the enhanced message
+    parts = [base_msg]
+    if full_key is not None:
+        parts.append(f"    full_key: {full_key}")
+    if obj_type is not None:
+        # Get just the class name without full module path
+        type_name = obj_type.__name__ if hasattr(obj_type, "__name__") else str(obj_type)
+        parts.append(f"    object_type={type_name}")
+
+    enhanced_msg = "\n".join(parts)
+
+    # Update the exception's args tuple with the enhanced message
+    e.args = (enhanced_msg,) + e.args[1:]
+
+
+def _find_bad_interpolation_key(cfg: Any, prefix: str = "") -> str | None:
+    """Walk config to find which key contains a bad interpolation.
+
+    Returns the full key path of the first interpolation error found, or None.
+    """
+    if not OmegaConf.is_config(cfg):
+        return None
+
+    if OmegaConf.is_dict(cfg):
+        for key in cfg.keys():
+            full_key = f"{prefix}.{key}" if prefix else str(key)
+            try:
+                value = cfg[key]
+                # Recurse into nested configs
+                if OmegaConf.is_config(value):
+                    result = _find_bad_interpolation_key(value, full_key)
+                    if result:
+                        return result
+            except OmegaConfBaseException:
+                return full_key
+    elif OmegaConf.is_list(cfg):
+        for i, item in enumerate(cfg._iter_ex(resolve=False)):
+            full_key = f"{prefix}[{i}]" if prefix else f"[{i}]"
+            try:
+                value = cfg[i]  # this triggers resolution
+                if OmegaConf.is_config(value):
+                    result = _find_bad_interpolation_key(value, full_key)
+                    if result:
+                        return result
+            except OmegaConfBaseException:
+                return full_key
+
+    return None
+
+
+def _resolve_with_context(cfg: Any) -> None:
+    """Resolve config with enhanced error context.
+
+    Wraps OmegaConf.resolve() to ensure errors include full_key and object_type.
+    This fixes Hydra #2235.
+    """
+    try:
+        OmegaConf.resolve(cfg)
+    except OmegaConfBaseException as e:
+        # Try to find the key that caused the error
+        if hasattr(e, "full_key") and e.full_key is None:
+            bad_key = _find_bad_interpolation_key(cfg)
+            if bad_key:
+                object.__setattr__(e, "full_key", bad_key)
+
+        _enhance_omegaconf_error(e, cfg)
+        _format_enhanced_error_message(e)
+        raise
 
 
 def _is_target(x: Any) -> bool:
@@ -164,8 +278,13 @@ def _prepare_input_dict_or_list(d: Union[Dict[Any, Any], List[Any]]) -> Any:
     return res
 
 
-def _resolve_target(target: Union[str, type, Callable[..., Any]], full_key: str) -> Union[type, Callable[..., Any]]:
-    """Resolve target string, type or callable into type or callable."""
+def _resolve_target(target: Union[str, type, Callable[..., Any]], full_key: str, call: bool = True) -> Union[type, Callable[..., Any], Any]:
+    """Resolve target string, type or callable into type or callable.
+
+    If call is False, returns the resolved target without requiring it to be callable.
+    This enables lookup of non-callable objects like torch.int64.
+    (Lerna extension - fixes Hydra issue #2140)
+    """
     if isinstance(target, str):
         if target in DEFAULT_BLOCKLISTED_MODULES:
             allowlist = os.environ.get("HYDRA_INSTANTIATE_ALLOWLIST_OVERRIDE", "")
@@ -187,6 +306,11 @@ def _resolve_target(target: Union[str, type, Callable[..., Any]], full_key: str)
             if full_key:
                 msg += f"\nfull_key: {full_key}"
             raise InstantiationException(msg) from e
+
+    # If _call_=False, return the target as-is without calling it (Hydra #2140)
+    if not call:
+        return target
+
     if not callable(target):
         msg = f"Expected a callable target, got '{target}' of type '{type(target).__name__}'"
         if full_key:
@@ -307,7 +431,7 @@ def instantiate(
         if kwargs:
             config = OmegaConf.merge(config, kwargs)
 
-        OmegaConf.resolve(config)
+        _resolve_with_context(config)
 
         _recursive_ = config.pop(_Keys.RECURSIVE, True)
         _convert_ = config.pop(_Keys.CONVERT, ConvertMode.NONE)
@@ -325,7 +449,7 @@ def instantiate(
         config_copy._set_flag(flags=["allow_objects", "struct", "readonly"], values=[True, False, False])
         config = config_copy
 
-        OmegaConf.resolve(config)
+        _resolve_with_context(config)
 
         _recursive_ = kwargs.pop(_Keys.RECURSIVE, True)
         _convert_ = kwargs.pop(_Keys.CONVERT, ConvertMode.NONE)
@@ -407,9 +531,17 @@ def instantiate_node(
             return lst
 
     elif OmegaConf.is_dict(node):
-        exclude_keys = set({"_target_", "_convert_", "_recursive_", "_partial_"})
+        exclude_keys = set({"_target_", "_convert_", "_recursive_", "_partial_", "_call_"})
         if _is_target(node):
-            _target_ = _resolve_target(node.get(_Keys.TARGET), full_key)
+            # Check for _call_ parameter (Lerna extension - Hydra #2140)
+            # If _call_=False, just resolve and return the target without calling
+            should_call = node.get("_call_", True)
+            _target_ = _resolve_target(node.get(_Keys.TARGET), full_key, call=should_call)
+
+            # If _call_=False, return the resolved target directly
+            if not should_call:
+                return _target_
+
             kwargs = {}
             is_partial = node.get("_partial_", False) or partial
             for key in node.keys():

@@ -134,17 +134,17 @@ impl PyJobContext {
 
     #[getter]
     fn output_dir(&self) -> String {
-        self.inner.output_dir.to_string_lossy().replace('\\', "/")
+        self.inner.output_dir.to_string_lossy().to_string()
     }
 
     #[getter]
     fn working_dir(&self) -> String {
-        self.inner.working_dir.to_string_lossy().replace('\\', "/")
+        self.inner.working_dir.to_string_lossy().to_string()
     }
 
     #[getter]
     fn original_cwd(&self) -> String {
-        self.inner.original_cwd.to_string_lossy().replace('\\', "/")
+        self.inner.original_cwd.to_string_lossy().to_string()
     }
 
     #[getter]
@@ -182,10 +182,9 @@ impl PyJobContext {
 #[pyfunction]
 #[pyo3(signature = (job_dir_value, job_subdir_value=None))]
 fn compute_output_dir(job_dir_value: &str, job_subdir_value: Option<&str>) -> String {
-    // Normalize path separators to forward slashes for cross-platform consistency
     rust_compute_output_dir(job_dir_value, job_subdir_value)
         .to_string_lossy()
-        .replace('\\', "/")
+        .to_string()
 }
 
 /// Create output directories
@@ -193,7 +192,7 @@ fn compute_output_dir(job_dir_value: &str, job_subdir_value: Option<&str>) -> St
 #[pyo3(signature = (output_dir, subdir=None))]
 fn create_output_dirs(output_dir: &str, subdir: Option<&str>) -> PyResult<String> {
     rust_create_output_dirs(&PathBuf::from(output_dir), subdir)
-        .map(|p| p.to_string_lossy().replace('\\', "/"))
+        .map(|p| p.to_string_lossy().to_string())
         .map_err(|e| PyIOError::new_err(e.to_string()))
 }
 
@@ -207,7 +206,7 @@ fn save_config(
 ) -> PyResult<String> {
     let config_dict = py_to_config_dict(py, config)?;
     rust_save_config_file(&config_dict, filename, &PathBuf::from(output_dir))
-        .map(|p| p.to_string_lossy().replace('\\', "/"))
+        .map(|p| p.to_string_lossy().to_string())
         .map_err(|e| PyIOError::new_err(e.to_string()))
 }
 
@@ -215,7 +214,7 @@ fn save_config(
 #[pyfunction]
 fn save_overrides(overrides: Vec<String>, filename: &str, output_dir: &str) -> PyResult<String> {
     rust_save_overrides_file(&overrides, filename, &PathBuf::from(output_dir))
-        .map(|p| p.to_string_lossy().replace('\\', "/"))
+        .map(|p| p.to_string_lossy().to_string())
         .map_err(|e| PyIOError::new_err(e.to_string()))
 }
 
@@ -240,7 +239,7 @@ fn setup_job_environment(
         &hydra_dict,
         &overrides,
     )
-    .map(|p| p.to_string_lossy().replace('\\', "/"))
+    .map(|p| p.to_string_lossy().to_string())
     .map_err(|e| PyIOError::new_err(e.to_string()))
 }
 

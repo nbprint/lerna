@@ -12,6 +12,38 @@ from lerna.errors import ConfigCompositionException
 from omegaconf import AnyNode, DictConfig, OmegaConf
 
 
+def _normalize_path(path: str) -> str:
+    """Normalize a config path by resolving . and .. segments.
+
+    Fixes Hydra #2878: relative paths with .. in defaults list
+    would create empty string keys in the config hierarchy.
+
+    Examples:
+        dir1/../dir2/child -> dir2/child
+        ./dir/child -> dir/child
+        dir1/dir2/../file -> dir1/file
+    """
+    if not path:
+        return path
+
+    parts = path.split("/")
+    result: List[str] = []
+
+    for part in parts:
+        if part == "." or part == "":
+            # Skip current directory markers and empty parts
+            continue
+        elif part == "..":
+            # Go up one directory if possible
+            if result:
+                result.pop()
+            # If result is empty, we're at root - ignore the ..
+        else:
+            result.append(part)
+
+    return "/".join(result)
+
+
 @dataclass
 class ResultDefault:
     config_path: Optional[str] = None
@@ -346,14 +378,17 @@ class ConfigDefault(InputDefault):
 
         if not absolute:
             if self.parent_base_dir == "":
-                return group
+                result = group
             else:
                 if group == "":
-                    return f"{self.parent_base_dir}"
+                    result = f"{self.parent_base_dir}"
                 else:
-                    return f"{self.parent_base_dir}/{group}"
+                    result = f"{self.parent_base_dir}/{group}"
         else:
-            return group
+            result = group
+
+        # Normalize paths with .. segments (Hydra #2878)
+        return _normalize_path(result)
 
     def get_name(self) -> Optional[str]:
         assert self.path is not None
@@ -375,11 +410,14 @@ class ConfigDefault(InputDefault):
 
         if not absolute:
             if self.parent_base_dir == "":
-                return path
+                result = path
             else:
-                return f"{self.parent_base_dir}/{path}"
+                result = f"{self.parent_base_dir}/{path}"
         else:
-            return path
+            result = path
+
+        # Normalize paths with .. segments (Hydra #2878)
+        return _normalize_path(result)
 
     def get_final_package(self, default_to_package_header: bool = True) -> str:
         return self._get_final_package(
@@ -470,15 +508,20 @@ class GroupDefault(InputDefault):
             absolute = False
 
         if self.parent_base_dir == "" or absolute:
-            return group
+            result = group
         else:
-            return f"{self.parent_base_dir}/{group}"
+            result = f"{self.parent_base_dir}/{group}"
+
+        # Normalize paths with .. segments (Hydra #2878)
+        return _normalize_path(result)
 
     def get_config_path(self) -> str:
         group_path = self.get_group_path()
         assert group_path != ""
 
-        return f"{group_path}/{self.get_name()}"
+        result = f"{group_path}/{self.get_name()}"
+        # Normalize paths with .. segments (Hydra #2878)
+        return _normalize_path(result)
 
     def is_name(self) -> bool:
         return self.value is None or isinstance(self.value, str)

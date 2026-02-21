@@ -364,7 +364,12 @@ def _update_overrides(
     for d in defaults_list:
         if d.is_self():
             continue
-        d.update_parent(parent.get_group_path(), parent.get_final_package())
+        # Fix for Hydra #2935: External appends (CLI +group=value) should use
+        # absolute paths from root, not relative to the parent config's subfolder.
+        if isinstance(d, GroupDefault) and d.external_append:
+            d.update_parent("", parent.get_final_package())
+        else:
+            d.update_parent(parent.get_group_path(), parent.get_final_package())
 
         legacy_hydra_override = False
         if isinstance(d, GroupDefault):
@@ -516,7 +521,10 @@ def _create_defaults_tree_impl(
             if d.is_override():
                 continue
 
-            d.update_parent(parent.get_group_path(), parent.get_final_package())
+            # Skip update_parent for external_append items - they were already
+            # handled in _update_overrides with the correct path (Hydra #2935 fix).
+            if not (isinstance(d, GroupDefault) and d.external_append):
+                d.update_parent(parent.get_group_path(), parent.get_final_package())
 
             if overrides.is_overridden(d):
                 assert isinstance(d, GroupDefault)
