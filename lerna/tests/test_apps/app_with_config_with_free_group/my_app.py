@@ -1,6 +1,7 @@
 # Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved
-import lerna
 from omegaconf import DictConfig
+
+import lerna
 
 
 @lerna.main(version_base=None, config_path="conf", config_name="config")

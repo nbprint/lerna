@@ -2,10 +2,11 @@
 from textwrap import dedent
 from typing import List, Optional
 
+from omegaconf import DictConfig, OmegaConf, open_dict
+
 from lerna import version
 from lerna.core.global_hydra import GlobalHydra
 from lerna.types import RunMode
-from omegaconf import DictConfig, OmegaConf, open_dict
 
 from ._internal.deprecation_warning import deprecation_warning
 

@@ -11,11 +11,6 @@ import sys
 from abc import abstractmethod
 from typing import Any, List, Optional, Tuple
 
-from lerna.core.config_loader import ConfigLoader
-from lerna.core.object_type import ObjectType
-from lerna.errors import ConfigCompositionException
-from lerna.plugins.plugin import Plugin
-from lerna.types import RunMode
 from omegaconf import (
     Container,
     DictConfig,
@@ -23,6 +18,12 @@ from omegaconf import (
     MissingMandatoryValue,
     OmegaConf,
 )
+
+from lerna.core.config_loader import ConfigLoader
+from lerna.core.object_type import ObjectType
+from lerna.errors import ConfigCompositionException
+from lerna.plugins.plugin import Plugin
+from lerna.types import RunMode
 
 
 class CompletionPlugin(Plugin):

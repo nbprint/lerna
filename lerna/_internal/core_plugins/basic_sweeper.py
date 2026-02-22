@@ -25,6 +25,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Sequence
 
+from omegaconf import DictConfig, OmegaConf
+
 from lerna.core.config_store import ConfigStore
 from lerna.core.override_parser.overrides_parser import OverridesParser
 from lerna.core.override_parser.types import Override
@@ -33,7 +35,6 @@ from lerna.errors import HydraException
 from lerna.plugins.launcher import Launcher
 from lerna.plugins.sweeper import Sweeper
 from lerna.types import HydraContext, TaskFunction
-from omegaconf import DictConfig, OmegaConf
 
 
 @dataclass

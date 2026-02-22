@@ -3,6 +3,7 @@ import re
 from pathlib import Path
 from typing import List, Optional
 
+from omegaconf import OmegaConf
 from pytest import mark
 
 from lerna.test_utils.test_utils import (
@@ -11,7 +12,6 @@ from lerna.test_utils.test_utils import (
     run_python_script,
     run_with_error,
 )
-from omegaconf import OmegaConf
 
 chdir_hydra_root()
 

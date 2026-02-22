@@ -5,9 +5,10 @@ import pickle
 from pathlib import Path
 from typing import Any
 
+from omegaconf import DictConfig
+
 import lerna
 from lerna.core.hydra_config import HydraConfig
-from omegaconf import DictConfig
 
 log = logging.getLogger(__name__)
 

@@ -4,12 +4,12 @@ from dataclasses import dataclass, field
 from textwrap import dedent
 from typing import List, Optional, Pattern, Union
 
+from omegaconf import AnyNode, DictConfig, OmegaConf
 from omegaconf.errors import InterpolationResolutionError
 
 from lerna import version
 from lerna._internal.deprecation_warning import deprecation_warning
 from lerna.errors import ConfigCompositionException
-from omegaconf import AnyNode, DictConfig, OmegaConf
 
 
 def _normalize_path(path: str) -> str:

@@ -7,6 +7,8 @@ from dataclasses import dataclass, field
 from textwrap import dedent
 from typing import Callable, Dict, List, Optional, Set, Tuple, Union
 
+from omegaconf import DictConfig, OmegaConf
+
 from lerna import MissingConfigException, version
 from lerna._internal.config_repository import IConfigRepository
 from lerna.core.config_store import ConfigStore
@@ -21,7 +23,6 @@ from lerna.core.default_element import (
 from lerna.core.object_type import ObjectType
 from lerna.core.override_parser.types import Override
 from lerna.errors import ConfigCompositionException
-from omegaconf import DictConfig, OmegaConf
 
 from .deprecation_warning import deprecation_warning
 

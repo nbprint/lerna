@@ -2,11 +2,12 @@
 from abc import ABC, abstractmethod
 from typing import Any, List, Optional
 
+from omegaconf import DictConfig
+
 from lerna.core.config_search_path import ConfigSearchPath
 from lerna.core.object_type import ObjectType
 from lerna.plugins.config_source import ConfigSource
 from lerna.types import RunMode
-from omegaconf import DictConfig
 
 
 class ConfigLoader(ABC):

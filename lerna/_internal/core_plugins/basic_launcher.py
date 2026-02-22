@@ -4,6 +4,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Optional, Sequence
 
+from omegaconf import DictConfig, open_dict
+
 from lerna.core.config_store import ConfigStore
 from lerna.core.utils import (
     JobReturn,
@@ -14,7 +16,6 @@ from lerna.core.utils import (
 )
 from lerna.plugins.launcher import Launcher
 from lerna.types import HydraContext, TaskFunction
-from omegaconf import DictConfig, open_dict
 
 log = logging.getLogger(__name__)
 

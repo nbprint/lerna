@@ -41,7 +41,6 @@ develop = [
     "build",
     "bump-my-version",
     "check-dist",
-    "check-manifest",
     "cibuildwheel",
     "codespell",
     "hatch-rs",
@@ -90,18 +89,6 @@ replace = 'version = "{new_version}"'
 filename = "rust/Cargo.toml"
 search = 'version = "{current_version}"'
 replace = 'version = "{new_version}"'
-
-[tool.check-manifest]
-ignore = [
-    ".copier-answers.yaml",
-    "Cargo.toml",
-    "Cargo.lock",
-    "Makefile",
-    "docs/**/*",
-    "examples/**/*",
-    "rust/**/*",
-    "src/**/*"
-]
 
 [tool.cibuildwheel]
 build = "cp310-*"
@@ -162,12 +149,12 @@ packages = [
     "lerna",
     "hydra_plugins",
     "rust",
-    "src",
     "Cargo.toml",
     "Cargo.lock",
 ]
 exclude = [
     "examples",
+    "rust/Makefile",
     "target",
 ]
 

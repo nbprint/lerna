@@ -1,9 +1,10 @@
 # Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved
 from typing import List, Optional
 
+from omegaconf import DictConfig
+
 from lerna import version
 from lerna._internal.deprecation_warning import deprecation_warning
-from omegaconf import DictConfig
 
 
 def compose(

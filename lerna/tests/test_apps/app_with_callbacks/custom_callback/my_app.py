@@ -3,10 +3,11 @@
 import logging
 from typing import Any
 
+from omegaconf import DictConfig, OmegaConf
+
 import lerna
 from lerna.core.utils import JobReturn
 from lerna.experimental.callback import Callback
-from omegaconf import DictConfig, OmegaConf
 
 log = logging.getLogger(__name__)
 

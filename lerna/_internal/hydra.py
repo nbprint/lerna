@@ -7,6 +7,8 @@ from argparse import ArgumentParser
 from collections import defaultdict
 from typing import Any, Callable, DefaultDict, List, Optional, Sequence, Type, Union
 
+from omegaconf import Container, DictConfig, OmegaConf, flag_override
+
 from lerna._internal.utils import get_column_widths, run_and_report
 from lerna.core.config_loader import ConfigLoader
 from lerna.core.config_search_path import ConfigSearchPath
@@ -26,7 +28,6 @@ from lerna.plugins.launcher import Launcher
 from lerna.plugins.search_path_plugin import SearchPathPlugin
 from lerna.plugins.sweeper import Sweeper
 from lerna.types import HydraContext, RunMode, TaskFunction
-from omegaconf import Container, DictConfig, OmegaConf, flag_override
 
 from ..core.default_element import DefaultsTreeNode, InputDefault
 from .callbacks import Callbacks

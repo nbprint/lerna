@@ -5,10 +5,6 @@ from dataclasses import dataclass
 from textwrap import dedent
 from typing import Dict, List, Optional, Tuple
 
-from lerna import version
-from lerna.core.config_search_path import ConfigSearchPath
-from lerna.core.object_type import ObjectType
-from lerna.plugins.config_source import ConfigResult, ConfigSource
 from omegaconf import (
     Container,
     DictConfig,
@@ -18,6 +14,11 @@ from omegaconf import (
     open_dict,
     read_write,
 )
+
+from lerna import version
+from lerna.core.config_search_path import ConfigSearchPath
+from lerna.core.object_type import ObjectType
+from lerna.plugins.config_source import ConfigResult, ConfigSource
 
 from ..core.default_element import ConfigDefault, GroupDefault, InputDefault
 from .deprecation_warning import deprecation_warning

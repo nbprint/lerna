@@ -8,6 +8,7 @@ from pathlib import Path
 from textwrap import dedent
 from typing import Any, Dict, List, Optional
 
+from omegaconf import MISSING, OmegaConf
 from pytest import fixture, mark, param, raises, warns
 
 from lerna import (
@@ -28,7 +29,6 @@ from lerna.errors import (
     OverrideParseException,
 )
 from lerna.test_utils.test_utils import chdir_hydra_root
-from omegaconf import MISSING, OmegaConf
 
 chdir_hydra_root()
 

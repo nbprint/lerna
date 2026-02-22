@@ -7,13 +7,13 @@ from enum import Enum
 from textwrap import dedent
 from typing import Any, Callable, Dict, List, Sequence, Tuple, Union
 
+from omegaconf import OmegaConf, SCMode
 from omegaconf._utils import is_structured_config
 from omegaconf.errors import OmegaConfBaseException
 
 from lerna._internal.utils import _locate
 from lerna.errors import InstantiationException
 from lerna.types import ConvertMode, TargetConf
-from omegaconf import OmegaConf, SCMode
 
 DEFAULT_BLOCKLISTED_MODULES = {
     "builtins.exec",

@@ -2,8 +2,9 @@
 from dataclasses import dataclass
 from typing import Any
 
-from lerna.core.config_store import ConfigStore
 from omegaconf import MISSING
+
+from lerna.core.config_store import ConfigStore
 
 
 @dataclass

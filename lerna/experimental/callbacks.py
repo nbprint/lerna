@@ -6,11 +6,12 @@ import pickle
 from pathlib import Path
 from typing import Any, List, Optional
 
+from omegaconf import DictConfig, OmegaConf, flag_override
+
 from lerna.core.global_hydra import GlobalHydra
 from lerna.core.utils import JobReturn, JobStatus
 from lerna.experimental.callback import Callback
 from lerna.types import RunMode
-from omegaconf import DictConfig, OmegaConf, flag_override
 
 
 class LogJobReturnCallback(Callback):

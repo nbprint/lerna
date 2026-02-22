@@ -2,10 +2,11 @@
 import time
 from pathlib import Path
 
+from omegaconf import DictConfig
+
 import lerna
 from lerna.core.hydra_config import HydraConfig
 from lerna.utils import get_original_cwd
-from omegaconf import DictConfig
 
 
 @lerna.main(version_base=None)

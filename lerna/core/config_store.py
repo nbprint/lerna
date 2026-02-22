@@ -3,10 +3,11 @@ import copy
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
 
+from omegaconf import DictConfig, OmegaConf
+
 from lerna.core.object_type import ObjectType
 from lerna.core.singleton import Singleton
 from lerna.plugins.config_source import ConfigLoadError
-from omegaconf import DictConfig, OmegaConf
 
 # Import Rust ConfigStore
 try:

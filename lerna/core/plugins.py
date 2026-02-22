@@ -10,6 +10,8 @@ from dataclasses import dataclass, field
 from timeit import default_timer as timer
 from typing import Any, Dict, List, Optional, Tuple, Type
 
+from omegaconf import DictConfig
+
 from lerna._internal.sources_registry import SourcesRegistry
 from lerna.core.singleton import Singleton
 from lerna.plugins.completion_plugin import CompletionPlugin
@@ -20,7 +22,6 @@ from lerna.plugins.search_path_plugin import SearchPathPlugin
 from lerna.plugins.sweeper import Sweeper
 from lerna.types import HydraContext, TaskFunction
 from lerna.utils import instantiate
-from omegaconf import DictConfig
 
 PLUGIN_TYPES: List[Type[Plugin]] = [
     Plugin,

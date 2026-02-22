@@ -18,12 +18,13 @@ from pathlib import Path
 from subprocess import PIPE, Popen
 from typing import Any, Callable, Dict, Iterator, List, Optional, Protocol, Tuple, Union
 
+from omegaconf import Container, DictConfig, OmegaConf
+
 from lerna._internal.hydra import Hydra
 from lerna._internal.utils import detect_task_name
 from lerna.core.global_hydra import GlobalHydra
 from lerna.core.utils import JobReturn, validate_config_path
 from lerna.types import TaskFunction
-from omegaconf import Container, DictConfig, OmegaConf
 
 
 def normalize_path_for_override(path: Union[str, Path]) -> str:

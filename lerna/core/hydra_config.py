@@ -1,9 +1,10 @@
 # Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved
 from typing import Any, Optional
 
+from omegaconf import DictConfig, OmegaConf
+
 from lerna.conf import HydraConf
 from lerna.core.singleton import Singleton
-from omegaconf import DictConfig, OmegaConf
 
 
 class HydraConfig(metaclass=Singleton):

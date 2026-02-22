@@ -1,4 +1,0 @@
-hydra:
-  callbacks:
-    custom_callback:
-      _target_: my_app.OnJobStartCallback

@@ -1,7 +1,0 @@
-foo: bar
-
-hydra:
-  callbacks:
-    custom_callback:
-      _target_: my_app.CustomCallback
-      callback_name: custom_callback

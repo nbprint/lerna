@@ -3,8 +3,9 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import TYPE_CHECKING, Any, Callable
 
-from lerna import version
 from omegaconf import MISSING
+
+from lerna import version
 
 from ._internal.deprecation_warning import deprecation_warning
 

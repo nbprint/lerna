@@ -14,7 +14,6 @@ mod core;
 mod defaults;
 mod defaults_list;
 mod env;
-mod example;
 mod glob;
 mod interpolation;
 mod job;
@@ -30,8 +29,6 @@ mod sweep;
 mod sweeper;
 mod utils;
 mod validation;
-
-pub use example::Example;
 
 #[pymodule]
 fn lerna(_py: Python, m: &Bound<PyModule>) -> PyResult<()> {
@@ -129,9 +126,6 @@ fn lerna(_py: Python, m: &Bound<PyModule>) -> PyResult<()> {
 
     // Sweeper bindings
     sweeper::register(m)?;
-
-    // Legacy example
-    m.add_class::<Example>()?;
 
     Ok(())
 }
