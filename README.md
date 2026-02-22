@@ -4,6 +4,11 @@ A high-performance configuration framework for Python applications, built with R
 
 Lerna is a rewrite of Facebook's [Hydra](https://github.com/facebookresearch/hydra) configuration framework. It provides the same powerful API with significantly improved performance through a Rust core.
 
+[![Build Status](https://github.com/nbprint/lerna/actions/workflows/build.yaml/badge.svg?branch=main&event=push)](https://github.com/nbprint/lerna/actions/workflows/build.yaml)
+[![codecov](https://codecov.io/gh/nbprint/lerna/branch/main/graph/badge.svg)](https://codecov.io/gh/nbprint/lerna)
+[![License](https://img.shields.io/github/license/nbprint/lerna)](https://github.com/nbprint/lerna)
+[![PyPI](https://img.shields.io/pypi/v/lerna.svg)](https://pypi.python.org/pypi/lerna)
+
 ## Features
 
 - **Same Hydra API**: Drop-in replacement for Hydra - just change `import hydra` to `import lerna`
