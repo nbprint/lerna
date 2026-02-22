@@ -1,6 +1,6 @@
 [package]
 name = "lerna"
-version = "0.1.0"
+version = "1.1.0"
 authors = ["the lerna authors <dev@1kbgz.com>"]
 edition = "2021"
 license = "Apache-2.0"
