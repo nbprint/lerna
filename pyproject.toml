@@ -166,7 +166,6 @@ packages = [
 exclude = [
     "examples",
     "rust",
-    "src",
 ]
 
 [tool.pytest.ini_options]
