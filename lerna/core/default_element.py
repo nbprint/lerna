@@ -609,6 +609,58 @@ See http://hydra.cc/docs/1.1/upgrades/1.0_to_1.1/defaults_list_interpolation for
 
 
 @dataclass
+class PatchDefault(InputDefault):
+    operations: List[str] = field(default_factory=list)
+    package_scope: Optional[str] = None
+
+    def is_self(self) -> bool:
+        return False
+
+    def is_optional(self) -> bool:
+        return False
+
+    def get_group_path(self) -> str:
+        return ""
+
+    def get_config_path(self) -> str:
+        return "_patch_"
+
+    def get_name(self) -> Optional[str]:
+        return None
+
+    def get_final_package(self, default_to_package_header: bool = True) -> str:
+        parent_package = self._get_parent_package()
+        return "" if parent_package is None else parent_package
+
+    def _relative_group_path(self) -> str:
+        return ""
+
+    def _get_attributes(self) -> List[str]:
+        return ["operations", "package_scope"]
+
+    def _get_flags(self) -> List[str]:
+        return []
+
+    def is_interpolation(self) -> bool:
+        return False
+
+    def is_missing(self) -> bool:
+        return False
+
+    def resolve_interpolation(self, known_choices: DictConfig) -> None:
+        return
+
+    def get_relative_override_key(self) -> str:
+        return ""
+
+    def is_override(self) -> bool:
+        return False
+
+    def is_external_append(self) -> bool:
+        return False
+
+
+@dataclass
 class DefaultsTreeNode:
     node: InputDefault
     children: Optional[List[Union["DefaultsTreeNode", InputDefault]]] = None

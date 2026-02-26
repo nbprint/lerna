@@ -248,6 +248,9 @@ class ConfigLoaderImpl(ConfigLoader):
         # The Hydra node should not be read-only even if the root config is read-only.
         OmegaConf.set_readonly(cfg.hydra, False)
 
+        # Apply defaults-list _patch_ operations before user CLI overrides.
+        ConfigLoaderImpl._apply_overrides_to_config(defaults_list.config_patch_overrides, cfg)
+
         # Apply command line overrides after enabling strict flag
         ConfigLoaderImpl._apply_overrides_to_config(config_overrides, cfg)
         app_overrides = []

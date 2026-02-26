@@ -17,10 +17,12 @@ from lerna.core.default_element import (
     DefaultsTreeNode,
     GroupDefault,
     InputDefault,
+    PatchDefault,
     ResultDefault,
     VirtualRoot,
 )
 from lerna.core.object_type import ObjectType
+from lerna.core.override_parser.overrides_parser import OverridesParser
 from lerna.core.override_parser.types import Override
 from lerna.errors import ConfigCompositionException
 
@@ -62,6 +64,7 @@ class Overrides:
 
     append_group_defaults: List[GroupDefault]
     config_overrides: List[Override]
+    patch_overrides: List[Override]
 
     known_choices: Dict[str, Optional[str]]
     known_choices_per_group: Dict[str, Set[str]]
@@ -73,7 +76,9 @@ class Overrides:
         self.override_metadata = {}
         self.append_group_defaults = []
         self.config_overrides = []
+        self.patch_overrides = []
         self.deletions = {}
+        self._override_parser = OverridesParser.create(config_loader=None)
 
         self.known_choices = {}
         self.known_choices_per_group = {}
@@ -112,6 +117,47 @@ class Overrides:
                 key = override.get_key_element()
                 self.override_choices[key] = value
                 self.override_metadata[key] = OverrideMetadata(external_override=True)
+
+    @staticmethod
+    def _resolve_patch_key(key: str, parent_package: str) -> str:
+        # _global_. prefix → absolute path (escape hatch to target root-level keys)
+        if key == "_global_":
+            return ""
+        if key.startswith("_global_."):
+            return key[len("_global_.") :]
+        # _here_. prefix → explicit relative to parent package
+        if key == "_here_":
+            return parent_package
+        if key.startswith("_here_."):
+            suffix = key[len("_here_.") :]
+            return f"{parent_package}.{suffix}" if parent_package else suffix
+        # Bare keys → auto-prefix with parent package (implicit _here_)
+        if parent_package:
+            return f"{parent_package}.{key}"
+        return key
+
+    def add_patch_operations(
+        self,
+        operations: List[str],
+        parent_package: str,
+        containing_config_path: str,
+        package_scope: Optional[str] = None,
+    ) -> None:
+        # If _patch_@pkg is used, scope bare keys to pkg instead of parent_package
+        effective_package = package_scope if package_scope is not None else parent_package
+        parsed = self._override_parser.parse_overrides(overrides=operations)
+        for override in parsed:
+            if override.is_sweep_override():
+                raise ConfigCompositionException(
+                    f"In '{containing_config_path}': _patch_ does not support sweep overrides ('{override.input_line}')."
+                )
+
+            resolved_key = Overrides._resolve_patch_key(override.key_or_group, effective_package)
+            if resolved_key == "":
+                raise ConfigCompositionException(f"In '{containing_config_path}': _patch_ override '{override.input_line}' resolved to an empty key.")
+
+            override.key_or_group = resolved_key
+            self.patch_overrides.append(override)
 
     def add_override(self, parent_config_path: str, default: GroupDefault) -> None:
         assert default.override
@@ -208,6 +254,7 @@ class DefaultsList:
     defaults: List[ResultDefault]
     defaults_tree: DefaultsTreeNode
     config_overrides: List[Override]
+    config_patch_overrides: List[Override]
     overrides: Overrides
 
 
@@ -363,6 +410,10 @@ def _update_overrides(
     seen_override = False
     last_override_seen = None
     for d in defaults_list:
+        if isinstance(d, PatchDefault):
+            d.update_parent(parent.get_group_path(), parent.get_final_package())
+            continue
+
         if d.is_self():
             continue
         # Fix for Hydra #2935: External appends (CLI +group=value) should use
@@ -515,6 +566,16 @@ def _create_defaults_tree_impl(
             child_list.append(subtree_)
 
     for d in reversed(defaults_list):
+        if isinstance(d, PatchDefault):
+            d.update_parent(parent.get_group_path(), parent.get_final_package())
+            overrides.add_patch_operations(
+                operations=d.operations,
+                parent_package=parent.get_final_package(),
+                containing_config_path=parent.get_config_path(),
+                package_scope=d.package_scope,
+            )
+            continue
+
         if d.is_self():
             d.update_parent(root.node.parent_base_dir, root.node.get_package())
             children.append(d)
@@ -733,6 +794,7 @@ def create_defaults_list(
     return DefaultsList(
         defaults=defaults,
         config_overrides=overrides.config_overrides,
+        config_patch_overrides=overrides.patch_overrides,
         defaults_tree=tree,
         overrides=overrides,
     )

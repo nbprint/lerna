@@ -20,7 +20,7 @@ from lerna.core.config_search_path import ConfigSearchPath
 from lerna.core.object_type import ObjectType
 from lerna.plugins.config_source import ConfigResult, ConfigSource
 
-from ..core.default_element import ConfigDefault, GroupDefault, InputDefault
+from ..core.default_element import ConfigDefault, GroupDefault, InputDefault, PatchDefault
 from .deprecation_warning import deprecation_warning
 from .sources_registry import SourcesRegistry
 
@@ -194,6 +194,37 @@ class ConfigRepository(IConfigRepository):
 
                 key = keys[0]
                 assert isinstance(key, str)
+
+                if key == "_patch_" or key.startswith("_patch_@"):
+                    # Extract optional package scope: _patch_@pkg → package_scope="pkg"
+                    package_scope = None
+                    if key.startswith("_patch_@"):
+                        package_scope = key[len("_patch_@") :]
+                        if not package_scope:
+                            raise ValueError(f"In {config_path}: _patch_@ requires a package name (e.g., _patch_@pkg)")
+
+                    node = item._get_node(key)
+                    assert node is not None and isinstance(node, Node)
+                    patch_value = node._value()
+
+                    if isinstance(patch_value, str):
+                        operations = [patch_value]
+                    elif isinstance(patch_value, list):
+                        operations = []
+                        for v in patch_value:
+                            vv = v._value()
+                            if not isinstance(vv, str):
+                                raise ValueError(
+                                    f"Unsupported _patch_ item value in defaults : {type(vv).__name__}, nested list items must be strings"
+                                )
+                            operations.append(vv)
+                    else:
+                        raise ValueError(f"Unsupported _patch_ value in defaults : {type(patch_value).__name__}. Supported: string or list")
+
+                    default = PatchDefault(operations=operations, package_scope=package_scope)
+                    res.append(default)
+                    continue
+
                 config_group, package, _package2 = self._split_group(key)
                 keywords = ConfigRepository.Keywords()
                 self._extract_keywords_from_config_group(config_group, keywords)

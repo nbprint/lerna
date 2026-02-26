@@ -211,6 +211,71 @@ python app.py --config-name=server/alpha +db@db_2=postgresql
 python app.py --config-name=server/alpha +db@db_2=postgresql  # Works!
 ```
 
+#### Defaults List Patching (`_patch_` directive)
+
+Hydra provides no way to remove or modify specific keys/values inherited from composed configs via the defaults list. Lerna adds a `_patch_` directive that lets you apply override operations to the composed config before CLI overrides are applied.
+
+```yaml
+# config.yaml
+defaults:
+  - some_lib/defaults    # pulls in a library config
+  - _self_
+  - _patch_:
+    - ~unwanted_key                # delete a key
+    - ~status=deprecated           # delete key only if value matches
+    - items=remove_value(stale)    # remove a list item by value
+    - items=remove_at(0)           # remove a list item by index
+    - +new_key=injected            # add a new key
+    - setting=new_value            # change a value
+```
+
+**Key resolution rules:**
+
+| Syntax             | Behavior                                           | Example                                      |
+| ------------------ | -------------------------------------------------- | -------------------------------------------- |
+| `_patch_:`         | Bare keys auto-prefix with parent config's package | `~drop_me` in `@pkg` config → `~pkg.drop_me` |
+| `_patch_@vendor:`  | Bare keys auto-prefix with specified package       | `~debug` → `~vendor.debug`                   |
+| `_here_.` prefix   | Explicit relative to parent package                | `_here_.drop_me` → `pkg.drop_me`             |
+| `_global_.` prefix | Absolute path from config root                     | `_global_.root_key` → `root_key`             |
+
+For root-level configs (no `@` package), bare keys and `_here_` are equivalent since the parent package is empty.
+
+**Supported operations** (uses lerna's full override syntax):
+
+| Operation            | Syntax                | Description                              |
+| -------------------- | --------------------- | ---------------------------------------- |
+| Delete key           | `~key`                | Remove key from config                   |
+| Conditional delete   | `~key=value`          | Remove key only if current value matches |
+| Change value         | `key=value`           | Set key to new value                     |
+| Add key              | `+key=value`          | Add new key (error if exists)            |
+| Force-add key        | `++key=value`         | Set key (create if missing)              |
+| List append          | `key=append(v)`       | Add item to end of list                  |
+| List prepend         | `key=prepend(v)`      | Add item to start of list                |
+| List insert          | `key=insert(i,v)`     | Insert item at index                     |
+| List remove by index | `key=remove_at(i)`    | Remove item at index                     |
+| List remove by value | `key=remove_value(v)` | Remove first matching item               |
+| List clear           | `key=list_clear()`    | Remove all list items                    |
+
+**Example with packaged config:**
+
+```yaml
+# config.yaml — using _patch_@vendor to scope bare keys to the vendor package
+defaults:
+  - vendor/large_defaults@vendor
+  - _self_
+  - _patch_@vendor:
+    - ~debug_mode           # bare key → targets vendor.debug_mode
+    - items=remove_value(x) # bare key → targets vendor.items
+
+# Multiple scoped patches can target different packages:
+# - _patch_@db:
+#   - ~debug
+# - _patch_@server:
+#   - port=9090
+```
+
+**Nested patches:** `_patch_` directives in sub-configs accumulate naturally. If `lib/refined.yaml` has its own `_patch_` that removes `beta`, and your root config adds `_patch_@lib:` to remove `gamma`, both patches apply — `beta` and `gamma` are both removed from the final config.
+
 #### Relative Path in Defaults Fix ([#2878](https://github.com/facebookresearch/hydra/issues/2878))
 
 Hydra produces empty string keys when using `..` in defaults list paths:
