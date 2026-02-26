@@ -403,3 +403,581 @@ class TestInstantiateErrorContext:
         error_msg = str(exc_info.value)
         assert "full_key: bad_interp" in error_msg
         assert "object_type=MyClass" in error_msg
+
+
+class TestDefaultsPatchDirective:
+    """Tests for defaults list _patch_ directive."""
+
+    @pytest.fixture
+    def config_dir(self, tmp_path):
+        """Root config with @_here_ — bare keys target root level directly."""
+        conf_dir = tmp_path / "conf"
+        some_thing_dir = conf_dir / "some_thing"
+        some_thing_dir.mkdir(parents=True)
+
+        (some_thing_dir / "base.yaml").write_text(
+            """
+drop_me: 1
+status: deprecated
+items:
+  - a
+  - b
+  - c
+keep: 42
+"""
+        )
+
+        # Root config: parent_package is "" so bare keys target root correctly
+        (conf_dir / "config.yaml").write_text(
+            """
+defaults:
+  - some_thing/base@_here_
+  - _self_
+  - _patch_:
+    - ~drop_me
+    - ~status=deprecated
+    - items=remove_value(b)
+
+name: root
+"""
+        )
+
+        return conf_dir
+
+    @pytest.fixture
+    def packaged_config_dir(self, tmp_path):
+        """Root config with @pkg — _patch_ in root must use explicit pkg. paths."""
+        conf_dir = tmp_path / "conf"
+        some_thing_dir = conf_dir / "some_thing"
+        some_thing_dir.mkdir(parents=True)
+
+        (some_thing_dir / "base.yaml").write_text(
+            """
+drop_me: true
+items:
+  - x
+  - y
+  - z
+keep: true
+"""
+        )
+
+        # _patch_ is in root config.yaml (parent_package=""), so explicit pkg. needed
+        (conf_dir / "config.yaml").write_text(
+            """
+defaults:
+  - some_thing/base@pkg
+  - _self_
+  - _patch_:
+    - ~pkg.drop_me
+    - pkg.items=remove_at(1)
+
+name: root
+"""
+        )
+
+        return conf_dir
+
+    @pytest.fixture
+    def auto_prefix_config_dir(self, tmp_path):
+        """_patch_ inside a packaged config — bare keys auto-prefix with package."""
+        conf_dir = tmp_path / "conf"
+        some_thing_dir = conf_dir / "some_thing"
+        some_thing_dir.mkdir(parents=True)
+
+        # This config will be included @pkg, so it gets parent_package="pkg"
+        # Its own _patch_ can use bare keys that auto-resolve to pkg.*
+        (some_thing_dir / "patched.yaml").write_text(
+            """
+defaults:
+  - base@_here_
+  - _self_
+  - _patch_:
+    - ~drop_me
+    - items=remove_value(b)
+
+extra: from_patched
+"""
+        )
+
+        (some_thing_dir / "base.yaml").write_text(
+            """
+drop_me: true
+items:
+  - a
+  - b
+  - c
+keep: 99
+"""
+        )
+
+        (conf_dir / "config.yaml").write_text(
+            """
+defaults:
+  - some_thing/patched@pkg
+  - _self_
+
+name: root
+"""
+        )
+
+        return conf_dir
+
+    @pytest.fixture
+    def global_escape_config_dir(self, tmp_path):
+        """_global_. targets root-level keys from inside any config."""
+        conf_dir = tmp_path / "conf"
+        some_thing_dir = conf_dir / "some_thing"
+        some_thing_dir.mkdir(parents=True)
+
+        (some_thing_dir / "base.yaml").write_text(
+            """
+keep: true
+"""
+        )
+
+        # _global_. prefix escapes to root level from root config
+        (conf_dir / "config.yaml").write_text(
+            """
+defaults:
+  - some_thing/base@pkg
+  - _self_
+  - _patch_:
+    - _global_.remove_me=null
+
+name: root
+remove_me: should_be_gone
+"""
+        )
+
+        return conf_dir
+
+    def test_patch_removes_key_value_and_list_item(self, config_dir):
+        from lerna import compose, initialize_config_dir
+        from lerna.core.global_hydra import GlobalHydra
+
+        GlobalHydra.instance().clear()
+        try:
+            with initialize_config_dir(config_dir=str(config_dir), version_base=None):
+                cfg = compose(config_name="config")
+                assert "drop_me" not in cfg
+                assert "status" not in cfg
+                assert cfg["items"] == ["a", "c"]
+                assert cfg.keep == 42
+        finally:
+            GlobalHydra.instance().clear()
+
+    def test_patch_explicit_package_path(self, packaged_config_dir):
+        """When _patch_ is in root config, explicit pkg. paths are required."""
+        from lerna import compose, initialize_config_dir
+        from lerna.core.global_hydra import GlobalHydra
+
+        GlobalHydra.instance().clear()
+        try:
+            with initialize_config_dir(config_dir=str(packaged_config_dir), version_base=None):
+                cfg = compose(config_name="config")
+                assert "drop_me" not in cfg.pkg
+                assert cfg.pkg["items"] == ["x", "z"]
+                assert cfg.pkg.keep is True
+        finally:
+            GlobalHydra.instance().clear()
+
+    def test_patch_bare_keys_auto_prefix(self, auto_prefix_config_dir):
+        """Bare keys in _patch_ auto-prefix when config itself is packaged."""
+        from lerna import compose, initialize_config_dir
+        from lerna.core.global_hydra import GlobalHydra
+
+        GlobalHydra.instance().clear()
+        try:
+            with initialize_config_dir(config_dir=str(auto_prefix_config_dir), version_base=None):
+                cfg = compose(config_name="config")
+                # bare ~drop_me resolved to ~pkg.drop_me (auto-prefix with parent_package)
+                assert "drop_me" not in cfg.pkg
+                # bare items=remove_value(b) resolved to pkg.items
+                assert cfg.pkg["items"] == ["a", "c"]
+                assert cfg.pkg.keep == 99
+                assert cfg.pkg.extra == "from_patched"
+        finally:
+            GlobalHydra.instance().clear()
+
+    def test_patch_global_escape(self, global_escape_config_dir):
+        """_global_. prefix targets root-level keys regardless of context."""
+        from lerna import compose, initialize_config_dir
+        from lerna.core.global_hydra import GlobalHydra
+
+        GlobalHydra.instance().clear()
+        try:
+            with initialize_config_dir(config_dir=str(global_escape_config_dir), version_base=None):
+                cfg = compose(config_name="config")
+                # _global_.remove_me targeted root level, setting it to null
+                assert cfg.remove_me is None
+                # pkg content is untouched
+                assert cfg.pkg.keep is True
+        finally:
+            GlobalHydra.instance().clear()
+
+    # --- Feature: _patch_@pkg scoped syntax ---
+
+    @pytest.fixture
+    def scoped_patch_config_dir(self, tmp_path):
+        """Root config using _patch_@pkg to scope bare keys to a package."""
+        conf_dir = tmp_path / "conf"
+        some_thing_dir = conf_dir / "some_thing"
+        some_thing_dir.mkdir(parents=True)
+
+        (some_thing_dir / "base.yaml").write_text(
+            """
+drop_me: true
+items:
+  - x
+  - y
+  - z
+keep: true
+"""
+        )
+
+        # _patch_@pkg: scopes bare keys to "pkg" without needing pkg. prefix
+        (conf_dir / "config.yaml").write_text(
+            """
+defaults:
+  - some_thing/base@pkg
+  - _self_
+  - _patch_@pkg:
+    - ~drop_me
+    - items=remove_at(1)
+
+name: root
+"""
+        )
+
+        return conf_dir
+
+    @pytest.fixture
+    def scoped_patch_multi_pkg_dir(self, tmp_path):
+        """Root config with multiple _patch_@<pkg> directives targeting different packages."""
+        conf_dir = tmp_path / "conf"
+        db_dir = conf_dir / "db"
+        server_dir = conf_dir / "server"
+        db_dir.mkdir(parents=True)
+        server_dir.mkdir(parents=True)
+
+        (db_dir / "base.yaml").write_text(
+            """
+driver: mysql
+debug: true
+pool_size: 10
+"""
+        )
+
+        (server_dir / "base.yaml").write_text(
+            """
+host: localhost
+verbose: true
+port: 8080
+"""
+        )
+
+        (conf_dir / "config.yaml").write_text(
+            """
+defaults:
+  - db/base@db
+  - server/base@server
+  - _self_
+  - _patch_@db:
+    - ~debug
+  - _patch_@server:
+    - ~verbose
+    - port=9090
+
+name: app
+"""
+        )
+
+        return conf_dir
+
+    def test_patch_scoped_package(self, scoped_patch_config_dir):
+        """_patch_@pkg scopes bare keys to 'pkg' from root config."""
+        from lerna import compose, initialize_config_dir
+        from lerna.core.global_hydra import GlobalHydra
+
+        GlobalHydra.instance().clear()
+        try:
+            with initialize_config_dir(config_dir=str(scoped_patch_config_dir), version_base=None):
+                cfg = compose(config_name="config")
+                assert "drop_me" not in cfg.pkg
+                assert cfg.pkg["items"] == ["x", "z"]
+                assert cfg.pkg.keep is True
+                assert cfg.name == "root"
+        finally:
+            GlobalHydra.instance().clear()
+
+    def test_patch_scoped_multiple_packages(self, scoped_patch_multi_pkg_dir):
+        """Multiple _patch_@<pkg> directives can target different packages."""
+        from lerna import compose, initialize_config_dir
+        from lerna.core.global_hydra import GlobalHydra
+
+        GlobalHydra.instance().clear()
+        try:
+            with initialize_config_dir(config_dir=str(scoped_patch_multi_pkg_dir), version_base=None):
+                cfg = compose(config_name="config")
+                # db package: debug removed
+                assert "debug" not in cfg.db
+                assert cfg.db.driver == "mysql"
+                assert cfg.db.pool_size == 10
+                # server package: verbose removed, port changed
+                assert "verbose" not in cfg.server
+                assert cfg.server.port == 9090
+                assert cfg.server.host == "localhost"
+        finally:
+            GlobalHydra.instance().clear()
+
+    # --- Feature: Error cases ---
+
+    @pytest.fixture
+    def patch_sweep_config_dir(self, tmp_path):
+        """Config with sweep override in _patch_ (should error)."""
+        conf_dir = tmp_path / "conf"
+        (conf_dir).mkdir(parents=True)
+
+        (conf_dir / "config.yaml").write_text(
+            """
+defaults:
+  - _self_
+  - _patch_:
+    - key=choice(1,2,3)
+
+key: original
+"""
+        )
+
+        return conf_dir
+
+    @pytest.fixture
+    def patch_nonexistent_delete_dir(self, tmp_path):
+        """Config that tries to delete a key that doesn't exist."""
+        conf_dir = tmp_path / "conf"
+        (conf_dir).mkdir(parents=True)
+
+        (conf_dir / "config.yaml").write_text(
+            """
+defaults:
+  - _self_
+  - _patch_:
+    - ~no_such_key
+
+existing: value
+"""
+        )
+
+        return conf_dir
+
+    @pytest.fixture
+    def patch_empty_scope_dir(self, tmp_path):
+        """Config with _patch_@ (empty package scope, should error)."""
+        conf_dir = tmp_path / "conf"
+        (conf_dir).mkdir(parents=True)
+
+        (conf_dir / "config.yaml").write_text(
+            """
+defaults:
+  - _self_
+  - _patch_@:
+    - ~key
+
+key: value
+"""
+        )
+
+        return conf_dir
+
+    def test_patch_sweep_override_rejected(self, patch_sweep_config_dir):
+        """Sweep overrides in _patch_ should raise ConfigCompositionException."""
+        from lerna import compose, initialize_config_dir
+        from lerna.core.global_hydra import GlobalHydra
+        from lerna.errors import ConfigCompositionException
+
+        GlobalHydra.instance().clear()
+        try:
+            with initialize_config_dir(config_dir=str(patch_sweep_config_dir), version_base=None):
+                with pytest.raises(ConfigCompositionException, match="_patch_ does not support sweep"):
+                    compose(config_name="config")
+        finally:
+            GlobalHydra.instance().clear()
+
+    def test_patch_delete_nonexistent_key(self, patch_nonexistent_delete_dir):
+        """Deleting a nonexistent key via _patch_ should raise an error."""
+        from lerna import compose, initialize_config_dir
+        from lerna.core.global_hydra import GlobalHydra
+        from lerna.errors import ConfigCompositionException
+
+        GlobalHydra.instance().clear()
+        try:
+            with initialize_config_dir(config_dir=str(patch_nonexistent_delete_dir), version_base=None):
+                with pytest.raises(ConfigCompositionException, match="does not exist"):
+                    compose(config_name="config")
+        finally:
+            GlobalHydra.instance().clear()
+
+    def test_patch_empty_package_scope_rejected(self, patch_empty_scope_dir):
+        """_patch_@ with empty package should raise ValueError."""
+        from lerna import compose, initialize_config_dir
+        from lerna.core.global_hydra import GlobalHydra
+
+        GlobalHydra.instance().clear()
+        try:
+            with initialize_config_dir(config_dir=str(patch_empty_scope_dir), version_base=None):
+                with pytest.raises(Exception, match="_patch_@ requires a package name"):
+                    compose(config_name="config")
+        finally:
+            GlobalHydra.instance().clear()
+
+    # --- Feature: Nested _patch_ from sub-configs ---
+
+    @pytest.fixture
+    def nested_patch_config_dir(self, tmp_path):
+        """Multi-level composition: grandchild has _patch_, child composes it, root composes child."""
+        conf_dir = tmp_path / "conf"
+        lib_dir = conf_dir / "lib"
+        lib_dir.mkdir(parents=True)
+
+        # Level 3: base config with raw data
+        (lib_dir / "base.yaml").write_text(
+            """
+alpha: 1
+beta: 2
+gamma: 3
+tags:
+  - old
+  - current
+  - experimental
+"""
+        )
+
+        # Level 2: mid-level config composes base and patches it
+        (lib_dir / "refined.yaml").write_text(
+            """
+defaults:
+  - base@_here_
+  - _self_
+  - _patch_:
+    - ~beta
+    - tags=remove_value(old)
+
+added_by_refined: true
+"""
+        )
+
+        # Level 1: root config composes the refined lib config at @lib package
+        (conf_dir / "config.yaml").write_text(
+            """
+defaults:
+  - lib/refined@lib
+  - _self_
+  - _patch_@lib:
+    - ~gamma
+    - tags=remove_value(experimental)
+
+name: root
+"""
+        )
+
+        return conf_dir
+
+    @pytest.fixture
+    def nested_patch_deep_dir(self, tmp_path):
+        """Three levels of configs, each with their own _patch_ directives."""
+        conf_dir = tmp_path / "conf"
+        a_dir = conf_dir / "a"
+        a_dir.mkdir(parents=True)
+
+        # Leaf: raw config
+        (a_dir / "leaf.yaml").write_text(
+            """
+x: 1
+y: 2
+z: 3
+w: 4
+items:
+  - one
+  - two
+  - three
+  - four
+"""
+        )
+
+        # Mid: composes leaf, patches out y and removes "two"
+        (a_dir / "mid.yaml").write_text(
+            """
+defaults:
+  - leaf@_here_
+  - _self_
+  - _patch_:
+    - ~y
+    - items=remove_value(two)
+
+mid_marker: true
+"""
+        )
+
+        # Root: composes mid@pkg, patches out z and removes "four"
+        (conf_dir / "config.yaml").write_text(
+            """
+defaults:
+  - a/mid@pkg
+  - _self_
+  - _patch_@pkg:
+    - ~z
+    - items=remove_value(four)
+
+root_marker: true
+"""
+        )
+
+        return conf_dir
+
+    def test_nested_patch_two_levels(self, nested_patch_config_dir):
+        """_patch_ in sub-config and root config both apply correctly."""
+        from lerna import compose, initialize_config_dir
+        from lerna.core.global_hydra import GlobalHydra
+
+        GlobalHydra.instance().clear()
+        try:
+            with initialize_config_dir(config_dir=str(nested_patch_config_dir), version_base=None):
+                cfg = compose(config_name="config")
+                # Sub-config's _patch_ removed beta and 'old' tag
+                assert "beta" not in cfg.lib
+                # Root's _patch_@lib removed gamma and 'experimental' tag
+                assert "gamma" not in cfg.lib
+                # alpha survives both patches
+                assert cfg.lib.alpha == 1
+                # tags: started [old, current, experimental], removed old and experimental
+                assert cfg.lib.tags == ["current"]
+                assert cfg.lib.added_by_refined is True
+                assert cfg.name == "root"
+        finally:
+            GlobalHydra.instance().clear()
+
+    def test_nested_patch_three_levels(self, nested_patch_deep_dir):
+        """Three levels of _patch_ directives accumulate correctly."""
+        from lerna import compose, initialize_config_dir
+        from lerna.core.global_hydra import GlobalHydra
+
+        GlobalHydra.instance().clear()
+        try:
+            with initialize_config_dir(config_dir=str(nested_patch_deep_dir), version_base=None):
+                cfg = compose(config_name="config")
+                # leaf had x=1, y=2, z=3, w=4
+                # mid removed y
+                assert "y" not in cfg.pkg
+                # root removed z
+                assert "z" not in cfg.pkg
+                # x and w survive
+                assert cfg.pkg.x == 1
+                assert cfg.pkg.w == 4
+                # items: started [one, two, three, four]
+                # mid removed "two", root removed "four"
+                assert cfg.pkg["items"] == ["one", "three"]
+                assert cfg.pkg.mid_marker is True
+                assert cfg.root_marker is True
+        finally:
+            GlobalHydra.instance().clear()

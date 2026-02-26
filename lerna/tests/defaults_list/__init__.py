@@ -45,7 +45,7 @@ def _test_defaults_tree_impl(
         overrides.ensure_overrides_used()
         overrides.ensure_deletions_used()
         assert result == expected
-        return DefaultsList(defaults=[], defaults_tree=result, overrides=overrides, config_overrides=[])
+        return DefaultsList(defaults=[], defaults_tree=result, overrides=overrides, config_overrides=[], config_patch_overrides=[])
     else:
         with expected:
             _create_defaults_tree(
