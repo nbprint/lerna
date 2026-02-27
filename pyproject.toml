@@ -142,6 +142,7 @@ src = "/"
 
 [tool.hatch.build.hooks.hatch-rs]
 verbose = true
+abi3 = true
 module = "lerna"
 path = "."
 
