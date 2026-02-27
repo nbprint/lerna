@@ -13,7 +13,7 @@ authors = [
 description = "Lerna is a framework for elegantly configuring complex applications"
 readme = "README.md"
 license = { text = "Apache-2.0" }
-version = "2.0.0"
+version = "2.0.1"
 requires-python = ">=3.10"
 keywords = []
 
@@ -65,7 +65,7 @@ Repository = "https://github.com/1kbgz/lerna"
 Homepage = "https://github.com/1kbgz/lerna"
 
 [tool.bumpversion]
-current_version = "2.0.0"
+current_version = "2.0.1"
 commit = true
 tag = true
 commit_args = "-s"
