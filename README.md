@@ -307,6 +307,10 @@ my-plugin = "my_package.plugin_module"
 # For package-style config directories:
 [project.entry-points."hydra.lernaplugins"]
 my-plugin = "pkg:my_package.hydra"
+
+# If only using lerna, you can also register under lerna.plugins:
+[project.entry-points."lerna.plugins"]
+my-plugin = "my_package.plugin_module"
 ```
 
 **Module-style entry points** (like `my_package.plugin_module`) are imported and scanned for `SearchPathPlugin` subclasses.
