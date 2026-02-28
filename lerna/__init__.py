@@ -1,7 +1,7 @@
 # Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved
 
 # Source of truth for Lerna's version (Hydra-compatible API)
-__version__ = "2.0.2"
+__version__ = "2.0.3"
 
 # Callback support from Rust
 from lerna import lerna as _rust, utils
