@@ -3,6 +3,7 @@ import importlib
 import importlib.util
 import inspect
 import pkgutil
+import re
 import sys
 import warnings
 from collections import defaultdict
@@ -22,6 +23,11 @@ from lerna.plugins.search_path_plugin import SearchPathPlugin
 from lerna.plugins.sweeper import Sweeper
 from lerna.types import HydraContext, TaskFunction
 from lerna.utils import instantiate
+
+if sys.version_info < (3, 10):
+    from importlib_metadata import entry_points
+else:
+    from importlib.metadata import entry_points
 
 PLUGIN_TYPES: List[Type[Plugin]] = [
     Plugin,
@@ -71,6 +77,7 @@ class Plugins(metaclass=Singleton):
         self.class_name_to_class = {}
 
         scanned_plugins, self.stats = self._scan_all_plugins(modules=top_level)
+        scanned_plugins.extend(_scan_entrypoint_search_path_plugins())
         for clazz in scanned_plugins:
             self._register(clazz)
 
@@ -256,3 +263,94 @@ class Plugins(metaclass=Singleton):
 
 def _is_concrete_plugin_type(obj: Any) -> bool:
     return inspect.isclass(obj) and issubclass(obj, Plugin) and not inspect.isabstract(obj)
+
+
+def _sanitize_entrypoint_name(name: str) -> str:
+    return re.sub(r"[^0-9a-zA-Z_]", "_", name)
+
+
+def _is_pkg_path_available(pkg_path: str) -> bool:
+    """Check whether a pkg:// path refers to an importable Python package."""
+    # Convert path separators to dots for importlib
+    module_path = pkg_path.replace("/", ".")
+    try:
+        spec = importlib.util.find_spec(module_path)
+        return spec is not None
+    except (ModuleNotFoundError, ValueError):
+        return False
+
+
+def _scan_entrypoint_search_path_plugins() -> List[Type[Plugin]]:
+    """
+    Discover SearchPathPlugin classes registered via the ``hydra.lernaplugins``
+    and ``lerna.plugins`` entry-point groups so that they are available when
+    lerna is used directly (without hydra-core).
+
+    Two flavours of entry point are supported:
+
+    * **pkg / file** – value starts with ``pkg:`` or ``file:``.  A dynamic
+      SearchPathPlugin is synthesised that appends the path.  The package is
+      validated first; if it cannot be imported the entry point is silently
+      skipped (avoids warnings under ``-Werror``).
+
+    * **module** – value is a dotted Python module path.  The module is
+      imported and any concrete *lerna* ``SearchPathPlugin`` subclasses found
+      inside are registered.  Hydra-only ``SearchPathPlugin`` subclasses are
+      intentionally skipped here because the hydra bridge plugin
+      (``hydra_plugins.lerna.searchpath``) already handles them.
+    """
+    scanned_plugins: List[Type[Plugin]] = []
+
+    discovered: List[Any] = []
+    for group in ("hydra.lernaplugins", "lerna.plugins"):
+        try:
+            discovered.extend(entry_points(group=group))
+        except TypeError:
+            discovered.extend(entry_points().get(group, []))  # type: ignore[arg-type]
+
+    for entry_point in discovered:
+        if entry_point.value.startswith(("pkg:", "file:")):
+            kind, path = entry_point.value.split(":", 1)
+            entrypoint_path = f"{kind}://{path}"
+            provider = entry_point.name
+
+            # Validate that the package actually exists before registering –
+            # otherwise an unavailable source warning is emitted which turns
+            # into a hard error under ``python -Werror``.
+            if kind == "pkg" and not _is_pkg_path_available(path):
+                continue
+
+            sanitized_name = _sanitize_entrypoint_name(provider)
+
+            def manipulate_search_path(self: Any, search_path: Any, provider: str = provider, entrypoint_path: str = entrypoint_path) -> None:
+                search_path.append(provider=provider, path=entrypoint_path)
+
+            dynamic_plugin = type(
+                f"EntryPointSearchPathPlugin_{sanitized_name}",
+                (SearchPathPlugin,),
+                {
+                    "__module__": __name__,
+                    "manipulate_search_path": manipulate_search_path,
+                },
+            )
+            scanned_plugins.append(dynamic_plugin)
+            continue
+
+        # Module-style entry point
+        try:
+            module = importlib.import_module(entry_point.value)
+        except ImportError as e:
+            warnings.warn(
+                f"Failed to import entry point {entry_point.name} from {entry_point.value}: {e}",
+                category=UserWarning,
+            )
+            continue
+
+        # Only register lerna-native SearchPathPlugin subclasses.
+        # Hydra SearchPathPlugin subclasses are handled by the hydra bridge
+        # (hydra_plugins/lerna/searchpath.py) and should not be double-registered.
+        for _, obj in inspect.getmembers(module):
+            if _is_concrete_plugin_type(obj) and issubclass(obj, SearchPathPlugin):
+                scanned_plugins.append(obj)
+
+    return scanned_plugins

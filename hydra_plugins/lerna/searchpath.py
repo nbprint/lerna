@@ -25,7 +25,8 @@ else:
 
 # NOTE: use `lernaplugins` instead of `plugins`
 # for https://github.com/facebookresearch/hydra/pull/3052
-_discovered_plugins = entry_points(group="hydra.lernaplugins")
+_discovered_plugins = list(entry_points(group="hydra.lernaplugins"))
+_discovered_plugins.extend(list(entry_points(group="lerna.plugins")))
 _searchpaths_pkg = {}
 _discovered_plugin_names = []
 for entry_point in _discovered_plugins:
