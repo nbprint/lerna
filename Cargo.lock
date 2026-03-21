@@ -59,7 +59,7 @@ dependencies = [
 
 [[package]]
 name = "lerna"
-version = "0.1.0"
+version = "2.0.2"
 dependencies = [
  "rand",
  "serde",
@@ -68,7 +68,7 @@ dependencies = [
 
 [[package]]
 name = "lerna_py"
-version = "0.1.0"
+version = "2.0.2"
 dependencies = [
  "lerna",
  "pyo3",
