@@ -51,12 +51,14 @@ class FileConfigSource(ConfigSource):
                     cfg = OmegaConf.create(raw_config)
                 except Exception:
                     # Fall back to Python YAML parser on errors
-                    raw = yaml.safe_load(content)
+                    f.seek(0)
+                    raw = yaml.safe_load(f)
                     if raw is None:
                         raw = {}
                     cfg = OmegaConf.create(raw)
             else:
-                raw = yaml.safe_load(content)
+                f.seek(0)
+                raw = yaml.safe_load(f)
                 if raw is None:
                     raw = {}
                 cfg = OmegaConf.create(raw)

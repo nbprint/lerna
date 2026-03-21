@@ -11,7 +11,6 @@ work with hydra-core installations.
 """
 
 import sys
-import warnings
 from importlib import import_module
 
 from hydra.core.config_search_path import ConfigSearchPath
@@ -38,10 +37,9 @@ for entry_point in _discovered_plugins:
     # Otherwise, it's a module style entry point
     try:
         mod = import_module(entry_point.value)
-    except ImportError as e:
-        # Use warnings instead of logging during module import to avoid
-        # issues with logging handlers that may be in an invalid state
-        warnings.warn(f"Failed to import entry point {entry_point.name} from {entry_point.value}: {e}")
+    except ImportError:
+        # Silently skip entry points that fail to import. These are optional
+        # third-party plugins and their absence should not disrupt the system.
         continue
     for attr in dir(mod):
         thing = getattr(mod, attr)
