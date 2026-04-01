@@ -43,11 +43,129 @@ impl std::error::Error for ConfigLoadError {}
 
 /// Parse a YAML string into a ConfigValue
 pub fn parse_yaml(content: &str) -> Result<ConfigValue, ConfigLoadError> {
+    let normalized = normalize_legacy_bool_scalars(content);
+
     // Use serde_yaml for parsing
-    let yaml: serde_yaml::Value = serde_yaml::from_str(content)
+    let yaml: serde_yaml::Value = serde_yaml::from_str(&normalized)
         .map_err(|e| ConfigLoadError::new(format!("YAML parse error: {}", e)))?;
 
     Ok(yaml_to_config_value(&yaml))
+}
+
+fn normalize_legacy_bool_scalars(content: &str) -> String {
+    let mut normalized = String::with_capacity(content.len());
+
+    for line in content.split_inclusive('\n') {
+        normalized.push_str(&normalize_legacy_bool_line(line));
+    }
+
+    if !content.ends_with('\n') && !content.is_empty() {
+        // split_inclusive() already includes the final line when no trailing newline,
+        // so this branch intentionally does nothing.
+    }
+
+    normalized
+}
+
+fn normalize_legacy_bool_line(line: &str) -> String {
+    let (body, newline) = if let Some(stripped) = line.strip_suffix('\n') {
+        (stripped, "\n")
+    } else {
+        (line, "")
+    };
+
+    let comment_start = find_comment_start(body).unwrap_or(body.len());
+    let code = &body[..comment_start];
+    let comment = &body[comment_start..];
+
+    if let Some((start, end, replacement)) = find_legacy_bool_span(code) {
+        let mut out = String::with_capacity(line.len());
+        out.push_str(&code[..start]);
+        out.push_str(replacement);
+        out.push_str(&code[end..]);
+        out.push_str(comment);
+        out.push_str(newline);
+        return out;
+    }
+
+    let mut out = String::with_capacity(line.len());
+    out.push_str(code);
+    out.push_str(comment);
+    out.push_str(newline);
+    out
+}
+
+fn find_comment_start(line: &str) -> Option<usize> {
+    let mut in_single = false;
+    let mut in_double = false;
+    let mut prev = '\0';
+
+    for (idx, ch) in line.char_indices() {
+        match ch {
+            '\'' if !in_double && prev != '\\' => in_single = !in_single,
+            '"' if !in_single && prev != '\\' => in_double = !in_double,
+            '#' if !in_single && !in_double => return Some(idx),
+            _ => {}
+        }
+        prev = ch;
+    }
+
+    None
+}
+
+fn find_legacy_bool_span(line: &str) -> Option<(usize, usize, &'static str)> {
+    if let Some(colon_idx) = find_unquoted_char(line, ':') {
+        let value = &line[colon_idx + 1..];
+        if let Some((start, end, replacement)) = find_trimmed_legacy_bool(value, colon_idx + 1) {
+            return Some((start, end, replacement));
+        }
+    }
+
+    let trimmed_start = line.trim_start();
+    let ws = line.len() - trimmed_start.len();
+    if let Some(after_dash) = trimmed_start.strip_prefix('-') {
+        let value = after_dash;
+        if let Some((start, end, replacement)) = find_trimmed_legacy_bool(value, ws + 1) {
+            return Some((start, end, replacement));
+        }
+    }
+
+    None
+}
+
+fn find_unquoted_char(line: &str, target: char) -> Option<usize> {
+    let mut in_single = false;
+    let mut in_double = false;
+    let mut prev = '\0';
+
+    for (idx, ch) in line.char_indices() {
+        match ch {
+            '\'' if !in_double && prev != '\\' => in_single = !in_single,
+            '"' if !in_single && prev != '\\' => in_double = !in_double,
+            _ if ch == target && !in_single && !in_double => return Some(idx),
+            _ => {}
+        }
+        prev = ch;
+    }
+
+    None
+}
+
+fn find_trimmed_legacy_bool(
+    segment: &str,
+    base_offset: usize,
+) -> Option<(usize, usize, &'static str)> {
+    let leading = segment.len() - segment.trim_start().len();
+    let trimmed = segment.trim();
+    let replacement = match trimmed {
+        "True" => "true",
+        "False" => "false",
+        _ => return None,
+    };
+
+    let start = base_offset + leading;
+    let end = start + trimmed.len();
+    Some((start, end, replacement))
 }
 
 /// Load a YAML file and parse it
@@ -185,6 +303,55 @@ ratio: 3.14
         assert_eq!(dict.get("value").unwrap().as_int(), Some(42));
         assert_eq!(dict.get("enabled").unwrap().as_bool(), Some(true));
         assert_eq!(dict.get("ratio").unwrap().as_float(), Some(3.14));
+    }
+
+    #[test]
+    fn test_parse_capitalized_booleans() {
+        let yaml = r#"
+cap_true: True
+cap_false: False
+small_true: true
+small_false: false
+"#;
+        let config = parse_yaml(yaml).unwrap();
+        let dict = config.as_dict().unwrap();
+
+        assert_eq!(dict.get("cap_true").unwrap().as_bool(), Some(true));
+        assert_eq!(dict.get("cap_false").unwrap().as_bool(), Some(false));
+        assert_eq!(dict.get("small_true").unwrap().as_bool(), Some(true));
+        assert_eq!(dict.get("small_false").unwrap().as_bool(), Some(false));
+    }
+
+    #[test]
+    fn test_parse_quoted_capitalized_booleans_as_strings() {
+        let yaml = r#"
+quoted_true: "True"
+quoted_false: 'False'
+"#;
+        let config = parse_yaml(yaml).unwrap();
+        let dict = config.as_dict().unwrap();
+
+        assert_eq!(dict.get("quoted_true").unwrap().as_str(), Some("True"));
+        assert_eq!(dict.get("quoted_false").unwrap().as_str(), Some("False"));
+    }
+
+    #[test]
+    fn test_parse_capitalized_booleans_in_list_items() {
+        let yaml = r#"
+items:
+  - True
+  - False
+  - "True"
+  - 'False'
+"#;
+        let config = parse_yaml(yaml).unwrap();
+        let dict = config.as_dict().unwrap();
+        let items = dict.get("items").unwrap().as_list().unwrap();
+
+        assert_eq!(items[0].as_bool(), Some(true));
+        assert_eq!(items[1].as_bool(), Some(false));
+        assert_eq!(items[2].as_str(), Some("True"));
+        assert_eq!(items[3].as_str(), Some("False"));
     }
 
     #[test]
