@@ -83,19 +83,37 @@ jobs:
 
     - name: Make dist (Linux)
       run: |
+        rm -rf dist
         make dist-rs
         make dist-py-sdist
         make dist-py-wheel
         make dist-check
+      shell: bash
       if: matrix.os == 'ubuntu-latest'
 
     - name: Make dist (Macos / Windows)
       run: |
+        rm -rf dist
         make dist-py-wheel
         make dist-check
+      shell: bash
       env:
         CIBW_ENVIRONMENT_MACOS: MACOSX_DEPLOYMENT_TARGET=11.0
       if: matrix.os != 'ubuntu-latest'
+
+    - name: Test wheel install
+      run: |
+        python -m venv /tmp/test-wheel
+        /tmp/test-wheel/bin/pip install dist/*.whl
+        /tmp/test-wheel/bin/python -c "import lerna"
+      if: matrix.os == 'ubuntu-latest'
+
+    - name: Test sdist install
+      run: |
+        python -m venv /tmp/test-sdist
+        /tmp/test-sdist/bin/pip install dist/*.tar.gz
+        /tmp/test-sdist/bin/python -c "import lerna"
+      if: matrix.os == 'ubuntu-latest'
 
     - uses: actions/upload-artifact@v7
       with:
