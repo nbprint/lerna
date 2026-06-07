@@ -203,6 +203,9 @@ default-section = "third-party"
 known-first-party = [
     "lerna",
 ]
+known-third-party = [
+    "hydra",
+]
 section-order = [
     "future",
     "standard-library",
