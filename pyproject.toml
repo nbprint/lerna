@@ -133,9 +133,9 @@ fail_under = 50
 
 [tool.hatch.build]
 artifacts = [
-    "project/*.dll",
-    "project/*.dylib",
-    "project/*.so",
+    "lerna/*.dll",
+    "lerna/*.dylib",
+    "lerna/*.so",
 ]
 
 [tool.hatch.build.sources]
