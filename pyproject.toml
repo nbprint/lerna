@@ -13,8 +13,13 @@ authors = [
 description = "Lerna is a framework for elegantly configuring complex applications"
 readme = "README.md"
 license = { text = "Apache-2.0" }
+<<<<<<< before updating
 version = "2.0.4"
 requires-python = ">=3.10"
+=======
+version = "0.1.0"
+requires-python = ">=3.11"
+>>>>>>> after updating
 keywords = []
 
 classifiers = [
@@ -24,7 +29,6 @@ classifiers = [
     "Programming Language :: Python :: Implementation :: CPython",
     "Programming Language :: Python :: Implementation :: PyPy",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
@@ -91,10 +95,15 @@ search = 'version = "{current_version}"'
 replace = 'version = "{new_version}"'
 
 [tool.cibuildwheel]
+<<<<<<< before updating
 build = "cp310-*"
 # Run a simple import test to verify the wheel is installable
 # Full tests are run by `make tests` separately
 test-command = "python -c 'import lerna; print(lerna.__version__)'"
+=======
+build = "cp311-*"
+test-command = "pytest -vvv {project}/lerna/tests"
+>>>>>>> after updating
 test-extras = "develop"
 
 [tool.cibuildwheel.linux]
