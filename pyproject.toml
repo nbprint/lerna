@@ -13,13 +13,8 @@ authors = [
 description = "Lerna is a framework for elegantly configuring complex applications"
 readme = "README.md"
 license = { text = "Apache-2.0" }
-<<<<<<< before updating
 version = "2.0.4"
 requires-python = ">=3.10"
-=======
-version = "0.1.0"
-requires-python = ">=3.11"
->>>>>>> after updating
 keywords = []
 
 classifiers = [
