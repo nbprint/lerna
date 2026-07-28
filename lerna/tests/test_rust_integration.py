@@ -805,7 +805,7 @@ class TestRustEnvIntegration:
         import lerna.lerna as rs
 
         resolver = rs.env.EnvResolver()
-        with pytest.raises(Exception):
+        with pytest.raises(ValueError):
             resolver.get_required("NONEXISTENT_VAR_12345")
 
     def test_env_resolver_with_override(self):

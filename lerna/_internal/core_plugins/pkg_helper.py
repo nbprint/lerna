@@ -6,12 +6,12 @@ These functions are designed to be passed to RustHybridConfigRepository as callb
 """
 
 from importlib import resources
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import yaml
 
 
-def load_pkg_config(module_path: str, config_path: str) -> Optional[Dict[str, Any]]:
+def load_pkg_config(module_path: str, config_path: str) -> dict[str, Any] | None:
     """
     Load a config file from a Python package.
 
@@ -90,7 +90,7 @@ def pkg_group_exists(module_path: str, group_path: str) -> bool:
         return False
 
 
-def pkg_list_options(module_path: str, group_path: str) -> List[str]:
+def pkg_list_options(module_path: str, group_path: str) -> list[str]:
     """
     List config options (YAML files) in a package group.
 
@@ -110,7 +110,7 @@ def pkg_list_options(module_path: str, group_path: str) -> List[str]:
         for item in files.iterdir():
             if item.is_file():
                 name = item.name
-                if name.endswith(".yaml") or name.endswith(".yml"):
+                if name.endswith((".yaml", ".yml")):
                     # Remove extension to get option name
                     options.append(name.rsplit(".", 1)[0])
 

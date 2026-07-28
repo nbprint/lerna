@@ -6,10 +6,11 @@ import os
 import sys
 import traceback
 import warnings
+from collections.abc import Sequence
 from dataclasses import dataclass
 from os.path import dirname, join, normpath, realpath
 from types import FrameType, TracebackType
-from typing import Any, List, Optional, Sequence, Tuple
+from typing import Any
 
 from omegaconf.errors import OmegaConfBaseException
 
@@ -26,7 +27,7 @@ from lerna.types import RunMode, TaskFunction
 log = logging.getLogger(__name__)
 
 
-def _get_module_name_override() -> Optional[str]:
+def _get_module_name_override() -> str | None:
     module_envs = ["HYDRA_MAIN_MODULE", "FB_PAR_MAIN_MODULE", "FB_XAR_MAIN_MODULE"]
     for module_env in module_envs:
         if module_env in os.environ:
@@ -36,7 +37,7 @@ def _get_module_name_override() -> Optional[str]:
 
 def detect_calling_file_or_module_from_task_function(
     task_function: Any,
-) -> Tuple[Optional[str], Optional[str]]:
+) -> tuple[str | None, str | None]:
     # if function is decorated, unwrap it
     while hasattr(task_function, "__wrapped__"):
         task_function = task_function.__wrapped__
@@ -46,8 +47,8 @@ def detect_calling_file_or_module_from_task_function(
     if override is not None:
         mdl = override
 
-    calling_file: Optional[str]
-    calling_module: Optional[str]
+    calling_file: str | None
+    calling_module: str | None
     if mdl not in (None, "__main__"):
         calling_file = None
         calling_module = mdl
@@ -63,7 +64,7 @@ def detect_calling_file_or_module_from_task_function(
 
 def detect_calling_file_or_module_from_stack_frame(
     stack_depth: int,
-) -> Tuple[Optional[str], Optional[str]]:
+) -> tuple[str | None, str | None]:
     stack = inspect.stack()
     frame = stack[stack_depth]
     if is_notebook() and "_dh" in frame[0].f_globals:
@@ -99,7 +100,7 @@ def is_notebook() -> bool:
         return False
 
 
-def detect_task_name(calling_file: Optional[str], calling_module: Optional[str]) -> str:
+def detect_task_name(calling_file: str | None, calling_module: str | None) -> str:
     if calling_file is not None:
         target_file = os.path.basename(calling_file)
         task_name = get_valid_filename(os.path.splitext(target_file)[0])
@@ -116,10 +117,10 @@ def detect_task_name(calling_file: Optional[str], calling_module: Optional[str])
 
 
 def compute_search_path_dir(
-    calling_file: Optional[str],
-    calling_module: Optional[str],
-    config_path: Optional[str],
-) -> Optional[str]:
+    calling_file: str | None,
+    calling_module: str | None,
+    config_path: str | None,
+) -> str | None:
     if config_path is not None:
         if os.path.isabs(config_path):
             return config_path
@@ -172,9 +173,7 @@ def is_under_debugger() -> bool:
     frames = inspect.stack()
     if len(frames) >= 3:
         filename = frames[-3].filename
-        if filename.endswith("/pdb.py"):
-            return True
-        elif filename.endswith("/pydevd.py"):
+        if filename.endswith(("/pdb.py", "/pydevd.py")):
             return True
 
     # unknown debugging will sometimes set sys.trace
@@ -182,15 +181,15 @@ def is_under_debugger() -> bool:
 
 
 def create_automatic_config_search_path(
-    calling_file: Optional[str],
-    calling_module: Optional[str],
-    config_path: Optional[str],
+    calling_file: str | None,
+    calling_module: str | None,
+    config_path: str | None,
 ) -> ConfigSearchPath:
     search_path_dir = compute_search_path_dir(calling_file, calling_module, config_path)
     return create_config_search_path(search_path_dir)
 
 
-def create_config_search_path(search_path_dir: Optional[str]) -> ConfigSearchPath:
+def create_config_search_path(search_path_dir: str | None) -> ConfigSearchPath:
     from lerna.core.plugins import Plugins
     from lerna.plugins.search_path_plugin import SearchPathPlugin
 
@@ -220,7 +219,7 @@ def run_and_report(func: Any) -> Any:
         return func()
     except Exception as ex:
         if _is_env_set("HYDRA_FULL_ERROR") or is_under_debugger():
-            raise ex
+            raise
         else:
             try:
                 if isinstance(ex, CompactHydraException):
@@ -253,7 +252,7 @@ def run_and_report(func: Any) -> Any:
                         sys.exit(1)
 
                     # strip OmegaConf frames from bottom of stack
-                    end: Optional[TracebackType] = tb
+                    end: TracebackType | None = tb
                     num_frames = 0
                     while end is not None:
                         frame = end.tb_frame
@@ -267,9 +266,9 @@ def run_and_report(func: Any) -> Any:
                     @dataclass
                     class FakeTracebackType:
                         tb_next: Any = None  # Optional["FakeTracebackType"]
-                        tb_frame: Optional[FrameType] = None
-                        tb_lasti: Optional[int] = None
-                        tb_lineno: Optional[int] = None
+                        tb_frame: FrameType | None = None
+                        tb_lasti: int | None = None
+                        tb_lineno: int | None = None
 
                     iter_tb = tb
                     final_tb = FakeTracebackType()
@@ -290,7 +289,7 @@ def run_and_report(func: Any) -> Any:
 
                     traceback.print_exception(None, value=ex, tb=final_tb)  # type: ignore
                 sys.stderr.write("\nSet the environment variable HYDRA_FULL_ERROR=1 for a complete stack trace.\n")
-            except Exception as ex2:
+            except Exception as ex2:  # noqa: BLE001
                 sys.stderr.write("An error occurred during Hydra's exception formatting:" + os.linesep + repr(ex2) + os.linesep)
                 raise ex
         sys.exit(1)
@@ -300,8 +299,8 @@ def _run_hydra(
     args: argparse.Namespace,
     args_parser: argparse.ArgumentParser,
     task_function: TaskFunction,
-    config_path: Optional[str],
-    config_name: Optional[str],
+    config_path: str | None,
+    config_name: str | None,
     caller_stack_depth: int = 2,
 ) -> None:
     from lerna.core.global_hydra import GlobalHydra
@@ -397,11 +396,11 @@ def _run_hydra(
 def _run_app(
     run: bool,
     multirun: bool,
-    mode: Optional[RunMode],
+    mode: RunMode | None,
     hydra: Any,
-    config_name: Optional[str],
+    config_name: str | None,
     task_function: TaskFunction,
-    overrides: List[str],
+    overrides: list[str],
 ) -> None:
     if mode is None:
         if run:
@@ -451,7 +450,7 @@ def _get_completion_help() -> str:
     from lerna.plugins.completion_plugin import CompletionPlugin
 
     completion_plugins = Plugins.instance().discover(CompletionPlugin)
-    completion_info: List[str] = []
+    completion_info: list[str] = []
     for plugin_cls in completion_plugins:
         assert issubclass(plugin_cls, CompletionPlugin)
         for cmd in ["install", "uninstall"]:
@@ -573,15 +572,15 @@ def get_args_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def get_args(args: Optional[Sequence[str]] = None) -> Any:
+def get_args(args: Sequence[str] | None = None) -> Any:
     return get_args_parser().parse_args(args=args)
 
 
-def get_column_widths(matrix: List[List[str]]) -> List[int]:
+def get_column_widths(matrix: list[list[str]]) -> list[int]:
     num_cols = 0
     for row in matrix:
         num_cols = max(num_cols, len(row))
-    widths: List[int] = [0] * num_cols
+    widths: list[int] = [0] * num_cols
     for row in matrix:
         for idx, col in enumerate(row):
             widths[idx] = max(widths[idx], len(col))
@@ -609,7 +608,7 @@ def _locate(path: str) -> Any:
     try:
         obj = import_module(part0)
     except Exception as exc_import:
-        raise ImportError(f"Error loading '{path}':\n{repr(exc_import)}" + f"\nAre you sure that module '{part0}' is installed?") from exc_import
+        raise ImportError(f"Error loading '{path}':\n{exc_import!r}" + f"\nAre you sure that module '{part0}' is installed?") from exc_import
     for m in range(1, len(parts)):
         part = parts[m]
         try:
@@ -623,12 +622,12 @@ def _locate(path: str) -> Any:
                     continue
                 except ModuleNotFoundError as exc_import:
                     raise ImportError(
-                        f"Error loading '{path}':\n{repr(exc_import)}" + f"\nAre you sure that '{part}' is importable from module '{parent_dotpath}'?"
+                        f"Error loading '{path}':\n{exc_import!r}" + f"\nAre you sure that '{part}' is importable from module '{parent_dotpath}'?"
                     ) from exc_import
                 except Exception as exc_import:
-                    raise ImportError(f"Error loading '{path}':\n{repr(exc_import)}") from exc_import
+                    raise ImportError(f"Error loading '{path}':\n{exc_import!r}") from exc_import
             raise ImportError(
-                f"Error loading '{path}':\n{repr(exc_attr)}" + f"\nAre you sure that '{part}' is an attribute of '{parent_dotpath}'?"
+                f"Error loading '{path}':\n{exc_attr!r}" + f"\nAre you sure that '{part}' is an attribute of '{parent_dotpath}'?"
             ) from exc_attr
     return obj
 

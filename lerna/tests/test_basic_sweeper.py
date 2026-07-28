@@ -2,7 +2,7 @@
 import re
 import sys
 from textwrap import dedent
-from typing import Any, List, Optional
+from typing import Any
 
 from pytest import mark, param
 
@@ -50,7 +50,7 @@ from lerna.test_utils.test_utils import assert_multiline_regex_search, run_proce
         param(["a=range(3)"], None, [[["a=0"], ["a=1"], ["a=2"]]], id="range_no_start"),
     ],
 )
-def test_split(args: List[str], max_batch_size: Optional[int], expected: List[List[List[str]]]) -> None:
+def test_split(args: list[str], max_batch_size: int | None, expected: list[list[list[str]]]) -> None:
     parser = OverridesParser.create()
     ret = BasicSweeper.split_arguments(parser.parse_overrides(args), max_batch_size=max_batch_size)
     lret = [list(x) for x in ret]
@@ -66,7 +66,7 @@ def test_partial_failure(
         "lerna/tests/test_apps/app_can_fail/my_app.py",
         "--multirun",
         "+divisor=1,0",
-        f'hydra.run.dir="{str(tmpdir)}"',
+        f'hydra.run.dir="{tmpdir!s}"',
         "hydra.job.chdir=True",
         "hydra.hydra_logging.formatters.simple.format='[HYDRA] %(message)s'",
     ]

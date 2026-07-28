@@ -3,7 +3,7 @@ import collections
 import collections.abc
 from dataclasses import dataclass, field
 from functools import partial
-from typing import Any, Dict, List, NoReturn, Optional, Tuple
+from typing import Any, NoReturn
 
 from omegaconf import MISSING, DictConfig, ListConfig
 
@@ -33,7 +33,7 @@ def partial_equal(obj1: Any, obj2: Any) -> bool:
     if isinstance(obj1, dict):
         if len(obj1) != len(obj2):
             return False
-        for i in obj1.keys():
+        for i in obj1:
             if not partial_equal(obj1[i], obj2[i]):
                 return False
         return True
@@ -43,7 +43,7 @@ def partial_equal(obj1: Any, obj2: Any) -> bool:
         return all(partial_equal(o1, o2) for o1, o2 in zip(obj1, obj2))
     if not (isinstance(obj1, partial) and isinstance(obj2, partial)):
         return False
-    return all([partial_equal(getattr(obj1, attr), getattr(obj2, attr)) for attr in ["func", "args", "keywords"]])
+    return all(partial_equal(getattr(obj1, attr), getattr(obj2, attr)) for attr in ["func", "args", "keywords"])
 
 
 class ArgsClass:
@@ -56,7 +56,7 @@ class ArgsClass:
     def __repr__(self) -> str:
         return f"self.args={self.args},self.kwarg={self.kwargs}"
 
-    def __eq__(self, other: Any) -> Any:
+    def __eq__(self, other: object) -> Any:
         if isinstance(other, ArgsClass):
             return self.args == other.args and self.kwargs == other.kwargs
         else:
@@ -141,7 +141,7 @@ class UntypedPassthroughClass:
 
 # Type not legal in a config
 class IllegalType:
-    def __eq__(self, other: Any) -> Any:
+    def __eq__(self, other: object) -> Any:
         return isinstance(other, IllegalType)
 
 
@@ -161,15 +161,15 @@ class ASubclass(AnotherClass):
 
 
 class Parameters:
-    def __init__(self, params: List[float]):
+    def __init__(self, params: list[float]):
         self.params = params
 
-    def __eq__(self, other: Any) -> Any:
+    def __eq__(self, other: object) -> Any:
         if isinstance(other, Parameters):
             return self.params == other.params
         return False
 
-    def __deepcopy__(self, memodict: Any = {}) -> Any:
+    def __deepcopy__(self, memodict: Any = None) -> Any:
         raise NotImplementedError("Pytorch parameters does not support deepcopy")
 
 
@@ -177,7 +177,7 @@ class Parameters:
 class Adam:
     params: Parameters
     lr: float = 0.001
-    betas: Tuple[float, ...] = (0.9, 0.999)
+    betas: tuple[float, ...] = (0.9, 0.999)
     eps: float = 1e-08
     weight_decay: int = 0
     amsgrad: bool = False
@@ -193,7 +193,7 @@ nesting = NestingClass()
 
 class ClassWithMissingModule:
     def __init__(self) -> None:
-        import some_missing_module  # type: ignore # noqa: F401
+        import some_missing_module  # type: ignore
 
         self.x = 1
 
@@ -202,7 +202,7 @@ class ClassWithMissingModule:
 class AdamConf:
     _target_: str = "lerna.tests.instantiate.Adam"
     lr: float = 0.001
-    betas: Tuple[float, ...] = (0.9, 0.999)
+    betas: tuple[float, ...] = (0.9, 0.999)
     eps: float = 1e-08
     weight_decay: int = 0
     amsgrad: bool = False
@@ -223,7 +223,7 @@ class User:
 @dataclass
 class UserGroup:
     name: str = MISSING
-    users: List[User] = MISSING
+    users: list[User] = MISSING
 
 
 # RECURSIVE
@@ -235,7 +235,7 @@ class CenterCrop(Transform):
     def __init__(self, size: int):
         self.size = size
 
-    def __eq__(self, other: Any) -> Any:
+    def __eq__(self, other: object) -> Any:
         if isinstance(other, type(self)):
             return self.size == other.size
         else:
@@ -246,7 +246,7 @@ class Rotation(Transform):
     def __init__(self, degrees: int):
         self.degrees = degrees
 
-    def __eq__(self, other: Any) -> Any:
+    def __eq__(self, other: object) -> Any:
         if isinstance(other, type(self)):
             return self.degrees == other.degrees
         else:
@@ -254,12 +254,12 @@ class Rotation(Transform):
 
 
 class Compose:
-    transforms: List[Transform]
+    transforms: list[Transform]
 
-    def __init__(self, transforms: List[Transform]):
+    def __init__(self, transforms: list[Transform]):
         self.transforms = transforms
 
-    def __eq__(self, other: Any) -> Any:
+    def __eq__(self, other: object) -> Any:
         return partial_equal(self.transforms, other.transforms)
 
 
@@ -274,7 +274,7 @@ class Tree:
         self.left = left
         self.right = right
 
-    def __eq__(self, other: Any) -> Any:
+    def __eq__(self, other: object) -> Any:
         if isinstance(other, type(self)):
             return partial_equal(self.value, other.value) and partial_equal(self.left, other.left) and partial_equal(self.right, other.right)
 
@@ -286,14 +286,14 @@ class Tree:
 
 
 class Mapping:
-    dictionary: Optional[Dict[str, "Mapping"]] = None
+    dictionary: dict[str, "Mapping"] | None = None
     value: Any = None
 
-    def __init__(self, value: Any = None, dictionary: Optional[Dict[str, "Mapping"]] = None) -> None:
+    def __init__(self, value: Any = None, dictionary: dict[str, "Mapping"] | None = None) -> None:
         self.dictionary = dictionary
         self.value = value
 
-    def __eq__(self, other: Any) -> Any:
+    def __eq__(self, other: object) -> Any:
         if isinstance(other, type(self)):
             return partial_equal(self.dictionary, other.dictionary) and partial_equal(self.value, other.value)
         else:
@@ -325,15 +325,15 @@ class RotationConf(TransformConf):
 class ComposeConf:
     _target_: str = "lerna.tests.instantiate.Compose"
     _partial_: bool = False
-    transforms: List[TransformConf] = MISSING
+    transforms: list[TransformConf] = MISSING
 
 
 @dataclass
 class TreeConf:
     _target_: str = "lerna.tests.instantiate.Tree"
     _partial_: bool = False
-    left: Optional["TreeConf"] = None
-    right: Optional["TreeConf"] = None
+    left: "TreeConf | None" = None
+    right: "TreeConf | None" = None
     value: Any = MISSING
 
 
@@ -341,11 +341,11 @@ class TreeConf:
 class MappingConf:
     _target_: str = "lerna.tests.instantiate.Mapping"
     _partial_: bool = False
-    dictionary: Optional[Dict[str, "MappingConf"]] = None
+    dictionary: dict[str, "MappingConf"] | None = None
 
     def __init__(
         self,
-        dictionary: Optional[Dict[str, "MappingConf"]] = None,
+        dictionary: dict[str, "MappingConf"] | None = None,
         _partial_: bool = False,
     ):
         self.dictionary = dictionary
@@ -366,13 +366,13 @@ class SimpleClass:
         self.a = a
         self.b = b
 
-    def __eq__(self, other: Any) -> Any:
+    def __eq__(self, other: object) -> Any:
         if isinstance(other, SimpleClass):
             return self.a == other.a and self.b == other.b
         return False
 
     @property
-    def _fields(self) -> List[str]:
+    def _fields(self) -> list[str]:
         return ["a", "b"]
 
 
@@ -407,13 +407,13 @@ class NestedConf:
 
 
 class TargetWithInstantiateInInit:
-    def __init__(self, user_config: Optional[DictConfig], user: Optional[User] = None) -> None:
+    def __init__(self, user_config: DictConfig | None, user: User | None = None) -> None:
         if user:
             self.user = user
         else:
             self.user = instantiate(user_config)
 
-    def __eq__(self, other: Any) -> bool:
+    def __eq__(self, other: object) -> bool:
         return self.user.__eq__(other.user)
 
 

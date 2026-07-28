@@ -240,12 +240,10 @@ name: not_a_list
 
     def test_append_to_non_list_fails(self, config_dir):
         """Cannot append to a non-list value."""
-        with initialize_config_dir(version_base=None, config_dir=config_dir):
-            with pytest.raises(Exception, match="not a list"):
-                compose(config_name="config", overrides=["name=append(new)"])
+        with initialize_config_dir(version_base=None, config_dir=config_dir), pytest.raises(Exception, match="not a list"):
+            compose(config_name="config", overrides=["name=append(new)"])
 
     def test_remove_at_out_of_bounds(self, config_dir):
         """Remove at out-of-bounds index should fail."""
-        with initialize_config_dir(version_base=None, config_dir=config_dir):
-            with pytest.raises(Exception, match="Cannot remove item"):
-                compose(config_name="config", overrides=["tags=remove_at(10)"])
+        with initialize_config_dir(version_base=None, config_dir=config_dir), pytest.raises(Exception, match="Cannot remove item"):
+            compose(config_name="config", overrides=["tags=remove_at(10)"])

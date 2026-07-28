@@ -1,7 +1,7 @@
 # Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved
 import re
 from textwrap import dedent
-from typing import Any, List, Optional
+from typing import Any
 
 from pytest import mark, param, raises, warns
 
@@ -62,7 +62,7 @@ Plugins.instance()
         ),
     ],
 )
-def test_loaded_defaults_list(config_path: str, expected_list: List[InputDefault]) -> None:
+def test_loaded_defaults_list(config_path: str, expected_list: list[InputDefault]) -> None:
     repo = create_repo()
     result = repo.load_config(config_path=config_path)
     assert result is not None
@@ -83,7 +83,7 @@ class TestDeprecatedOptional:
     def test_version_base_1_1(
         self,
         config_path: str,
-        expected_list: List[InputDefault],
+        expected_list: list[InputDefault],
         hydra_restore_singletons: Any,
     ) -> None:
         version.setbase("1.1")
@@ -106,8 +106,8 @@ class TestDeprecatedOptional:
     def test_version_base_1_2(
         self,
         config_path: str,
-        expected_list: List[InputDefault],
-        version_base: Optional[str],
+        expected_list: list[InputDefault],
+        version_base: str | None,
         hydra_restore_singletons: Any,
     ) -> None:
         version.setbase(version_base)
@@ -121,8 +121,8 @@ class TestDeprecatedOptional:
 
 
 def _test_defaults_list_impl(
-    config_name: Optional[str],
-    overrides: List[str],
+    config_name: str | None,
+    overrides: list[str],
     expected: Any,
     prepend_hydra: bool = False,
     skip_missing: bool = False,
@@ -424,7 +424,7 @@ def test_get_final_package(default: InputDefault, parent_package: str, parent_ba
         ),
     ],
 )
-def test_simple_defaults_list_cases(config_name: str, overrides: List[str], expected: List[ResultDefault]) -> None:
+def test_simple_defaults_list_cases(config_name: str, overrides: list[str], expected: list[ResultDefault]) -> None:
     _test_defaults_list_impl(config_name=config_name, overrides=overrides, expected=expected)
 
 
@@ -488,7 +488,7 @@ def test_simple_defaults_list_cases(config_name: str, overrides: List[str], expe
         ),
     ],
 )
-def test_override_package_in_defaults_list(config_name: str, overrides: List[str], expected: List[ResultDefault]) -> None:
+def test_override_package_in_defaults_list(config_name: str, overrides: list[str], expected: list[ResultDefault]) -> None:
     _test_defaults_list_impl(config_name=config_name, overrides=overrides, expected=expected)
 
 
@@ -535,7 +535,7 @@ def test_override_package_in_defaults_list(config_name: str, overrides: List[str
         ),
     ],
 )
-def test_include_nested_group_pkg2(config_name: str, overrides: List[str], expected: List[ResultDefault]) -> None:
+def test_include_nested_group_pkg2(config_name: str, overrides: list[str], expected: list[ResultDefault]) -> None:
     _test_defaults_list_impl(config_name=config_name, overrides=overrides, expected=expected)
 
 
@@ -586,7 +586,7 @@ def test_include_nested_group_pkg2(config_name: str, overrides: List[str], expec
         ),
     ],
 )
-def test_group_default_pkg1(config_name: str, overrides: List[str], expected: List[ResultDefault]) -> None:
+def test_group_default_pkg1(config_name: str, overrides: list[str], expected: list[ResultDefault]) -> None:
     _test_defaults_list_impl(config_name=config_name, overrides=overrides, expected=expected)
 
 
@@ -641,7 +641,7 @@ def test_group_default_pkg1(config_name: str, overrides: List[str], expected: Li
         ),
     ],
 )
-def test_include_nested_group_global(config_name: str, overrides: List[str], expected: List[ResultDefault]) -> None:
+def test_include_nested_group_global(config_name: str, overrides: list[str], expected: list[ResultDefault]) -> None:
     _test_defaults_list_impl(config_name=config_name, overrides=overrides, expected=expected)
 
 
@@ -711,7 +711,7 @@ def test_include_nested_group_global(config_name: str, overrides: List[str], exp
         ),
     ],
 )
-def test_group_global(config_name: str, overrides: List[str], expected: List[ResultDefault]) -> None:
+def test_group_global(config_name: str, overrides: list[str], expected: list[ResultDefault]) -> None:
     _test_defaults_list_impl(config_name=config_name, overrides=overrides, expected=expected)
 
 
@@ -766,7 +766,7 @@ def test_group_global(config_name: str, overrides: List[str], expected: List[Res
         ),
     ],
 )
-def test_include_nested_group_global_foo(config_name: str, overrides: List[str], expected: List[ResultDefault]) -> None:
+def test_include_nested_group_global_foo(config_name: str, overrides: list[str], expected: list[ResultDefault]) -> None:
     _test_defaults_list_impl(config_name=config_name, overrides=overrides, expected=expected)
 
 
@@ -850,8 +850,8 @@ def test_include_nested_group_global_foo(config_name: str, overrides: List[str],
 )
 def test_include_nested_group_name_(
     config_name: str,
-    overrides: List[str],
-    expected: List[ResultDefault],
+    overrides: list[str],
+    expected: list[ResultDefault],
     warning_file: str,
 ) -> None:
     url = "https://hydra.cc/docs/1.2/upgrades/1.0_to_1.1/changes_to_package_header"
@@ -910,7 +910,7 @@ def test_include_nested_group_name_(
         ),
     ],
 )
-def test_primary_cfg_pkg_header_foo(config_name: str, overrides: List[str], expected: List[ResultDefault]) -> None:
+def test_primary_cfg_pkg_header_foo(config_name: str, overrides: list[str], expected: list[ResultDefault]) -> None:
     _test_defaults_list_impl(config_name=config_name, overrides=overrides, expected=expected)
 
 
@@ -1011,7 +1011,7 @@ def test_primary_cfg_pkg_header_foo(config_name: str, overrides: List[str], expe
         ),
     ],
 )
-def test_include_nested_group_pkg_header_foo(config_name: str, overrides: List[str], expected: List[ResultDefault]) -> None:
+def test_include_nested_group_pkg_header_foo(config_name: str, overrides: list[str], expected: list[ResultDefault]) -> None:
     _test_defaults_list_impl(config_name=config_name, overrides=overrides, expected=expected)
 
 
@@ -1053,7 +1053,7 @@ def test_include_nested_group_pkg_header_foo(config_name: str, overrides: List[s
         ),
     ],
 )
-def test_nested_package_header_is_absolute(config_name: str, overrides: List[str], expected: List[ResultDefault]) -> None:
+def test_nested_package_header_is_absolute(config_name: str, overrides: list[str], expected: list[ResultDefault]) -> None:
     _test_defaults_list_impl(config_name=config_name, overrides=overrides, expected=expected)
 
 
@@ -1137,7 +1137,7 @@ def test_nested_package_header_is_absolute(config_name: str, overrides: List[str
         ),
     ],
 )
-def test_overriding_package_header_from_defaults_list(config_name: str, overrides: List[str], expected: List[ResultDefault]) -> None:
+def test_overriding_package_header_from_defaults_list(config_name: str, overrides: list[str], expected: list[ResultDefault]) -> None:
     _test_defaults_list_impl(config_name=config_name, overrides=overrides, expected=expected)
 
 
@@ -1163,10 +1163,10 @@ def test_overriding_package_header_from_defaults_list(config_name: str, override
 @mark.parametrize("version_base", ["1.2", None])
 def test_legacy_override_hydra_version_base_1_2(
     config_name: str,
-    overrides: List[str],
-    expected: List[ResultDefault],
+    overrides: list[str],
+    expected: list[ResultDefault],
     recwarn: Any,  # Testing deprecated behavior
-    version_base: Optional[str],
+    version_base: str | None,
     hydra_restore_singletons: Any,
 ) -> None:
     version.setbase(version_base)
@@ -1216,8 +1216,8 @@ def test_legacy_override_hydra_version_base_1_2(
 )
 def test_legacy_override_hydra_version_base_1_1(
     config_name: str,
-    overrides: List[str],
-    expected: List[ResultDefault],
+    overrides: list[str],
+    expected: list[ResultDefault],
     recwarn: Any,  # Testing deprecated behavior
     hydra_restore_singletons: Any,
 ) -> None:
@@ -1292,8 +1292,8 @@ def test_legacy_override_hydra_version_base_1_1(
 )
 def test_with_hydra_config(
     config_name: str,
-    overrides: List[str],
-    expected: List[ResultDefault],
+    overrides: list[str],
+    expected: list[ResultDefault],
     recwarn: Any,  # Testing deprecated behavior
 ) -> None:
     _test_defaults_list_impl(
@@ -1329,7 +1329,7 @@ def test_with_hydra_config(
         ),
     ],
 )
-def test_experiment_use_case(config_name: str, overrides: List[str], expected: List[ResultDefault]) -> None:
+def test_experiment_use_case(config_name: str, overrides: list[str], expected: list[ResultDefault]) -> None:
     _test_defaults_list_impl(
         config_name=config_name,
         overrides=overrides,
@@ -1370,7 +1370,7 @@ def test_experiment_use_case(config_name: str, overrides: List[str], expected: L
         ),
     ],
 )
-def test_as_as_primary(config_name: str, overrides: List[str], expected: List[ResultDefault]) -> None:
+def test_as_as_primary(config_name: str, overrides: list[str], expected: list[ResultDefault]) -> None:
     _test_defaults_list_impl(
         config_name=config_name,
         overrides=overrides,
@@ -1432,7 +1432,7 @@ def test_as_as_primary(config_name: str, overrides: List[str], expected: List[Re
         ),
     ],
 )
-def test_placeholder(config_name: str, overrides: List[str], expected: List[ResultDefault]) -> None:
+def test_placeholder(config_name: str, overrides: list[str], expected: list[ResultDefault]) -> None:
     _test_defaults_list_impl(
         config_name=config_name,
         overrides=overrides,
@@ -1501,7 +1501,7 @@ def test_placeholder(config_name: str, overrides: List[str], expected: List[Resu
         ),
     ],
 )
-def test_interpolation_simple(config_name: str, overrides: List[str], expected: List[ResultDefault]) -> None:
+def test_interpolation_simple(config_name: str, overrides: list[str], expected: list[ResultDefault]) -> None:
     _test_defaults_list_impl(
         config_name=config_name,
         overrides=overrides,
@@ -1522,7 +1522,7 @@ def test_interpolation_simple(config_name: str, overrides: List[str], expected: 
         ),
     ],
 )
-def test_deletion(config_name: str, overrides: List[str], expected: List[ResultDefault]) -> None:
+def test_deletion(config_name: str, overrides: list[str], expected: list[ResultDefault]) -> None:
     _test_defaults_list_impl(
         config_name=config_name,
         overrides=overrides,
@@ -1553,7 +1553,7 @@ def test_deletion(config_name: str, overrides: List[str], expected: List[ResultD
         ),
     ],
 )
-def test_duplicate_items(config_name: str, overrides: List[str], expected: List[ResultDefault]) -> None:
+def test_duplicate_items(config_name: str, overrides: list[str], expected: list[ResultDefault]) -> None:
     _test_defaults_list_impl(
         config_name=config_name,
         overrides=overrides,
@@ -1647,9 +1647,9 @@ def test_duplicate_items(config_name: str, overrides: List[str], expected: List[
 @mark.parametrize("version_base", ["1.2", None])
 def test_name_collision(
     config_name: str,
-    overrides: List[str],
-    expected: List[ResultDefault],
-    version_base: Optional[str],
+    overrides: list[str],
+    expected: list[ResultDefault],
+    version_base: str | None,
     hydra_restore_singletons: Any,
 ) -> None:
     version.setbase(version_base)
@@ -1708,7 +1708,7 @@ def test_name_collision(
         ),
     ],
 )
-def test_load_group_header(config_name: str, overrides: List[str], expected: List[ResultDefault], recwarn: Any) -> None:
+def test_load_group_header(config_name: str, overrides: list[str], expected: list[ResultDefault], recwarn: Any) -> None:
     _test_defaults_list_impl(
         config_name=config_name,
         overrides=overrides,
@@ -1741,8 +1741,8 @@ def test_load_group_header(config_name: str, overrides: List[str], expected: Lis
 )
 def test_with_none_primary(
     config_name: str,
-    overrides: List[str],
-    expected: List[ResultDefault],
+    overrides: list[str],
+    expected: list[ResultDefault],
 ) -> None:
     _test_defaults_list_impl(
         config_name=config_name,
@@ -1809,8 +1809,8 @@ def test_with_none_primary(
 )
 def test_with_none_primary_with_hydra(
     config_name: str,
-    overrides: List[str],
-    expected: List[ResultDefault],
+    overrides: list[str],
+    expected: list[ResultDefault],
 ) -> None:
     _test_defaults_list_impl(
         config_name=config_name,
@@ -1845,8 +1845,8 @@ def test_with_none_primary_with_hydra(
 )
 def test_two_config_items(
     config_name: str,
-    overrides: List[str],
-    expected: List[ResultDefault],
+    overrides: list[str],
+    expected: list[ResultDefault],
 ) -> None:
     _test_defaults_list_impl(
         config_name=config_name,
@@ -1898,9 +1898,9 @@ def test_two_config_items(
 )
 def test_with_missing_config(
     config_name: str,
-    overrides: List[str],
+    overrides: list[str],
     skip_missing: bool,
-    expected: List[ResultDefault],
+    expected: list[ResultDefault],
 ) -> None:
     _test_defaults_list_impl(
         config_name=config_name,
@@ -1991,9 +1991,9 @@ def test_set_package_header_with_parent_pkg(default: InputDefault, package_heade
 )
 def test_select_multi_pkg(
     config_name: str,
-    overrides: List[str],
+    overrides: list[str],
     skip_missing: bool,
-    expected: List[ResultDefault],
+    expected: list[ResultDefault],
 ) -> None:
     _test_defaults_list_impl(
         config_name=config_name,

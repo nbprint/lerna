@@ -6,7 +6,7 @@ These callbacks allow Rust's PyHybridConfigRepository to load configs
 from Python's ConfigStore singleton.
 """
 
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from omegaconf import OmegaConf
 
@@ -14,7 +14,7 @@ from lerna.core.config_store import ConfigStore
 from lerna.core.object_type import ObjectType
 
 
-def load_structured_config(config_path: str) -> Optional[Dict[str, Any]]:
+def load_structured_config(config_path: str) -> dict[str, Any] | None:
     """
     Load a config from ConfigStore and return as dict.
 
@@ -33,7 +33,7 @@ def load_structured_config(config_path: str) -> Optional[Dict[str, Any]]:
         config_node = cs.load(path)
         # Convert DictConfig to plain dict for Rust
         return OmegaConf.to_container(config_node.node, resolve=False)
-    except Exception:
+    except Exception:  # noqa: BLE001
         return None
 
 
@@ -55,7 +55,7 @@ def structured_config_exists(config_path: str) -> bool:
             path = f"{path}.yaml"
         obj_type = cs.get_type(path)
         return obj_type == ObjectType.CONFIG
-    except Exception:
+    except Exception:  # noqa: BLE001
         return False
 
 
@@ -76,11 +76,11 @@ def structured_group_exists(group_path: str) -> bool:
             return bool(cs.repo)
         obj_type = cs.get_type(group_path)
         return obj_type == ObjectType.GROUP
-    except Exception:
+    except Exception:  # noqa: BLE001
         return False
 
 
-def structured_list_options(group_path: str) -> List[str]:
+def structured_list_options(group_path: str) -> list[str]:
     """
     List options (configs and subgroups) in a ConfigStore group.
 
@@ -93,11 +93,11 @@ def structured_list_options(group_path: str) -> List[str]:
     try:
         cs = ConfigStore.instance()
         return cs.list(group_path)
-    except Exception:
+    except Exception:  # noqa: BLE001
         return []
 
 
-def get_structured_package(config_path: str) -> Optional[str]:
+def get_structured_package(config_path: str) -> str | None:
     """
     Get the package for a structured config.
 
@@ -111,5 +111,5 @@ def get_structured_package(config_path: str) -> Optional[str]:
         cs = ConfigStore.instance()
         config_node = cs.load(config_path)
         return config_node.package
-    except Exception:
+    except Exception:  # noqa: BLE001
         return None

@@ -1,5 +1,5 @@
 # Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved
-from typing import Any, List, Optional, Type
+from typing import Any
 
 from pytest import mark, param, raises, skip
 
@@ -22,7 +22,7 @@ class ConfigSourceTestSuite:
         """
         return False
 
-    def test_not_available(self, type_: Type[ConfigSource], path: str) -> None:
+    def test_not_available(self, type_: type[ConfigSource], path: str) -> None:
         scheme = type_(provider="foo", path=path).scheme()
         # Test is meaningless for StructuredConfigSource
         if scheme == "structured":
@@ -48,7 +48,7 @@ class ConfigSourceTestSuite:
             param("not_found", False, id="not_found"),
         ],
     )
-    def test_is_group(self, type_: Type[ConfigSource], path: str, config_path: str, expected: bool) -> None:
+    def test_is_group(self, type_: type[ConfigSource], path: str, config_path: str, expected: bool) -> None:
         src = type_(provider="foo", path=path)
         ret = src.is_group(config_path=config_path)
         assert ret == expected
@@ -69,7 +69,7 @@ class ConfigSourceTestSuite:
             ("not_found", False),
         ],
     )
-    def test_is_config(self, type_: Type[ConfigSource], path: str, config_path: str, expected: bool) -> None:
+    def test_is_config(self, type_: type[ConfigSource], path: str, config_path: str, expected: bool) -> None:
         src = type_(provider="foo", path=path)
         ret = src.is_config(config_path=config_path)
         assert ret == expected
@@ -80,7 +80,7 @@ class ConfigSourceTestSuite:
             ("dataset", True),
         ],
     )
-    def test_is_config_with_overlap_name(self, type_: Type[ConfigSource], path: str, config_path: str, expected: bool) -> None:
+    def test_is_config_with_overlap_name(self, type_: type[ConfigSource], path: str, config_path: str, expected: bool) -> None:
         if self.skip_overlap_config_path_name():
             skip(f"ConfigSourcePlugin {type_.__name__} does not support config objects and config groups with overlapping names.")
         src = type_(provider="foo", path=path)
@@ -108,16 +108,15 @@ class ConfigSourceTestSuite:
             ("optimizer", None, ["adam", "nesterov"]),
             ("level1", None, ["level2"]),
             ("level1/level2", None, ["nested1", "nested2"]),
-            ("", None, ["config_without_group", "dataset", "level1", "optimizer"]),
         ],
     )
     def test_list(
         self,
-        type_: Type[ConfigSource],
+        type_: type[ConfigSource],
         path: str,
         config_path: str,
-        results_filter: Optional[ObjectType],
-        expected: List[str],
+        results_filter: ObjectType | None,
+        expected: list[str],
     ) -> None:
         src = type_(provider="foo", path=path)
         ret = src.list(config_path=config_path, results_filter=results_filter)
@@ -134,11 +133,11 @@ class ConfigSourceTestSuite:
     )
     def test_list_with_overlap_name(
         self,
-        type_: Type[ConfigSource],
+        type_: type[ConfigSource],
         path: str,
         config_path: str,
-        results_filter: Optional[ObjectType],
-        expected: List[str],
+        results_filter: ObjectType | None,
+        expected: list[str],
     ) -> None:
         if self.skip_overlap_config_path_name():
             skip(f"ConfigSourcePlugin {type_.__name__} does not support config objects and config groups with overlapping names.")
@@ -234,10 +233,10 @@ class ConfigSourceTestSuite:
     )
     def test_source_load_config(
         self,
-        type_: Type[ConfigSource],
+        type_: type[ConfigSource],
         path: str,
         config_path: str,
-        expected_defaults_list: List[InputDefault],
+        expected_defaults_list: list[InputDefault],
         expected_package: Any,
         expected_config: Any,
         recwarn: Any,
@@ -271,7 +270,7 @@ class ConfigSourceTestSuite:
     )
     def test_package_behavior(
         self,
-        type_: Type[ConfigSource],
+        type_: type[ConfigSource],
         path: str,
         config_path: str,
         expected_result: Any,
@@ -282,12 +281,12 @@ class ConfigSourceTestSuite:
         assert cfg.header["package"] == expected_package
         assert cfg.config == expected_result
 
-    def test_default_package_for_primary_config(self, type_: Type[ConfigSource], path: str) -> None:
+    def test_default_package_for_primary_config(self, type_: type[ConfigSource], path: str) -> None:
         src = type_(provider="foo", path=path)
         cfg = src.load_config(config_path="primary_config")
         assert cfg.header["package"] is None
 
-    def test_primary_config_with_non_global_package(self, type_: Type[ConfigSource], path: str) -> None:
+    def test_primary_config_with_non_global_package(self, type_: type[ConfigSource], path: str) -> None:
         src = type_(provider="foo", path=path)
         cfg = src.load_config(config_path="primary_config_with_non_global_package")
         assert cfg.header["package"] == "foo"

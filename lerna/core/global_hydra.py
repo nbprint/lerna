@@ -1,5 +1,5 @@
 # Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved
-from typing import Any, Optional
+from typing import Any
 
 from lerna._internal.hydra import Hydra
 from lerna.core.config_loader import ConfigLoader
@@ -8,7 +8,7 @@ from lerna.core.singleton import Singleton
 
 class GlobalHydra(metaclass=Singleton):
     def __init__(self) -> None:
-        self.hydra: Optional[Hydra] = None
+        self.hydra: Hydra | None = None
 
     def initialize(self, hydra: "Hydra") -> None:
         assert isinstance(hydra, Hydra), f"Unexpected Hydra type : {type(hydra)}"

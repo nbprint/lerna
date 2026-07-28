@@ -11,7 +11,7 @@ not used - the Rust parser has built-in functions (choice, range, sort, etc.).
 """
 
 import sys
-from typing import Any, List, Optional
+from typing import Any
 
 from lerna._internal.grammar.functions import Functions
 from lerna.core.config_loader import ConfigLoader
@@ -49,13 +49,13 @@ class OverridesParser:
     """
 
     _rust_parser: Any = None
-    _functions: Optional[Functions] = None
+    _functions: Functions | None = None
 
     @classmethod
     def create(
         cls,
-        config_loader: Optional[ConfigLoader] = None,
-        searchpath: Optional[List[str]] = None,
+        config_loader: ConfigLoader | None = None,
+        searchpath: list[str] | None = None,
     ) -> "OverridesParser":
         """Create an OverridesParser instance.
 
@@ -68,9 +68,9 @@ class OverridesParser:
 
     def __init__(
         self,
-        functions: Optional[Functions] = None,
-        config_loader: Optional[ConfigLoader] = None,
-        searchpath: Optional[List[str]] = None,
+        functions: Functions | None = None,
+        config_loader: ConfigLoader | None = None,
+        searchpath: list[str] | None = None,
     ):
         self.config_loader = config_loader
         self.searchpath = searchpath
@@ -165,8 +165,8 @@ class OverridesParser:
         assert isinstance(ret, Override)
         return ret
 
-    def parse_overrides(self, overrides: List[str]) -> List[Override]:
-        ret: List[Override] = []
+    def parse_overrides(self, overrides: list[str]) -> list[Override]:
+        ret: list[Override] = []
         for idx, override in enumerate(overrides):
             try:
                 parsed = self.parse_rule(override, "override")
@@ -270,8 +270,8 @@ def _parse_list_operation(operation_str: str) -> ListOperationType:
 
 def _rust_dict_to_override(
     data: dict,
-    config_loader: Optional[ConfigLoader] = None,
-    searchpath: Optional[List[str]] = None,
+    config_loader: ConfigLoader | None = None,
+    searchpath: list[str] | None = None,
 ) -> Override:
     """Convert Rust parser output dict to Python Override object.
 
@@ -303,7 +303,7 @@ def _rust_dict_to_override(
 
     # For DEL overrides without value, value_type should be None
     if data["value"] is None:
-        value_type: Optional[ValueType] = None
+        value_type: ValueType | None = None
     else:
         value_type = value_type_map.get(data["value_type"])
 
@@ -311,8 +311,8 @@ def _rust_dict_to_override(
     raw_value = _convert_rust_value(data["value"])
 
     # Initialize list operation fields (only used for EXTEND_LIST type)
-    list_operation: Optional[ListOperationType] = None
-    list_index: Optional[int] = None
+    list_operation: ListOperationType | None = None
+    list_index: int | None = None
 
     if raw_value is None:
         value: Any = None

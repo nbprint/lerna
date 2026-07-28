@@ -4,7 +4,7 @@ Launcher plugin interface
 """
 
 from abc import abstractmethod
-from typing import Sequence
+from collections.abc import Sequence
 
 from omegaconf import DictConfig
 

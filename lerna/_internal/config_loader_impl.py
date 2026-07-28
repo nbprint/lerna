@@ -4,8 +4,9 @@ import os
 import re
 import sys
 import warnings
+from collections.abc import MutableSequence
 from textwrap import dedent
-from typing import Any, List, MutableSequence, Optional, Tuple, Union
+from typing import Any
 
 from omegaconf import Container, DictConfig, ListConfig, OmegaConf, flag_override, open_dict
 from omegaconf.errors import (
@@ -60,7 +61,7 @@ class ConfigLoaderImpl(ConfigLoader):
 
     @staticmethod
     def validate_sweep_overrides_legal(
-        overrides: List[Override],
+        overrides: list[Override],
         run_mode: RunMode,
         from_shell: bool,
     ) -> None:
@@ -90,12 +91,12 @@ class ConfigLoaderImpl(ConfigLoader):
                 else:
                     assert False
 
-    def _missing_config_error(self, config_name: Optional[str], msg: str, with_search_path: bool) -> None:
+    def _missing_config_error(self, config_name: str | None, msg: str, with_search_path: bool) -> None:
         def add_search_path() -> str:
             descs = []
             for src in self.repository.get_sources():
                 if src.provider != "schema":
-                    descs.append(f"\t{repr(src)}")
+                    descs.append(f"\t{src!r}")
             lines = "\n".join(descs)
 
             if with_search_path:
@@ -108,22 +109,21 @@ class ConfigLoaderImpl(ConfigLoader):
     def ensure_main_config_source_available(self) -> None:
         for source in self.get_sources():
             # if specified, make sure main config search path exists
-            if source.provider == "main":
-                if not source.available():
-                    if source.scheme() == "pkg":
-                        if source.path == "":
-                            msg = "Primary config module is empty.\nPython requires resources to be in a module with an __init__.py file"
-                        else:
-                            msg = f"Primary config module '{source.path}' not found.\nCheck that it's correct and contains an __init__.py file"
+            if source.provider == "main" and not source.available():
+                if source.scheme() == "pkg":
+                    if source.path == "":
+                        msg = "Primary config module is empty.\nPython requires resources to be in a module with an __init__.py file"
                     else:
-                        msg = f"Primary config directory not found.\nCheck that the config directory '{source.path}' exists and readable"
+                        msg = f"Primary config module '{source.path}' not found.\nCheck that it's correct and contains an __init__.py file"
+                else:
+                    msg = f"Primary config directory not found.\nCheck that the config directory '{source.path}' exists and readable"
 
-                    self._missing_config_error(config_name=None, msg=msg, with_search_path=False)
+                self._missing_config_error(config_name=None, msg=msg, with_search_path=False)
 
     def load_configuration(
         self,
-        config_name: Optional[str],
-        overrides: List[str],
+        config_name: str | None,
+        overrides: list[str],
         run_mode: RunMode,
         from_shell: bool = True,
         validate_sweep_overrides: bool = True,
@@ -141,8 +141,8 @@ class ConfigLoaderImpl(ConfigLoader):
 
     def _process_config_searchpath(
         self,
-        config_name: Optional[str],
-        parsed_overrides: List[Override],
+        config_name: str | None,
+        parsed_overrides: list[Override],
         repo: CachingConfigRepository,
     ) -> None:
         if config_name is not None:
@@ -204,8 +204,8 @@ class ConfigLoaderImpl(ConfigLoader):
                 )
 
     def _parse_overrides_and_create_caching_repo(
-        self, config_name: Optional[str], overrides: List[str]
-    ) -> Tuple[List[Override], CachingConfigRepository]:
+        self, config_name: str | None, overrides: list[str]
+    ) -> tuple[list[Override], CachingConfigRepository]:
         parser = OverridesParser.create()
         parsed_overrides = parser.parse_overrides(overrides=overrides)
         caching_repo = CachingConfigRepository(self.repository)
@@ -214,8 +214,8 @@ class ConfigLoaderImpl(ConfigLoader):
 
     def _load_configuration_impl(
         self,
-        config_name: Optional[str],
-        overrides: List[str],
+        config_name: str | None,
+        overrides: list[str],
         run_mode: RunMode,
         from_shell: bool = True,
         validate_sweep_overrides: bool = True,
@@ -289,7 +289,7 @@ class ConfigLoaderImpl(ConfigLoader):
 
         return cfg
 
-    def load_sweep_config(self, master_config: DictConfig, sweep_overrides: List[str]) -> DictConfig:
+    def load_sweep_config(self, master_config: DictConfig, sweep_overrides: list[str]) -> DictConfig:
         # Recreate the config for this sweep instance with the appropriate overrides
         overrides = OmegaConf.to_container(master_config.hydra.overrides.hydra)
         assert isinstance(overrides, list)
@@ -311,7 +311,7 @@ class ConfigLoaderImpl(ConfigLoader):
         return self.config_search_path
 
     @staticmethod
-    def _apply_overrides_to_config(overrides: List[Override], cfg: DictConfig) -> None:
+    def _apply_overrides_to_config(overrides: list[Override], cfg: DictConfig) -> None:
         for override in overrides:
             if override.package is not None:
                 raise ConfigCompositionException(
@@ -336,7 +336,7 @@ class ConfigLoaderImpl(ConfigLoader):
                             del cfg[key]
                         else:
                             node = OmegaConf.select(cfg, key[0:last_dot])
-                            node_key: Union[str, int] = key[last_dot + 1 :]
+                            node_key: str | int = key[last_dot + 1 :]
                             if isinstance(node, ListConfig):
                                 node_key = int(node_key)
                             del node[node_key]
@@ -498,7 +498,7 @@ class ConfigLoaderImpl(ConfigLoader):
         return res
 
     @staticmethod
-    def _embed_result_config(ret: ConfigResult, package_override: Optional[str]) -> ConfigResult:
+    def _embed_result_config(ret: ConfigResult, package_override: str | None) -> ConfigResult:
         package = ret.header["package"]
         if package_override is not None:
             package = package_override
@@ -511,16 +511,16 @@ class ConfigLoaderImpl(ConfigLoader):
 
         return ret
 
-    def list_groups(self, parent_name: str) -> List[str]:
+    def list_groups(self, parent_name: str) -> list[str]:
         return self.get_group_options(group_name=parent_name, results_filter=ObjectType.GROUP)
 
     def get_group_options(
         self,
         group_name: str,
-        results_filter: Optional[ObjectType] = ObjectType.CONFIG,
-        config_name: Optional[str] = None,
-        overrides: Optional[List[str]] = None,
-    ) -> List[str]:
+        results_filter: ObjectType | None = ObjectType.CONFIG,
+        config_name: str | None = None,
+        overrides: list[str] | None = None,
+    ) -> list[str]:
         if overrides is None:
             overrides = []
         _, caching_repo = self._parse_overrides_and_create_caching_repo(config_name, overrides)
@@ -528,9 +528,9 @@ class ConfigLoaderImpl(ConfigLoader):
 
     def _try_rust_compose(
         self,
-        defaults: List[ResultDefault],
+        defaults: list[ResultDefault],
         repo: IConfigRepository,
-    ) -> Optional[DictConfig]:
+    ) -> DictConfig | None:
         """
         Compose config using Rust for performance.
 
@@ -680,7 +680,7 @@ class ConfigLoaderImpl(ConfigLoader):
 
     def _compose_config_from_defaults_list(
         self,
-        defaults: List[ResultDefault],
+        defaults: list[ResultDefault],
         repo: IConfigRepository,
     ) -> DictConfig:
         # Try Rust-accelerated compose first
@@ -705,13 +705,13 @@ class ConfigLoaderImpl(ConfigLoader):
 
         return cfg
 
-    def get_sources(self) -> List[ConfigSource]:
+    def get_sources(self) -> list[ConfigSource]:
         return self.repository.get_sources()
 
     def compute_defaults_list(
         self,
-        config_name: Optional[str],
-        overrides: List[str],
+        config_name: str | None,
+        overrides: list[str],
         run_mode: RunMode,
     ) -> DefaultsList:
         parsed_overrides, caching_repo = self._parse_overrides_and_create_caching_repo(config_name, overrides)
@@ -725,7 +725,7 @@ class ConfigLoaderImpl(ConfigLoader):
         return defaults_list
 
 
-def get_overrides_dirname(overrides: List[Override], exclude_keys: List[str], item_sep: str, kv_sep: str) -> str:
+def get_overrides_dirname(overrides: list[Override], exclude_keys: list[str], item_sep: str, kv_sep: str) -> str:
     lines = []
     for override in overrides:
         if override.key_or_group not in exclude_keys:

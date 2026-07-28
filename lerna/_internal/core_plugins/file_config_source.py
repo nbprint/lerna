@@ -1,6 +1,5 @@
 # Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved
 import os
-from typing import List, Optional
 
 import yaml
 from omegaconf import OmegaConf
@@ -49,7 +48,7 @@ class FileConfigSource(ConfigSource):
                     if raw_config is None:
                         raw_config = {}
                     cfg = OmegaConf.create(raw_config)
-                except Exception:
+                except Exception:  # noqa: BLE001
                     # Fall back to Python YAML parser on errors
                     f.seek(0)
                     raw = yaml.safe_load(f)
@@ -82,8 +81,8 @@ class FileConfigSource(ConfigSource):
         full_path = os.path.realpath(os.path.join(self.path, config_path))
         return os.path.isfile(full_path)
 
-    def list(self, config_path: str, results_filter: Optional[ObjectType]) -> List[str]:
-        files: List[str] = []
+    def list(self, config_path: str, results_filter: ObjectType | None) -> list[str]:
+        files: list[str] = []
         full_path = os.path.realpath(os.path.join(self.path, config_path))
         for file in os.listdir(full_path):
             file_path = os.path.join(config_path, file)
@@ -94,4 +93,4 @@ class FileConfigSource(ConfigSource):
                 results_filter=results_filter,
             )
 
-        return sorted(list(set(files)))
+        return sorted(set(files))

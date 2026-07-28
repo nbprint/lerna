@@ -2,10 +2,11 @@
 import copy
 import pickle
 import re
+from collections.abc import Callable
 from dataclasses import dataclass
 from functools import partial
 from textwrap import dedent
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any
 
 from omegaconf import MISSING, DictConfig, ListConfig, MissingMandatoryValue, OmegaConf
 from pytest import fixture, mark, param, raises, warns
@@ -413,7 +414,7 @@ def config(request: Any, src: Any) -> Any:
 def test_class_instantiate(
     instantiate_func: Any,
     config: Any,
-    passthrough: Dict[str, Any],
+    passthrough: dict[str, Any],
     expected: Any,
     recursive: bool,
 ) -> Any:
@@ -597,7 +598,7 @@ def test_none_cases(
 def test_interpolation_accessing_parent(
     instantiate_func: Any,
     input_conf: Any,
-    passthrough: Dict[str, Any],
+    passthrough: dict[str, Any],
     expected: Any,
     convert_to_list: bool,
     skip_deepcopy: bool,
@@ -1071,7 +1072,7 @@ def test_instantiate_with_callable_target_keyword(instantiate_func: Any, target:
 def test_recursive_instantiation(
     instantiate_func: Any,
     config: Any,
-    passthrough: Dict[str, Any],
+    passthrough: dict[str, Any],
     expected: Any,
 ) -> None:
     obj = instantiate_func(config, **passthrough)
@@ -1258,7 +1259,7 @@ def test_recursive_instantiation(
 def test_partial_instantiate(
     instantiate_func: Any,
     config: Any,
-    passthrough: Dict[str, Any],
+    passthrough: dict[str, Any],
     expected: Any,
 ) -> None:
     obj = instantiate_func(config, **passthrough)
@@ -1657,7 +1658,7 @@ def test_allowlist_works(instantiate_func: Any, monkeypatch: Any) -> None:
 )
 def test_convert_params_override(
     instantiate_func: Any,
-    primitive: Optional[bool],
+    primitive: bool | None,
     expected_primitive: bool,
     input_: Any,
     expected: Any,
@@ -1884,7 +1885,7 @@ def test_convert_and_recursive_node(instantiate_func: Any, nested_recursive: boo
         ),
     ],
 )
-def test_instantiate_convert_dataclasses(instantiate_func: Any, config: Any, expected: Tuple[Any, Any, Any, Any]) -> None:
+def test_instantiate_convert_dataclasses(instantiate_func: Any, config: Any, expected: tuple[Any, Any, Any, Any]) -> None:
     """Instantiate on nested dataclass + dataclass."""
     modes = [ConvertMode.NONE, ConvertMode.PARTIAL, ConvertMode.OBJECT, ConvertMode.ALL]
     assert len(modes) == len(expected)
@@ -2102,12 +2103,12 @@ def test_nested_dataclass_with_partial_convert(instantiate_func: Any) -> None:
 
 
 class DictValues:
-    def __init__(self, d: Dict[str, User]):
+    def __init__(self, d: dict[str, User]):
         self.d = d
 
 
 class ListValues:
-    def __init__(self, d: List[User]):
+    def __init__(self, d: list[User]):
         self.d = d
 
 
@@ -2115,7 +2116,7 @@ def test_dict_with_structured_config(instantiate_func: Any) -> None:
     @dataclass
     class DictValuesConf:
         _target_: str = "lerna.tests.instantiate.test_instantiate.DictValues"
-        d: Dict[str, User] = MISSING
+        d: dict[str, User] = MISSING
 
     schema = OmegaConf.structured(DictValuesConf)
     cfg = OmegaConf.merge(schema, {"d": {"007": {"name": "Bond", "age": 7}}})
@@ -2136,7 +2137,7 @@ def test_list_with_structured_config(instantiate_func: Any) -> None:
     @dataclass
     class ListValuesConf:
         _target_: str = "lerna.tests.instantiate.test_instantiate.ListValues"
-        d: List[User] = MISSING
+        d: list[User] = MISSING
 
     schema = OmegaConf.structured(ListValuesConf)
     cfg = OmegaConf.merge(schema, {"d": [{"name": "Bond", "age": 7}]})
@@ -2158,7 +2159,7 @@ def test_list_as_none(instantiate_func: Any) -> None:
     @dataclass
     class ListValuesConf:
         _target_: str = "lerna.tests.instantiate.test_instantiate.ListValues"
-        d: Optional[List[User]] = None
+        d: list[User] | None = None
 
     cfg = OmegaConf.structured(ListValuesConf)
     obj = instantiate_func(config=cfg)
@@ -2169,7 +2170,7 @@ def test_dict_as_none(instantiate_func: Any) -> None:
     @dataclass
     class DictValuesConf:
         _target_: str = "lerna.tests.instantiate.test_instantiate.DictValues"
-        d: Optional[Dict[str, User]] = None
+        d: dict[str, User] | None = None
 
     cfg = OmegaConf.structured(DictValuesConf)
     obj = instantiate_func(config=cfg)

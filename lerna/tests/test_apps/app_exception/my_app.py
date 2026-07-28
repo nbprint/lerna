@@ -6,7 +6,7 @@ import lerna
 
 @lerna.main(version_base=None)
 def my_app(_: DictConfig) -> None:
-    1 / 0
+    _ = 1 / 0
 
 
 if __name__ == "__main__":

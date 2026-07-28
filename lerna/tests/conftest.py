@@ -25,7 +25,7 @@ from lerna.extra.pytest_plugin import (  # noqa: F401
 _initial_state_without_structured = copy.deepcopy(Singleton.get_state())
 
 # Import the structured config test module to register its configs
-import lerna.tests.test_apps.config_source_test.structured  # noqa: F401, E402
+import lerna.tests.test_apps.config_source_test.structured  # noqa: F401
 
 # Store the state with the structured configs registered
 _initial_state_with_configs = copy.deepcopy(Singleton.get_state())

@@ -12,7 +12,7 @@ class PosOnlyArgsClass:
     def __repr__(self) -> str:
         return f"{self.a=},{self.b},{self.kwargs=}"
 
-    def __eq__(self, other: Any) -> Any:
+    def __eq__(self, other: object) -> Any:
         if isinstance(other, PosOnlyArgsClass):
             return self.a == other.a and self.b == other.b and self.kwargs == other.kwargs
         else:

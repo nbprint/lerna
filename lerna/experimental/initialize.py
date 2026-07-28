@@ -1,6 +1,6 @@
 # Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved
 import copy
-from typing import Any, Optional
+from typing import Any
 
 from lerna import version
 from lerna._internal.deprecation_warning import deprecation_warning
@@ -26,8 +26,8 @@ def restore_gh_from_backup(_gh_backup: Any) -> Any:
 class initialize:
     def __init__(
         self,
-        config_path: Optional[str] = _UNSPECIFIED_,
-        job_name: Optional[str] = None,
+        config_path: str | None = _UNSPECIFIED_,
+        job_name: str | None = None,
         caller_stack_depth: int = 1,
     ) -> None:
         from lerna import initialize as real_initialize
@@ -49,7 +49,7 @@ class initialize:
     def __enter__(self, *args: Any, **kwargs: Any) -> None:
         self.delegate.__enter__(*args, **kwargs)
 
-    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
+    def __exit__(self, exc_type: object, exc_val: object, exc_tb: object) -> None:
         self.delegate.__exit__(exc_type, exc_val, exc_tb)
 
     def __repr__(self) -> str:
@@ -83,7 +83,7 @@ class initialize_config_module:
     def __enter__(self, *args: Any, **kwargs: Any) -> None:
         self.delegate.__enter__(*args, **kwargs)
 
-    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
+    def __exit__(self, exc_type: object, exc_val: object, exc_tb: object) -> None:
         self.delegate.__exit__(exc_type, exc_val, exc_tb)
 
     def __repr__(self) -> str:
@@ -118,7 +118,7 @@ class initialize_config_dir:
     def __enter__(self, *args: Any, **kwargs: Any) -> None:
         self.delegate.__enter__(*args, **kwargs)
 
-    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
+    def __exit__(self, exc_type: object, exc_val: object, exc_tb: object) -> None:
         self.delegate.__exit__(exc_type, exc_val, exc_tb)
 
     def __repr__(self) -> str:

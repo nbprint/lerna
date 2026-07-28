@@ -8,8 +8,9 @@ import sys
 import warnings
 from collections import defaultdict
 from dataclasses import dataclass, field
+from importlib.metadata import entry_points
 from timeit import default_timer as timer
-from typing import Any, Dict, List, Optional, Tuple, Type
+from typing import Any
 
 from omegaconf import DictConfig
 
@@ -24,12 +25,7 @@ from lerna.plugins.sweeper import Sweeper
 from lerna.types import HydraContext, TaskFunction
 from lerna.utils import instantiate
 
-if sys.version_info < (3, 10):
-    from importlib_metadata import entry_points
-else:
-    from importlib.metadata import entry_points
-
-PLUGIN_TYPES: List[Type[Plugin]] = [
+PLUGIN_TYPES: list[type[Plugin]] = [
     Plugin,
     ConfigSource,
     CompletionPlugin,
@@ -43,7 +39,7 @@ PLUGIN_TYPES: List[Type[Plugin]] = [
 class ScanStats:
     total_time: float = 0
     total_modules_import_time: float = 0
-    modules_import_time: Dict[str, float] = field(default_factory=dict)
+    modules_import_time: dict[str, float] = field(default_factory=dict)
 
 
 class Plugins(metaclass=Singleton):
@@ -54,13 +50,13 @@ class Plugins(metaclass=Singleton):
         return ret
 
     def __init__(self) -> None:
-        self.plugin_type_to_subclass_list: Dict[Type[Plugin], List[Type[Plugin]]] = {}
-        self.class_name_to_class: Dict[str, Type[Plugin]] = {}
-        self.stats: Optional[ScanStats] = None
+        self.plugin_type_to_subclass_list: dict[type[Plugin], list[type[Plugin]]] = {}
+        self.class_name_to_class: dict[str, type[Plugin]] = {}
+        self.stats: ScanStats | None = None
         self._initialize()
 
     def _initialize(self) -> None:
-        top_level: List[Any] = []
+        top_level: list[Any] = []
         core_plugins = importlib.import_module("lerna._internal.core_plugins")
         top_level.append(core_plugins)
 
@@ -81,7 +77,7 @@ class Plugins(metaclass=Singleton):
         for clazz in scanned_plugins:
             self._register(clazz)
 
-    def register(self, clazz: Type[Plugin]) -> None:
+    def register(self, clazz: type[Plugin]) -> None:
         """
         Call Plugins.instance().register(MyPlugin) to manually register a plugin class.
         """
@@ -89,12 +85,11 @@ class Plugins(metaclass=Singleton):
             raise ValueError("Not a valid Hydra Plugin")
         self._register(clazz)
 
-    def _register(self, clazz: Type[Plugin]) -> None:
+    def _register(self, clazz: type[Plugin]) -> None:
         assert _is_concrete_plugin_type(clazz)
         for plugin_type in PLUGIN_TYPES:
-            if issubclass(clazz, plugin_type):
-                if clazz not in self.plugin_type_to_subclass_list[plugin_type]:
-                    self.plugin_type_to_subclass_list[plugin_type].append(clazz)
+            if issubclass(clazz, plugin_type) and clazz not in self.plugin_type_to_subclass_list[plugin_type]:
+                self.plugin_type_to_subclass_list[plugin_type].append(clazz)
         name = f"{clazz.__module__}.{clazz.__name__}"
         self.class_name_to_class[name] = clazz
         if issubclass(clazz, ConfigSource):
@@ -113,25 +108,20 @@ class Plugins(metaclass=Singleton):
                 # For plugins outside of lerna-core, the approved module is lerna_plugins or hydra_plugins.
                 raise RuntimeError(f"Invalid plugin '{classname}': not in lerna_plugins or hydra_plugins package")
 
-            if classname not in self.class_name_to_class.keys():
+            if classname not in self.class_name_to_class:
                 raise RuntimeError(f"Unknown plugin class : '{classname}'")
             clazz = self.class_name_to_class[classname]
             plugin = instantiate(config=config, _target_=clazz)
             assert isinstance(plugin, Plugin)
 
         except ImportError as e:
-            raise ImportError(f"Could not instantiate plugin {classname} : {str(e)}\n\n\tIS THE PLUGIN INSTALLED?\n\n")
+            raise ImportError(f"Could not instantiate plugin {classname} : {e!s}\n\n\tIS THE PLUGIN INSTALLED?\n\n")
 
         return plugin
 
     @staticmethod
     def is_in_toplevel_plugins_module(clazz: str) -> bool:
-        return (
-            clazz.startswith("lerna_plugins.")
-            or clazz.startswith("hydra_plugins.")
-            or clazz.startswith("lerna._internal.core_plugins.")
-            or clazz.startswith("lerna._internal.core_plugins.")
-        )
+        return clazz.startswith(("lerna_plugins.", "hydra_plugins.", "lerna._internal.core_plugins.", "lerna._internal.core_plugins."))
 
     def instantiate_sweeper(
         self,
@@ -165,12 +155,12 @@ class Plugins(metaclass=Singleton):
 
     @staticmethod
     def _scan_all_plugins(
-        modules: List[Any],
-    ) -> Tuple[List[Type[Plugin]], ScanStats]:
+        modules: list[Any],
+    ) -> tuple[list[type[Plugin]], ScanStats]:
         stats = ScanStats()
         stats.total_time = timer()
 
-        scanned_plugins: List[Type[Plugin]] = []
+        scanned_plugins: list[type[Plugin]] = []
 
         for mdl in modules:
             for importer, modname, ispkg in pkgutil.walk_packages(path=mdl.__path__, prefix=mdl.__name__ + ".", onerror=lambda x: None):
@@ -184,21 +174,16 @@ class Plugins(metaclass=Singleton):
                     import_time = timer()
 
                     with warnings.catch_warnings(record=True) as recorded_warnings:
-                        if sys.version_info < (3, 10):
-                            m = importer.find_module(modname)  # type: ignore
-                            assert m is not None
-                            loaded_mod = m.load_module(modname)
+                        spec = importer.find_spec(modname)  # type: ignore[call-arg]
+                        assert spec is not None
+                        if modname in sys.modules:
+                            loaded_mod = sys.modules[modname]
                         else:
-                            spec = importer.find_spec(modname)  # type: ignore[call-arg]
-                            assert spec is not None
-                            if modname in sys.modules:
-                                loaded_mod = sys.modules[modname]
-                            else:
-                                loaded_mod = importlib.util.module_from_spec(spec)
-                            if loaded_mod is not None:
-                                assert spec.loader is not None
-                                spec.loader.exec_module(loaded_mod)
-                                sys.modules[modname] = loaded_mod
+                            loaded_mod = importlib.util.module_from_spec(spec)
+                        if loaded_mod is not None:
+                            assert spec.loader is not None
+                            spec.loader.exec_module(loaded_mod)
+                            sys.modules[modname] = loaded_mod
 
                     import_time = timer() - import_time
                     if len(recorded_warnings) > 0:
@@ -235,30 +220,28 @@ class Plugins(metaclass=Singleton):
         stats.total_time = timer() - stats.total_time
         return scanned_plugins, stats
 
-    def get_stats(self) -> Optional[ScanStats]:
+    def get_stats(self) -> ScanStats | None:
         return self.stats
 
-    def discover(self, plugin_type: Optional[Type[Plugin]] = None) -> List[Type[Plugin]]:
+    def discover(self, plugin_type: type[Plugin] | None = None) -> list[type[Plugin]]:
         """
         :param plugin_type: class of plugin to discover, None for all
         :return: a list of plugins implementing the plugin type (or all if plugin type is None)
         """
         Plugins.check_usage(self)
-        ret: List[Type[Plugin]] = []
         if plugin_type is None:
             plugin_type = Plugin
         assert issubclass(plugin_type, Plugin)
         if plugin_type not in self.plugin_type_to_subclass_list:
             return []
-        for clazz in self.plugin_type_to_subclass_list[plugin_type]:
-            ret.append(clazz)
-
-        return ret
+        return self.plugin_type_to_subclass_list[plugin_type].copy()
 
     @staticmethod
     def check_usage(self_: Any) -> None:
         if not isinstance(self_, Plugins):
-            raise ValueError(f"Plugins is now a Singleton. usage: Plugins.instance().{inspect.stack()[1][3]}(...)")
+            raise ValueError(  # noqa: TRY004
+                f"Plugins is now a Singleton. usage: Plugins.instance().{inspect.stack()[1][3]}(...)"
+            )
 
 
 def _is_concrete_plugin_type(obj: Any) -> bool:
@@ -280,7 +263,7 @@ def _is_pkg_path_available(pkg_path: str) -> bool:
         return False
 
 
-def _scan_entrypoint_search_path_plugins() -> List[Type[Plugin]]:
+def _scan_entrypoint_search_path_plugins() -> list[type[Plugin]]:
     """
     Discover SearchPathPlugin classes registered via the ``hydra.lernaplugins``
     and ``lerna.plugins`` entry-point groups so that they are available when
@@ -299,9 +282,9 @@ def _scan_entrypoint_search_path_plugins() -> List[Type[Plugin]]:
       intentionally skipped here because the hydra bridge plugin
       (``hydra_plugins.lerna.searchpath``) already handles them.
     """
-    scanned_plugins: List[Type[Plugin]] = []
+    scanned_plugins: list[type[Plugin]] = []
 
-    discovered: List[Any] = []
+    discovered: list[Any] = []
     for group in ("hydra.lernaplugins", "lerna.plugins"):
         try:
             discovered.extend(entry_points(group=group))

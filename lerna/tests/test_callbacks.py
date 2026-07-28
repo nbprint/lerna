@@ -5,7 +5,7 @@ import pickle
 import sys
 from pathlib import Path
 from textwrap import dedent
-from typing import Any, List
+from typing import Any
 
 from omegaconf import open_dict, read_write
 from pytest import mark, param
@@ -115,7 +115,7 @@ chdir_hydra_root()
 def test_app_with_callbacks(
     tmpdir: Path,
     app_path: str,
-    args: List[str],
+    args: list[str],
     expected: str,
 ) -> None:
     cmd = [
@@ -161,9 +161,8 @@ def test_experimental_save_job_info_callback(tmpdir: Path, multirun: bool) -> No
     job_return_on_job_end: JobReturn = load_pickle(callback_output / "job_return.pickle")
 
     task_cfg_from_callback = copy.deepcopy(config_on_job_start)
-    with read_write(task_cfg_from_callback):
-        with open_dict(task_cfg_from_callback):
-            del task_cfg_from_callback["hydra"]
+    with read_write(task_cfg_from_callback), open_dict(task_cfg_from_callback):
+        del task_cfg_from_callback["hydra"]
 
     # load pickles generated from the application
     app_output_dir = tmpdir / "0" if multirun else tmpdir
@@ -215,7 +214,7 @@ def test_save_job_return_callback(tmpdir: Path, multirun: bool) -> None:
         ("Config overrides are not supported as of now", ["+x=1"]),
     ],
 )
-def test_experimental_rerun(tmpdir: Path, warning_msg: str, overrides: List[str]) -> None:
+def test_experimental_rerun(tmpdir: Path, warning_msg: str, overrides: list[str]) -> None:
     app_path = "lerna/tests/test_apps/app_with_pickle_job_info_callback/my_app.py"
 
     cmd = [
@@ -247,7 +246,7 @@ def test_experimental_rerun(tmpdir: Path, warning_msg: str, overrides: List[str]
         str(config_file),
     ]
     cmd.extend(overrides)
-    result, err = run_python_script(cmd, allow_warnings=True)
+    _result, err = run_python_script(cmd, allow_warnings=True)
     assert warning_msg in err
 
     with open(log_file) as file:

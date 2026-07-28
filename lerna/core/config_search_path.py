@@ -1,7 +1,7 @@
 # Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved
 from abc import ABC, abstractmethod
+from collections.abc import MutableSequence
 from dataclasses import dataclass
-from typing import MutableSequence, Optional, Union
 
 
 class SearchPathElement:
@@ -22,8 +22,8 @@ class SearchPathQuery:
     Used in append and prepend API
     """
 
-    provider: Optional[str] = None
-    path: Optional[str] = None
+    provider: str | None = None
+    path: str | None = None
 
 
 class ConfigSearchPath(ABC):
@@ -31,7 +31,7 @@ class ConfigSearchPath(ABC):
     def get_path(self) -> MutableSequence[SearchPathElement]: ...
 
     @abstractmethod
-    def append(self, provider: str, path: str, anchor: Optional[SearchPathQuery] = None) -> None:
+    def append(self, provider: str, path: str, anchor: SearchPathQuery | None = None) -> None:
         """
         Appends to the search path.
         Note, this currently only takes effect if called before the ConfigRepository is instantiated.
@@ -42,14 +42,12 @@ class ConfigSearchPath(ABC):
         :param anchor: Optional anchor query to append after
         """
 
-    ...
-
     @abstractmethod
     def prepend(
         self,
         provider: str,
         path: str,
-        anchor: Optional[Union[SearchPathQuery, str]] = None,
+        anchor: SearchPathQuery | str | None = None,
     ) -> None:
         """
         Prepends to the search path.
@@ -60,5 +58,3 @@ class ConfigSearchPath(ABC):
         :param path: path element, can be a file system path or a package path (For example pkg://lerna.conf)
         :param anchor: Optional anchor query to prepend before
         """
-
-    ...

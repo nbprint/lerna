@@ -2,7 +2,7 @@
 import os
 import zipfile
 from importlib import resources
-from typing import Any, List, Optional
+from typing import Any
 
 import yaml
 from omegaconf import OmegaConf
@@ -80,7 +80,7 @@ class ImportlibResourcesConfigSource(ConfigSource):
                     if raw_config is None:
                         raw_config = {}
                     cfg = OmegaConf.create(raw_config)
-                except Exception:
+                except Exception:  # noqa: BLE001
                     # Fall back to Python YAML parser on errors
                     raw = yaml.safe_load(content_str)
                     if raw is None:
@@ -134,8 +134,8 @@ class ImportlibResourcesConfigSource(ConfigSource):
         res = files.joinpath(config_path)
         return self._safe_is_file(res)
 
-    def list(self, config_path: str, results_filter: Optional[ObjectType]) -> List[str]:
-        files: List[str] = []
+    def list(self, config_path: str, results_filter: ObjectType | None) -> list[str]:
+        files: list[str] = []
         for file in resources.files(self.path).joinpath(config_path).iterdir():
             fname = file.name
             fpath = os.path.join(config_path, fname)
@@ -146,4 +146,4 @@ class ImportlibResourcesConfigSource(ConfigSource):
                 results_filter=results_filter,
             )
 
-        return sorted(list(set(files)))
+        return sorted(set(files))

@@ -1,5 +1,5 @@
 # Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved
-from typing import List, MutableSequence, Optional, Union
+from collections.abc import MutableSequence
 
 from lerna.core.config_search_path import (
     ConfigSearchPath,
@@ -9,7 +9,7 @@ from lerna.core.config_search_path import (
 
 
 class ConfigSearchPathImpl(ConfigSearchPath):
-    config_search_path: List[SearchPathElement]
+    config_search_path: list[SearchPathElement]
 
     def __init__(self) -> None:
         self.config_search_path = []
@@ -45,7 +45,7 @@ class ConfigSearchPathImpl(ConfigSearchPath):
                 assert False
         return -1
 
-    def append(self, provider: str, path: str, anchor: Optional[SearchPathQuery] = None) -> None:
+    def append(self, provider: str, path: str, anchor: SearchPathQuery | None = None) -> None:
         if anchor is None:
             self.config_search_path.append(SearchPathElement(provider, path))
         else:
@@ -62,7 +62,7 @@ class ConfigSearchPathImpl(ConfigSearchPath):
         self,
         provider: str,
         path: str,
-        anchor: Optional[Union[SearchPathQuery, str]] = None,
+        anchor: SearchPathQuery | str | None = None,
     ) -> None:
         """
         Prepends to the search path.

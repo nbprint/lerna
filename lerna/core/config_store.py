@@ -1,9 +1,10 @@
 # Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved
 import copy
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from omegaconf import DictConfig, OmegaConf
+from typing_extensions import Self
 
 from lerna.core.object_type import ObjectType
 from lerna.core.singleton import Singleton
@@ -24,28 +25,28 @@ class ConfigStoreWithProvider:
     def __init__(self, provider: str) -> None:
         self.provider = provider
 
-    def __enter__(self) -> "ConfigStoreWithProvider":
+    def __enter__(self) -> Self:
         return self
 
     def store(
         self,
         name: str,
         node: Any,
-        group: Optional[str] = None,
-        package: Optional[str] = None,
+        group: str | None = None,
+        package: str | None = None,
     ) -> None:
         ConfigStore.instance().store(group=group, name=name, node=node, package=package, provider=self.provider)
 
-    def __exit__(self, exc_type: Any, exc_value: Any, exc_traceback: Any) -> Any: ...
+    def __exit__(self, exc_type: object, exc_value: object, exc_traceback: object) -> Any: ...
 
 
 @dataclass
 class ConfigNode:
     name: str
     node: DictConfig
-    group: Optional[str]
-    package: Optional[str]
-    provider: Optional[str]
+    group: str | None
+    package: str | None
+    provider: str | None
 
 
 class ConfigStore(metaclass=Singleton):
@@ -53,7 +54,7 @@ class ConfigStore(metaclass=Singleton):
     def instance(*args: Any, **kwargs: Any) -> "ConfigStore":
         return Singleton.instance(ConfigStore, *args, **kwargs)  # type: ignore
 
-    repo: Dict[str, Any]
+    repo: dict[str, Any]
     _rust_store: Any
 
     def __init__(self) -> None:
@@ -64,13 +65,13 @@ class ConfigStore(metaclass=Singleton):
         else:
             self._rust_store = None
 
-    def __getstate__(self) -> Dict[str, Any]:
+    def __getstate__(self) -> dict[str, Any]:
         # Don't include _rust_store in pickle state
         state = self.__dict__.copy()
         state["_rust_store"] = None  # Rust store will be recreated
         return state
 
-    def __setstate__(self, state: Dict[str, Any]) -> None:
+    def __setstate__(self, state: dict[str, Any]) -> None:
         self.__dict__.update(state)
         # Recreate Rust store on unpickle
         if _RUST_AVAILABLE:
@@ -82,9 +83,9 @@ class ConfigStore(metaclass=Singleton):
         self,
         name: str,
         node: Any,
-        group: Optional[str] = None,
-        package: Optional[str] = None,
-        provider: Optional[str] = None,
+        group: str | None = None,
+        package: str | None = None,
+        provider: str | None = None,
     ) -> None:
         """
         Stores a config node into the repository
@@ -167,7 +168,7 @@ class ConfigStore(metaclass=Singleton):
         else:
             return ObjectType.CONFIG
 
-    def list(self, path: str) -> List[str]:
+    def list(self, path: str) -> list[str]:
         d = self._open(path)
         if d is None:
             raise OSError(f"Path not found {path}")

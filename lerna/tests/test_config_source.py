@@ -334,7 +334,7 @@ class TestConfigSourceEdgeCases:
                 result = source.load_config("bad.yaml")
                 # If it returns, check it's usable
                 assert result is None or isinstance(result, ConfigResult)
-            except Exception:
+            except Exception:  # noqa: BLE001, S110
                 # Expected - invalid YAML should raise
                 pass
 
