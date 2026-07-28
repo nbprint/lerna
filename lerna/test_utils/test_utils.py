@@ -20,7 +20,6 @@ from subprocess import PIPE, Popen
 from typing import Any, Protocol
 
 from omegaconf import Container, DictConfig, OmegaConf
-from typing_extensions import Self
 
 from lerna._internal.hydra import Hydra
 from lerna._internal.utils import detect_task_name
@@ -68,7 +67,7 @@ class TaskTestFunction:
 
         return 100
 
-    def __enter__(self) -> Self:
+    def __enter__(self) -> "TaskTestFunction":  # noqa: PYI034
         try:
             validate_config_path(self.config_path)
 
@@ -142,7 +141,7 @@ class SweepTaskFunction:
             return self.task_function(cfg)
         return 100
 
-    def __enter__(self) -> Self:
+    def __enter__(self) -> "SweepTaskFunction":  # noqa: PYI034
         overrides = copy.deepcopy(self.overrides)
         assert overrides is not None
         if self.temp_dir:

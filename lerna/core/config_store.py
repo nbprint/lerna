@@ -4,7 +4,6 @@ from dataclasses import dataclass
 from typing import Any
 
 from omegaconf import DictConfig, OmegaConf
-from typing_extensions import Self
 
 from lerna.core.object_type import ObjectType
 from lerna.core.singleton import Singleton
@@ -25,7 +24,7 @@ class ConfigStoreWithProvider:
     def __init__(self, provider: str) -> None:
         self.provider = provider
 
-    def __enter__(self) -> Self:
+    def __enter__(self) -> "ConfigStoreWithProvider":  # noqa: PYI034
         return self
 
     def store(
