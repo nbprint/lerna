@@ -3,8 +3,9 @@
 import json
 import logging.config
 import os
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 import lerna._internal.instantiate._instantiate2
 import lerna.types
@@ -31,11 +32,13 @@ def get_class(path: str) -> type:
     try:
         cls = _locate(path)
         if not isinstance(cls, type):
-            raise ValueError(f"Located non-class of type '{type(cls).__name__}'" + f" while loading '{path}'")
+            raise ValueError(  # noqa: TRY004
+                f"Located non-class of type '{type(cls).__name__}'" + f" while loading '{path}'"
+            )
         return cls
     except Exception as e:
         log.error(f"Error getting class at {path}: {e}")
-        raise e
+        raise
 
 
 def get_method(path: str) -> Callable[..., Any]:
@@ -50,12 +53,14 @@ def get_method(path: str) -> Callable[..., Any]:
     try:
         obj = _locate(path)
         if not callable(obj):
-            raise ValueError(f"Located non-callable of type '{type(obj).__name__}'" + f" while loading '{path}'")
+            raise ValueError(  # noqa: TRY004
+                f"Located non-callable of type '{type(obj).__name__}'" + f" while loading '{path}'"
+            )
         cl: Callable[..., Any] = obj
         return cl
     except Exception as e:
         log.error(f"Error getting callable at {path} : {e}")
-        raise e
+        raise
 
 
 # Alias for get_method
@@ -76,7 +81,7 @@ def get_object(path: str) -> Any:
         return obj
     except Exception as e:
         log.error(f"Error getting object at {path} : {e}")
-        raise e
+        raise
 
 
 def get_original_cwd() -> str:

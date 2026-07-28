@@ -5,6 +5,6 @@ from .initialize import initialize, initialize_config_dir, initialize_config_mod
 __all__ = [
     "compose",
     "initialize",
-    "initialize_config_module",
     "initialize_config_dir",
+    "initialize_config_module",
 ]

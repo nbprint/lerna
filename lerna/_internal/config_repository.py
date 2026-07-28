@@ -3,7 +3,6 @@ import copy
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from textwrap import dedent
-from typing import Dict, List, Optional, Tuple
 
 from omegaconf import (
     Container,
@@ -37,7 +36,7 @@ class IConfigRepository(ABC):
     def get_schema_source(self) -> ConfigSource: ...
 
     @abstractmethod
-    def load_config(self, config_path: str) -> Optional[ConfigResult]: ...
+    def load_config(self, config_path: str) -> ConfigResult | None: ...
 
     @abstractmethod
     def group_exists(self, config_path: str) -> bool: ...
@@ -46,10 +45,10 @@ class IConfigRepository(ABC):
     def config_exists(self, config_path: str) -> bool: ...
 
     @abstractmethod
-    def get_group_options(self, group_name: str, results_filter: Optional[ObjectType] = ObjectType.CONFIG) -> List[str]: ...
+    def get_group_options(self, group_name: str, results_filter: ObjectType | None = ObjectType.CONFIG) -> list[str]: ...
 
     @abstractmethod
-    def get_sources(self) -> List[ConfigSource]: ...
+    def get_sources(self) -> list[ConfigSource]: ...
 
     @abstractmethod
     def initialize_sources(self, config_search_path: ConfigSearchPath) -> None: ...
@@ -57,7 +56,7 @@ class IConfigRepository(ABC):
 
 class ConfigRepository(IConfigRepository):
     config_search_path: ConfigSearchPath
-    sources: List[ConfigSource]
+    sources: list[ConfigSource]
 
     def __init__(self, config_search_path: ConfigSearchPath) -> None:
         self.initialize_sources(config_search_path)
@@ -77,7 +76,7 @@ class ConfigRepository(IConfigRepository):
         assert source.__class__.__name__ == "StructuredConfigSource" and source.provider == "schema", "schema config source must be last"
         return source
 
-    def load_config(self, config_path: str) -> Optional[ConfigResult]:
+    def load_config(self, config_path: str) -> ConfigResult | None:
         source = self._find_object_source(config_path=config_path, object_type=ObjectType.CONFIG)
         ret = None
         if source is not None:
@@ -97,17 +96,17 @@ class ConfigRepository(IConfigRepository):
     def config_exists(self, config_path: str) -> bool:
         return self._find_object_source(config_path, ObjectType.CONFIG) is not None
 
-    def get_group_options(self, group_name: str, results_filter: Optional[ObjectType] = ObjectType.CONFIG) -> List[str]:
-        options: List[str] = []
+    def get_group_options(self, group_name: str, results_filter: ObjectType | None = ObjectType.CONFIG) -> list[str]:
+        options: list[str] = []
         for source in self.sources:
             if source.is_group(config_path=group_name):
                 options.extend(source.list(config_path=group_name, results_filter=results_filter))
-        return sorted(list(set(options)))
+        return sorted(set(options))
 
-    def get_sources(self) -> List[ConfigSource]:
+    def get_sources(self) -> list[ConfigSource]:
         return self.sources
 
-    def _find_object_source(self, config_path: str, object_type: Optional[ObjectType]) -> Optional[ConfigSource]:
+    def _find_object_source(self, config_path: str, object_type: ObjectType | None) -> ConfigSource | None:
         found_source = None
         for source in self.sources:
             if object_type == ObjectType.CONFIG:
@@ -139,7 +138,7 @@ class ConfigRepository(IConfigRepository):
     def _split_group(
         self,
         group_with_package: str,
-    ) -> Tuple[str, Optional[str], Optional[str]]:
+    ) -> tuple[str, str | None, str | None]:
         idx = group_with_package.find("@")
         if idx == -1:
             # group
@@ -164,7 +163,7 @@ class ConfigRepository(IConfigRepository):
         self,
         config_path: str,
         defaults: ListConfig,
-    ) -> List[InputDefault]:
+    ) -> list[InputDefault]:
         def issue_deprecated_name_warning() -> None:
             # DEPRECATED: remove in 1.2
             url = "https://hydra.cc/docs/1.2/upgrades/1.0_to_1.1/changes_to_package_header"
@@ -176,15 +175,14 @@ class ConfigRepository(IConfigRepository):
                 ),
             )
 
-        res: List[InputDefault] = []
+        res: list[InputDefault] = []
         for item in defaults._iter_ex(resolve=False):
             default: InputDefault
             if isinstance(item, DictConfig):
                 if not version.base_at_least("1.2"):
                     old_optional = None
-                    if len(item) > 1:
-                        if "optional" in item:
-                            old_optional = item.pop("optional")
+                    if len(item) > 1 and "optional" in item:
+                        old_optional = item.pop("optional")
                 keys = list(item.keys())
 
                 if len(keys) > 1:
@@ -214,7 +212,7 @@ class ConfigRepository(IConfigRepository):
                         for v in patch_value:
                             vv = v._value()
                             if not isinstance(vv, str):
-                                raise ValueError(
+                                raise ValueError(  # noqa: TRY004
                                     f"Unsupported _patch_ item value in defaults : {type(vv).__name__}, nested list items must be strings"
                                 )
                             operations.append(vv)
@@ -229,24 +227,22 @@ class ConfigRepository(IConfigRepository):
                 keywords = ConfigRepository.Keywords()
                 self._extract_keywords_from_config_group(config_group, keywords)
 
-                if not version.base_at_least("1.2"):
-                    if not keywords.optional and old_optional is not None:
-                        keywords.optional = old_optional
+                if not version.base_at_least("1.2") and not keywords.optional and old_optional is not None:
+                    keywords.optional = old_optional
 
                 node = item._get_node(key)
                 assert node is not None and isinstance(node, Node)
                 config_value = node._value()
 
-                if not version.base_at_least("1.2"):
-                    if old_optional is not None:
-                        msg = dedent(
-                            f"""
+                if not version.base_at_least("1.2") and old_optional is not None:
+                    msg = dedent(
+                        f"""
                             In {config_path}: 'optional: true' is deprecated.
                             Use 'optional {key}: {config_value}' instead.
                             Support for the old style is removed for Hydra version_base >= 1.2"""
-                        )
+                    )
 
-                        deprecation_warning(msg)
+                    deprecation_warning(msg)
 
                 if config_value is not None and not isinstance(config_value, (str, list)):
                     raise ValueError(f"Unsupported item value in defaults : {type(config_value).__name__}. Supported: string or list")
@@ -256,13 +252,14 @@ class ConfigRepository(IConfigRepository):
                     for v in config_value:
                         vv = v._value()
                         if not isinstance(vv, str):
-                            raise ValueError(f"Unsupported item value in defaults : {type(vv).__name__}, nested list items must be strings")
+                            raise ValueError(  # noqa: TRY004
+                                f"Unsupported item value in defaults : {type(vv).__name__}, nested list items must be strings"
+                            )
                         options.append(vv)
                     config_value = options
 
-                if not version.base_at_least("1.2"):
-                    if package is not None and "_name_" in package:
-                        issue_deprecated_name_warning()
+                if not version.base_at_least("1.2") and package is not None and "_name_" in package:
+                    issue_deprecated_name_warning()
 
                 default = GroupDefault(
                     group=keywords.group,
@@ -274,13 +271,12 @@ class ConfigRepository(IConfigRepository):
 
             elif isinstance(item, str):
                 path, package, _package2 = self._split_group(item)
-                if not version.base_at_least("1.2"):
-                    if package is not None and "_name_" in package:
-                        issue_deprecated_name_warning()
+                if not version.base_at_least("1.2") and package is not None and "_name_" in package:
+                    issue_deprecated_name_warning()
 
                 default = ConfigDefault(path=path, package=package)
             else:
-                raise ValueError(f"Unsupported type in defaults : {type(item).__name__}")
+                raise ValueError(f"Unsupported type in defaults : {type(item).__name__}")  # noqa: TRY004
             res.append(default)
         return res
 
@@ -289,23 +285,24 @@ class ConfigRepository(IConfigRepository):
         if not OmegaConf.is_dict(cfg):
             return empty
         assert isinstance(cfg, DictConfig)
-        with read_write(cfg):
-            with open_dict(cfg):
-                if not cfg._is_typed():
-                    defaults = cfg.pop("defaults", empty)
-                else:
-                    # If node is a backed by Structured Config, flag it and temporarily keep the defaults list in.
-                    # It will be removed later.
-                    # This is addressing an edge case where the defaults list re-appears once the dataclass is used
-                    # as a prototype during OmegaConf merge.
-                    cfg._set_flag("HYDRA_REMOVE_TOP_LEVEL_DEFAULTS", True)
-                    defaults = cfg.get("defaults", empty)
+        with read_write(cfg), open_dict(cfg):
+            if not cfg._is_typed():
+                defaults = cfg.pop("defaults", empty)
+            else:
+                # If node is a backed by Structured Config, flag it and temporarily keep the defaults list in.
+                # It will be removed later.
+                # This is addressing an edge case where the defaults list re-appears once the dataclass is used
+                # as a prototype during OmegaConf merge.
+                cfg._set_flag("HYDRA_REMOVE_TOP_LEVEL_DEFAULTS", True)
+                defaults = cfg.get("defaults", empty)
         if not isinstance(defaults, ListConfig):
             if isinstance(defaults, DictConfig):
                 type_str = "mapping"
             else:
                 type_str = type(defaults).__name__
-            raise ValueError(f"Invalid defaults list in '{config_path}', defaults must be a list (got {type_str})")
+            raise ValueError(  # noqa: TRY004
+                f"Invalid defaults list in '{config_path}', defaults must be a list (got {type_str})"
+            )
 
         return defaults
 
@@ -334,7 +331,7 @@ class CachingConfigRepository(IConfigRepository):
     def __init__(self, delegate: IConfigRepository):
         # copy the underlying repository to avoid mutating it with initialize_sources()
         self.delegate = copy.deepcopy(delegate)
-        self.cache: Dict[str, Optional[ConfigResult]] = {}
+        self.cache: dict[str, ConfigResult | None] = {}
 
     def get_schema_source(self) -> ConfigSource:
         return self.delegate.get_schema_source()
@@ -345,7 +342,7 @@ class CachingConfigRepository(IConfigRepository):
         # For the use case this is used, the only thing in the cache is the primary config
         # and we want to keep it even though we re-initialized the sources.
 
-    def load_config(self, config_path: str) -> Optional[ConfigResult]:
+    def load_config(self, config_path: str) -> ConfigResult | None:
         cache_key = f"config_path={config_path}"
         if cache_key in self.cache:
             return self.cache[cache_key]
@@ -360,8 +357,8 @@ class CachingConfigRepository(IConfigRepository):
     def config_exists(self, config_path: str) -> bool:
         return self.delegate.config_exists(config_path=config_path)
 
-    def get_group_options(self, group_name: str, results_filter: Optional[ObjectType] = ObjectType.CONFIG) -> List[str]:
+    def get_group_options(self, group_name: str, results_filter: ObjectType | None = ObjectType.CONFIG) -> list[str]:
         return self.delegate.get_group_options(group_name=group_name, results_filter=results_filter)
 
-    def get_sources(self) -> List[ConfigSource]:
+    def get_sources(self) -> list[ConfigSource]:
         return self.delegate.get_sources()

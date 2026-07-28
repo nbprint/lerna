@@ -33,8 +33,6 @@ class TestBasicLauncherIntegration(IntegrationTestSuite):
     Run this launcher through the integration test suite.
     """
 
-    pass
-
 
 @mark.parametrize(
     "launcher_name, overrides",

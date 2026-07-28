@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 """Test the Rust defaults list helper."""
 
 from typing import Any

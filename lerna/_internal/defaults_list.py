@@ -3,9 +3,9 @@
 import copy
 import os
 import warnings
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from textwrap import dedent
-from typing import Callable, Dict, List, Optional, Set, Tuple, Union
 
 from omegaconf import DictConfig, OmegaConf
 
@@ -45,33 +45,33 @@ cs.store(name="_dummy_empty_config_", node={}, provider="hydra")
 
 @dataclass
 class Deletion:
-    name: Optional[str]
+    name: str | None
     used: bool = field(default=False, compare=False)
 
 
 @dataclass
 class OverrideMetadata:
     external_override: bool
-    containing_config_path: Optional[str] = None
+    containing_config_path: str | None = None
     used: bool = False
-    relative_key: Optional[str] = None
+    relative_key: str | None = None
 
 
 @dataclass
 class Overrides:
-    override_choices: Dict[str, Optional[Union[str, List[str]]]]
-    override_metadata: Dict[str, OverrideMetadata]
+    override_choices: dict[str, str | list[str] | None]
+    override_metadata: dict[str, OverrideMetadata]
 
-    append_group_defaults: List[GroupDefault]
-    config_overrides: List[Override]
-    patch_overrides: List[Override]
+    append_group_defaults: list[GroupDefault]
+    config_overrides: list[Override]
+    patch_overrides: list[Override]
 
-    known_choices: Dict[str, Optional[str]]
-    known_choices_per_group: Dict[str, Set[str]]
+    known_choices: dict[str, str | None]
+    known_choices_per_group: dict[str, set[str]]
 
-    deletions: Dict[str, Deletion]
+    deletions: dict[str, Deletion]
 
-    def __init__(self, repo: IConfigRepository, overrides_list: List[Override]) -> None:
+    def __init__(self, repo: IConfigRepository, overrides_list: list[Override]) -> None:
         self.override_choices = {}
         self.override_metadata = {}
         self.append_group_defaults = []
@@ -138,10 +138,10 @@ class Overrides:
 
     def add_patch_operations(
         self,
-        operations: List[str],
+        operations: list[str],
         parent_package: str,
         containing_config_path: str,
-        package_scope: Optional[str] = None,
+        package_scope: str | None = None,
     ) -> None:
         # If _patch_@pkg is used, scope bare keys to pkg instead of parent_package
         effective_package = package_scope if package_scope is not None else parent_package
@@ -188,10 +188,10 @@ class Overrides:
         for key, meta in self.override_metadata.items():
             if not meta.used:
                 group = key.split("@")[0]
-                choices = self.known_choices_per_group[group] if group in self.known_choices_per_group else set()
+                choices = self.known_choices_per_group.get(group, set())
 
                 if len(choices) > 1:
-                    msg = f"Could not override '{key}'.\nDid you mean to override one of {', '.join(sorted(list(choices)))}?"
+                    msg = f"Could not override '{key}'.\nDid you mean to override one of {', '.join(sorted(choices))}?"
                 elif len(choices) == 1:
                     msg = f"Could not override '{key}'.\nDid you mean to override {copy.copy(choices).pop()}?"
                 elif len(choices) == 0:
@@ -251,16 +251,16 @@ class Overrides:
 
 @dataclass
 class DefaultsList:
-    defaults: List[ResultDefault]
+    defaults: list[ResultDefault]
     defaults_tree: DefaultsTreeNode
-    config_overrides: List[Override]
-    config_patch_overrides: List[Override]
+    config_overrides: list[Override]
+    config_patch_overrides: list[Override]
     overrides: Overrides
 
 
 def _validate_self(
     containing_node: InputDefault,
-    defaults: List[InputDefault],
+    defaults: list[InputDefault],
     has_config_content: bool,
 ) -> bool:
     # check that self is present only once
@@ -306,7 +306,7 @@ def _expand_virtual_root(
     overrides: Overrides,
     skip_missing: bool,
 ) -> DefaultsTreeNode:
-    children: List[Union[DefaultsTreeNode, InputDefault]] = []
+    children: list[DefaultsTreeNode | InputDefault] = []
     assert root.children is not None
     for d in reversed(root.children):
         assert isinstance(d, InputDefault)
@@ -366,7 +366,7 @@ def _check_not_missing(
 
 def _create_interpolation_map(
     overrides: Overrides,
-    defaults_list: List[InputDefault],
+    defaults_list: list[InputDefault],
     self_added: bool,
 ) -> DictConfig:
     known_choices = OmegaConf.create(overrides.known_choices)
@@ -402,7 +402,7 @@ def _create_defaults_tree(
 
 
 def _update_overrides(
-    defaults_list: List[InputDefault],
+    defaults_list: list[InputDefault],
     overrides: Overrides,
     parent: InputDefault,
     interpolated_subtree: bool,
@@ -477,7 +477,7 @@ def _has_config_content(cfg: DictConfig) -> bool:
     if cfg._is_none() or cfg._is_missing():
         return False
 
-    for key in cfg.keys():
+    for key in cfg:
         if not OmegaConf.is_missing(cfg, key) and key != "defaults":
             return True
     return False
@@ -492,7 +492,7 @@ def _create_defaults_tree_impl(
     overrides: Overrides,
 ) -> DefaultsTreeNode:
     parent = root.node
-    children: List[Union[InputDefault, DefaultsTreeNode]] = []
+    children: list[InputDefault | DefaultsTreeNode] = []
     if parent.is_virtual():
         if is_root_config:
             return _expand_virtual_root(repo, root, overrides, skip_missing)
@@ -549,7 +549,7 @@ def _create_defaults_tree_impl(
     _update_overrides(defaults_list, overrides, parent, interpolated_subtree)
 
     def add_child(
-        child_list: List[Union[InputDefault, DefaultsTreeNode]],
+        child_list: list[InputDefault | DefaultsTreeNode],
         new_root_: DefaultsTreeNode,
     ) -> None:
         subtree_ = _create_defaults_tree_impl(
@@ -641,7 +641,7 @@ def _create_defaults_tree_impl(
     return root
 
 
-def _create_result_default(tree: Optional[DefaultsTreeNode], node: InputDefault) -> Optional[ResultDefault]:
+def _create_result_default(tree: DefaultsTreeNode | None, node: InputDefault) -> ResultDefault | None:
     if node.is_virtual():
         return None
     if node.get_name() is None:
@@ -677,7 +677,7 @@ def _create_result_default(tree: Optional[DefaultsTreeNode], node: InputDefault)
 
 def _dfs_walk(
     tree: DefaultsTreeNode,
-    operator: Callable[[Optional[DefaultsTreeNode], InputDefault], None],
+    operator: Callable[[DefaultsTreeNode | None, InputDefault], None],
 ) -> None:
     if tree.children is None or len(tree.children) == 0:
         operator(tree.parent, tree.node)
@@ -692,12 +692,12 @@ def _dfs_walk(
 
 def _tree_to_list(
     tree: DefaultsTreeNode,
-) -> List[ResultDefault]:
+) -> list[ResultDefault]:
     class Collector:
         def __init__(self) -> None:
-            self.output: List[ResultDefault] = []
+            self.output: list[ResultDefault] = []
 
-        def __call__(self, tree_node: Optional[DefaultsTreeNode], node: InputDefault) -> None:
+        def __call__(self, tree_node: DefaultsTreeNode | None, node: InputDefault) -> None:
             if node.is_deleted():
                 return
 
@@ -713,7 +713,7 @@ def _tree_to_list(
     return visitor.output
 
 
-def _create_root(config_name: Optional[str], with_hydra: bool) -> DefaultsTreeNode:
+def _create_root(config_name: str | None, with_hydra: bool) -> DefaultsTreeNode:
     primary: InputDefault
     if config_name is None:
         primary = ConfigDefault(path="_dummy_empty_config_", primary=True)
@@ -730,7 +730,7 @@ def _create_root(config_name: Optional[str], with_hydra: bool) -> DefaultsTreeNo
     return root
 
 
-def ensure_no_duplicates_in_list(result: List[ResultDefault]) -> None:
+def ensure_no_duplicates_in_list(result: list[ResultDefault]) -> None:
     keys = set()
     for item in result:
         if not item.is_self:
@@ -743,11 +743,11 @@ def ensure_no_duplicates_in_list(result: List[ResultDefault]) -> None:
 
 def _create_defaults_list(
     repo: IConfigRepository,
-    config_name: Optional[str],
+    config_name: str | None,
     overrides: Overrides,
     prepend_hydra: bool,
     skip_missing: bool,
-) -> Tuple[List[ResultDefault], DefaultsTreeNode]:
+) -> tuple[list[ResultDefault], DefaultsTreeNode]:
     root = _create_root(config_name=config_name, with_hydra=prepend_hydra)
 
     defaults_tree = _create_defaults_tree(
@@ -766,8 +766,8 @@ def _create_defaults_list(
 
 def create_defaults_list(
     repo: IConfigRepository,
-    config_name: Optional[str],
-    overrides_list: List[Override],
+    config_name: str | None,
+    overrides_list: list[Override],
     prepend_hydra: bool,
     skip_missing: bool,
 ) -> DefaultsList:
@@ -833,7 +833,7 @@ def config_not_found_error(repo: IConfigRepository, tree: DefaultsTreeNode) -> N
 
     descs = []
     for src in repo.get_sources():
-        descs.append(f"\t{repr(src)}")
+        descs.append(f"\t{src!r}")
     lines = "\n".join(descs)
     msg += "\nConfig search path:" + f"\n{lines}"
 
@@ -846,11 +846,11 @@ def config_not_found_error(repo: IConfigRepository, tree: DefaultsTreeNode) -> N
 
 def create_defaults_list_rust(
     repo: IConfigRepository,
-    config_name: Optional[str],
-    overrides_list: List[Override],
+    config_name: str | None,
+    overrides_list: list[Override],
     prepend_hydra: bool,
     skip_missing: bool,
-) -> Optional[DefaultsList]:
+) -> DefaultsList | None:
     """
     Create defaults list using Rust implementation.
 

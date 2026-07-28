@@ -1,7 +1,8 @@
 # Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved
 import inspect
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List
+from typing import Any
 
 from omegaconf._utils import type_str
 
@@ -13,8 +14,8 @@ from lerna.errors import HydraException
 @dataclass
 class FunctionCall:
     name: str
-    args: List[Any]
-    kwargs: Dict[str, Any]
+    args: list[Any]
+    kwargs: dict[str, Any]
 
 
 @dataclass
@@ -38,8 +39,8 @@ class Functions:
         }
     )
 
-    definitions: Dict[str, inspect.Signature] = field(default_factory=dict)
-    functions: Dict[str, Callable[..., Any]] = field(default_factory=dict)
+    definitions: dict[str, inspect.Signature] = field(default_factory=dict)
+    functions: dict[str, Callable[..., Any]] = field(default_factory=dict)
     # Tracks which Rust-native functions have been overridden by user registrations
     user_overrides: set = field(default_factory=set)
 

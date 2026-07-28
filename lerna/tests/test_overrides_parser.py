@@ -2,8 +2,9 @@
 import builtins
 import math
 import re
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, List, Union
+from typing import Any
 
 try:
     from _pytest.python_api import RaisesContext
@@ -312,7 +313,7 @@ def test_shuffle_sequence(value: str, expected: Any) -> None:
         param("{3.14: 0, 1e3: 1}", {3.14: 0, 1000.0: 1}, id="dict_float_key"),
         param("{true: 1, fAlSe: 0}", {True: 1, False: 0}, id="dict_bool_key"),
         param(
-            "{%s: 1}" % UNQUOTED_SPECIAL,
+            f"{{{UNQUOTED_SPECIAL}: 1}}",
             {UNQUOTED_SPECIAL: 1},
             id="dict_unquoted_char_key",
         ),
@@ -654,9 +655,6 @@ def test_key(value: str, expected: Any) -> None:
         param("-inf", -math.inf, id="primitive:float:inf:neg"),
         param("nan", math.nan, id="primitive:float:nan"),
         param("NaN", math.nan, id="primitive:float:nan"),
-        # bool
-        param("true", True, id="primitive:bool"),
-        param("false", False, id="primitive:bool"),
         # interpolations:
         param("${a}", "${a}", id="primitive:interpolation"),
         param("${a.b.c}", "${a.b.c}", id="primitive:interpolation"),
@@ -778,11 +776,6 @@ def test_primitive(value: str, expected: Any) -> None:
         param(
             "'inf'",
             QuotedString(text="inf", quote=Quote.single),
-            id="float:constant",
-        ),
-        param(
-            "'nan'",
-            QuotedString(text="nan", quote=Quote.single),
             id="float:constant",
         ),
         param(
@@ -1189,9 +1182,9 @@ def test_get_key_element(override: str, expected: str) -> None:
         param("key={a:10,b:20}", "{a: 10, b: 20}", True, id="dict"),
         param("key={a:10,b:[1,2,3]}", "{a: 10, b: [1, 2, 3]}", True, id="dict"),
         param(
-            "key={%s: 1}" % UNQUOTED_SPECIAL,
+            f"key={{{UNQUOTED_SPECIAL}: 1}}",
             # Note that \ gets escaped.
-            "{%s: 1}" % UNQUOTED_SPECIAL.replace("\\", "\\\\"),
+            "{{{}: 1}}".format(UNQUOTED_SPECIAL.replace("\\", "\\\\")),
             True,
             id="dict_unquoted_key_special",
         ),
@@ -1224,18 +1217,14 @@ def test_override_get_value_element_method(override: str, expected: str, space_a
         param("key=3.1415", 3.1415, id="float"),
         param("key=[]", [], id="list"),
         param("key=[1,2,3]", [1, 2, 3], id="list"),
-        param("key=[1,2,3]", [1, 2, 3], id="list"),
-        param("key=['a b', 2, 3]", ["a b", 2, 3], id="list"),
         param("key=['a b', 2, 3]", ["a b", 2, 3], id="list"),
         param("key={}", {}, id="dict"),
         param("key={a:10}", {"a": 10}, id="dict"),
-        param("key={a:10}", {"a": 10}, id="dict"),
-        param("key={a:10,b:20}", {"a": 10, "b": 20}, id="dict"),
         param("key={a:10,b:20}", {"a": 10, "b": 20}, id="dict"),
         param("key={a:10,b:[1,2,3]}", {"a": 10, "b": [1, 2, 3]}, id="dict"),
         param("key={123id: 0}", {"123id": 0}, id="dict_key_int_plus_id"),
         param(
-            "key={%s: 0}" % UNQUOTED_SPECIAL,
+            f"key={{{UNQUOTED_SPECIAL}: 0}}",
             {UNQUOTED_SPECIAL: 0},
             id="dict_key_noquote",
         ),
@@ -1263,13 +1252,12 @@ def test_override_value_method(override: str, expected: str) -> None:
         # up
         param(0, 2, 1, [0.0, 1.0], id="FloatRange:up"),
         param(0, 2, 0.5, [0.0, 0.5, 1.0, 1.5], id="FloatRange:up"),
-        param(0, 2, 1, [0.0, 1.0], id="FloatRange:up"),
         # down
         param(2, 0, -1, [2.0, 1.0], id="FloatRange:down"),
         param(10.0, 5.0, -2, [10.0, 8.0, 6.0], id="FloatRange:down"),
     ],
 )
-def test_float_range(start: float, stop: float, step: float, expected: List[float]) -> None:
+def test_float_range(start: float, stop: float, step: float, expected: list[float]) -> None:
     res = list(FloatRange(start, stop, step))
     assert len(res) == len(expected)
     for i in range(len(res)):
@@ -1450,39 +1438,11 @@ def test_sweep_shuffle(value: str, expected: str) -> None:
 
 @dataclass
 class CastResults:
-    json_str: Union[
-        str,
-        Sweep,
-        RaisesContext[HydraException],
-    ]
-    int: Union[
-        int,
-        List[Union[int, List[int]]],
-        Dict[str, Any],
-        Sweep,
-        RaisesContext[HydraException],
-    ]
-    float: Union[
-        float,
-        List[Union[float, List[float]]],
-        Dict[str, Any],
-        Sweep,
-        RaisesContext[HydraException],
-    ]
-    bool: Union[
-        bool,
-        List[Union[bool, List[bool]]],
-        Dict[str, Any],
-        Sweep,
-        RaisesContext[HydraException],
-    ]
-    str: Union[
-        str,
-        List[Union[str, List[str]]],
-        Dict[str, Any],
-        Sweep,
-        RaisesContext[HydraException],
-    ]
+    json_str: str | Sweep | RaisesContext[HydraException]
+    int: int | list[int | list[int]] | dict[str, Any] | Sweep | RaisesContext[HydraException]
+    float: float | list[float | list[float]] | dict[str, Any] | Sweep | RaisesContext[HydraException]
+    bool: bool | list[bool | list[bool]] | dict[str, Any] | Sweep | RaisesContext[HydraException]
+    str: str | list[str | list[str]] | dict[str, Any] | Sweep | RaisesContext[HydraException]
 
     @staticmethod
     def error(msg: builtins.str) -> Any:
@@ -1847,11 +1807,11 @@ def test_function(value: Any, expected_value: Any) -> None:
 class F:
     @staticmethod
     def foo1(value: int) -> str:
-        return f"{type(value).__name__}:{str(value)}"
+        return f"{type(value).__name__}:{value!s}"
 
     @staticmethod
-    def foo2(x: Union[int, str], y: Union[int, str]) -> str:
-        return f"{type(x).__name__}:{str(x)},{type(y).__name__}:{str(y)}"
+    def foo2(x: int | str, y: int | str) -> str:
+        return f"{type(x).__name__}:{x!s},{type(y).__name__}:{y!s}"
 
     @staticmethod
     def range(start: int, stop: int, step: int = 1) -> str:
@@ -1866,11 +1826,11 @@ class F:
         return sum(args, 0)
 
     @staticmethod
-    def sort(*args: int, reverse: bool = False) -> List[int]:
+    def sort(*args: int, reverse: bool = False) -> list[int]:
         if reverse:
-            return list(reversed(sorted(args)))
+            return sorted(args, reverse=True)
         else:
-            return list(sorted(args))
+            return sorted(args)
 
 
 @mark.parametrize(
@@ -2070,7 +2030,7 @@ def test_glob(value: str, expected: Any) -> None:
         param(["t*"], [], ["the", "the"], id="=*"),
     ],
 )
-def test_glob_filter(include: List[str], exclude: List[str], expected: List[str]) -> None:
+def test_glob_filter(include: list[str], exclude: list[str], expected: list[str]) -> None:
     strings = ["the", "quick", "brown", "fox", "jumped", "under", "the", "lazy", "dog"]
     assert Glob(include=include, exclude=exclude).filter(strings) == expected
 
@@ -2179,8 +2139,8 @@ def test_whitespaces(value: str, expected_key: str, expected_value: Any, expecte
 )
 def test_sweep_iterators(
     value: str,
-    expected_sweep_string_list: List[str],
-    expected_sweep_encoded_list: List[Any],
+    expected_sweep_string_list: list[str],
+    expected_sweep_encoded_list: list[Any],
 ) -> None:
     ret = parser.parse_override(value)
     actual_sweep_string_list = [x for x in ret.sweep_string_iterator()]

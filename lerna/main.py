@@ -3,9 +3,10 @@ import copy
 import functools
 import pickle
 import warnings
+from collections.abc import Callable
 from pathlib import Path
 from textwrap import dedent
-from typing import Any, Callable, List, Optional
+from typing import Any
 
 from omegaconf import DictConfig, open_dict, read_write
 
@@ -19,7 +20,7 @@ from .types import TaskFunction
 _UNSPECIFIED_: Any = object()
 
 
-def _get_rerun_conf(file_path: str, overrides: List[str]) -> DictConfig:
+def _get_rerun_conf(file_path: str, overrides: list[str]) -> DictConfig:
     msg = "Experimental rerun CLI option, other command line args are ignored."
     warnings.warn(msg, UserWarning)
     file = Path(file_path)
@@ -35,18 +36,17 @@ def _get_rerun_conf(file_path: str, overrides: List[str]) -> DictConfig:
     configure_log(config.hydra.job_logging, config.hydra.verbose)
     HydraConfig.instance().set_config(config)
     task_cfg = copy.deepcopy(config)
-    with read_write(task_cfg):
-        with open_dict(task_cfg):
-            del task_cfg["hydra"]
+    with read_write(task_cfg), open_dict(task_cfg):
+        del task_cfg["hydra"]
     assert isinstance(task_cfg, DictConfig)
     return task_cfg
 
 
 def main(
-    config_path: Optional[str] = _UNSPECIFIED_,
-    config_name: Optional[str] = None,
-    version_base: Optional[str] = _UNSPECIFIED_,
-    overrides: Optional[List[str]] = None,
+    config_path: str | None = _UNSPECIFIED_,
+    config_name: str | None = None,
+    version_base: str | None = _UNSPECIFIED_,
+    overrides: list[str] | None = None,
 ) -> Callable[[TaskFunction], Any]:
     """
     :param config_path: The config path, a directory where Hydra will search for
@@ -82,7 +82,7 @@ def main(
 
     def main_decorator(task_function: TaskFunction) -> Callable[[], None]:
         @functools.wraps(task_function)
-        def decorated_main(cfg_passthrough: Optional[DictConfig] = None) -> Any:
+        def decorated_main(cfg_passthrough: DictConfig | None = None) -> Any:
             if cfg_passthrough is not None:
                 return task_function(cfg_passthrough)
             else:

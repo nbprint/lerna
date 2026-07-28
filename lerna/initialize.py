@@ -2,7 +2,7 @@
 import copy
 import os
 from textwrap import dedent
-from typing import Any, Optional
+from typing import Any
 
 from lerna import version
 from lerna._internal.deprecation_warning import deprecation_warning
@@ -52,10 +52,10 @@ class initialize:
 
     def __init__(
         self,
-        config_path: Optional[str] = _UNSPECIFIED_,
-        job_name: Optional[str] = None,
+        config_path: str | None = _UNSPECIFIED_,
+        job_name: str | None = None,
         caller_stack_depth: int = 1,
-        version_base: Optional[str] = _UNSPECIFIED_,
+        version_base: str | None = _UNSPECIFIED_,
     ) -> None:
         self._gh_backup = get_gh_backup()
 
@@ -93,7 +93,7 @@ class initialize:
 
     def __enter__(self, *args: Any, **kwargs: Any) -> None: ...
 
-    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
+    def __exit__(self, exc_type: object, exc_val: object, exc_tb: object) -> None:
         restore_gh_from_backup(self._gh_backup)
 
     def __repr__(self) -> str:
@@ -112,7 +112,7 @@ class initialize_config_module:
         self,
         config_module: str,
         job_name: str = "app",
-        version_base: Optional[str] = _UNSPECIFIED_,
+        version_base: str | None = _UNSPECIFIED_,
     ):
         self._gh_backup = get_gh_backup()
 
@@ -127,7 +127,7 @@ class initialize_config_module:
 
     def __enter__(self, *args: Any, **kwargs: Any) -> None: ...
 
-    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
+    def __exit__(self, exc_type: object, exc_val: object, exc_tb: object) -> None:
         restore_gh_from_backup(self._gh_backup)
 
     def __repr__(self) -> str:
@@ -147,7 +147,7 @@ class initialize_config_dir:
         self,
         config_dir: str,
         job_name: str = "app",
-        version_base: Optional[str] = _UNSPECIFIED_,
+        version_base: str | None = _UNSPECIFIED_,
     ) -> None:
         self._gh_backup = get_gh_backup()
 
@@ -163,7 +163,7 @@ class initialize_config_dir:
 
     def __enter__(self, *args: Any, **kwargs: Any) -> None: ...
 
-    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
+    def __exit__(self, exc_type: object, exc_val: object, exc_tb: object) -> None:
         restore_gh_from_backup(self._gh_backup)
 
     def __repr__(self) -> str:

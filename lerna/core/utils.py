@@ -4,6 +4,7 @@ import logging
 import os
 import re
 import sys
+from collections.abc import Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime
@@ -11,7 +12,7 @@ from enum import Enum
 from os.path import splitext
 from pathlib import Path
 from textwrap import dedent
-from typing import Any, Dict, Optional, Sequence, Union, cast
+from typing import Any, cast
 
 from omegaconf import DictConfig, OmegaConf, open_dict, read_write
 
@@ -42,11 +43,11 @@ def simple_stdout_log_config(level: int = logging.INFO) -> None:
 
 def configure_log(
     log_config: DictConfig,
-    verbose_config: Union[bool, str, Sequence[str]] = False,
+    verbose_config: bool | str | Sequence[str] = False,
 ) -> None:
     assert isinstance(verbose_config, (bool, str)) or OmegaConf.is_list(verbose_config)
     if log_config is not None:
-        conf: Dict[str, Any] = OmegaConf.to_container(  # type: ignore
+        conf: dict[str, Any] = OmegaConf.to_container(  # type: ignore
             log_config, resolve=True
         )
         if conf["root"] is not None:
@@ -88,7 +89,7 @@ def filter_overrides(overrides: Sequence[str]) -> Sequence[str]:
     return [x for x in overrides if not x.startswith("hydra.")]
 
 
-def _check_hydra_context(hydra_context: Optional[HydraContext]) -> None:
+def _check_hydra_context(hydra_context: HydraContext | None) -> None:
     if hydra_context is None:
         # hydra_context is required as of Hydra 1.2.
         # We can remove this check in Hydra 1.3.
@@ -105,7 +106,7 @@ def run_job(
     task_function: TaskFunction,
     config: DictConfig,
     job_dir_key: str,
-    job_subdir_key: Optional[str],
+    job_subdir_key: str | None,
     hydra_context: HydraContext,
     configure_logging: bool = True,
 ) -> "JobReturn":
@@ -126,9 +127,8 @@ def run_job(
         subdir = str(OmegaConf.select(config, job_subdir_key))
         output_dir = os.path.join(output_dir, subdir)
 
-    with read_write(config.hydra.runtime):
-        with open_dict(config.hydra.runtime):
-            config.hydra.runtime.output_dir = os.path.abspath(output_dir)
+    with read_write(config.hydra.runtime), open_dict(config.hydra.runtime):
+        config.hydra.runtime.output_dir = os.path.abspath(output_dir)
 
     # update Hydra config
     HydraConfig.instance().set_config(config)
@@ -136,9 +136,8 @@ def run_job(
     try:
         ret = JobReturn()
         task_cfg = copy.deepcopy(config)
-        with read_write(task_cfg):
-            with open_dict(task_cfg):
-                del task_cfg["hydra"]
+        with read_write(task_cfg), open_dict(task_cfg):
+            del task_cfg["hydra"]
 
         ret.cfg = task_cfg
         hydra_cfg = copy.deepcopy(HydraConfig.instance().cfg)
@@ -152,9 +151,8 @@ def run_job(
 
         _chdir = hydra_cfg.hydra.job.chdir
 
-        if _chdir is None:
-            if version.base_at_least("1.2"):
-                _chdir = False
+        if _chdir is None and version.base_at_least("1.2"):
+            _chdir = False
 
         if _chdir is None:
             url = "https://hydra.cc/docs/1.2/upgrades/1.1_to_1.2/changes_to_job_working_dir/"
@@ -188,7 +186,7 @@ def run_job(
             try:
                 ret.return_value = task_function(task_cfg)
                 ret.status = JobStatus.COMPLETED
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 ret.return_value = e
                 ret.status = JobStatus.FAILED
 
@@ -218,7 +216,7 @@ def setup_globals() -> None:
     # please add documentation when you add a new resolver
     OmegaConf.register_new_resolver(
         "now",
-        lambda pattern: datetime.now().strftime(pattern),
+        lambda pattern: datetime.now().strftime(pattern),  # noqa: DTZ005
         use_cache=True,
         replace=True,
     )
@@ -245,11 +243,11 @@ class JobStatus(Enum):
 
 @dataclass
 class JobReturn:
-    overrides: Optional[Sequence[str]] = None
-    cfg: Optional[DictConfig] = None
-    hydra_cfg: Optional[DictConfig] = None
-    working_dir: Optional[str] = None
-    task_name: Optional[str] = None
+    overrides: Sequence[str] | None = None
+    cfg: DictConfig | None = None
+    hydra_cfg: DictConfig | None = None
+    working_dir: str | None = None
+    task_name: str | None = None
     status: JobStatus = JobStatus.UNKNOWN
     _return_value: Any = None
 
@@ -283,7 +281,7 @@ class JobRuntime(metaclass=Singleton):
         self.conf[key] = value
 
 
-def validate_config_path(config_path: Optional[str]) -> None:
+def validate_config_path(config_path: str | None) -> None:
     if config_path is not None:
         split_file = splitext(config_path)
         if split_file[1] in (".yaml", ".yml"):
@@ -297,7 +295,7 @@ def validate_config_path(config_path: Optional[str]) -> None:
 
 
 @contextmanager
-def env_override(env: Dict[str, str]) -> Any:
+def env_override(env: dict[str, str]) -> Any:
     """Temporarily set environment variables inside the context manager and
     fully restore previous environment afterwards
     """
@@ -319,6 +317,6 @@ def _flush_loggers() -> None:
     for h_weak_ref in logging._handlerList:  # type: ignore
         try:
             h_weak_ref().flush()
-        except Exception:
+        except Exception:  # noqa: BLE001, S110
             # ignore exceptions thrown during flushing
             pass

@@ -1,5 +1,4 @@
 # Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved
-from typing import List, Type
 
 from pytest import mark, raises
 
@@ -15,7 +14,7 @@ from lerna.utils import get_class
 # Individual plugins are responsible to test that they are discoverable.
 launchers = ["lerna._internal.core_plugins.basic_launcher.BasicLauncher"]
 sweepers = ["lerna._internal.core_plugins.basic_sweeper.BasicSweeper"]
-search_path_plugins: List[str] = []
+search_path_plugins: list[str] = []
 
 
 @mark.parametrize(
@@ -27,7 +26,7 @@ search_path_plugins: List[str] = []
         (Plugin, launchers + sweepers + search_path_plugins),
     ],
 )
-def test_discover(plugin_type: Type[Plugin], expected: List[str]) -> None:
+def test_discover(plugin_type: type[Plugin], expected: list[str]) -> None:
     plugins = Plugins.instance().discover(plugin_type)
     expected_classes = [get_class(c) for c in expected]
     for ex in expected_classes:

@@ -5,7 +5,6 @@ import shutil
 import subprocess
 import sys
 from pathlib import Path
-from typing import List
 
 from packaging import version
 from pytest import mark, param, skip, xfail
@@ -27,7 +26,7 @@ def is_fish_supported() -> bool:
     if shutil.which("fish") is None:
         return False
 
-    proc = subprocess.run(["fish", "--version"], stdout=subprocess.PIPE, encoding="utf-8")
+    proc = subprocess.run(["fish", "--version"], stdout=subprocess.PIPE, encoding="utf-8", check=False)
     matches = re.match(r".*version\s+(\d\.\d\.\d)(.*)", proc.stdout)
     if not matches:
         return False
@@ -35,19 +34,14 @@ def is_fish_supported() -> bool:
     fish_version, git_version = matches.groups()
 
     # Release after 3.1.2 or git build after 3.1.2 contain space fix.
-    if version.parse(fish_version) > version.parse("3.1.2"):
-        return True
-    elif version.parse(fish_version) >= version.parse("3.1.2") and git_version:
-        return True
-    else:
-        return False
+    return bool(version.parse(fish_version) > version.parse("3.1.2") or version.parse(fish_version) >= version.parse("3.1.2") and git_version)
 
 
 def is_zsh_supported() -> bool:
     if shutil.which("zsh") is None:
         return False
 
-    proc = subprocess.run(["zsh", "--version"], stdout=subprocess.PIPE, encoding="utf-8")
+    proc = subprocess.run(["zsh", "--version"], stdout=subprocess.PIPE, encoding="utf-8", check=False)
     matches = re.match(r"zsh\s+(\d\.\d(\.\d)?)", proc.stdout)
     if not matches:
         return False
@@ -55,10 +49,7 @@ def is_zsh_supported() -> bool:
     zsh_version = matches.groups()[0]
 
     # Support for Bash completion functions introduced in Zsh 4.2
-    if version.parse(zsh_version) > version.parse("4.2"):
-        return True
-    else:
-        return False
+    return version.parse(zsh_version) > version.parse("4.2")
 
 
 def create_config_loader() -> ConfigLoaderImpl:
@@ -79,10 +70,9 @@ def test_bash_completion_with_dot_in_path() -> None:
     stdout, stderr = process.communicate()
     assert stderr == b""
     assert stdout == b"TRUE\n"
-    return
 
 
-base_completion_list: List[str] = [
+base_completion_list: list[str] = [
     "dict.",
     "dict_prefix=",
     "group=",
@@ -150,7 +140,6 @@ base_completion_list: List[str] = [
         param("group=", 2, ["group=dict", "group=list"], id="group"),
         param("group=dict group.dict=", 2, ["group.dict=true"], id="group"),
         param("group=dict group=", 2, ["group=dict", "group=list"], id="group"),
-        param("group=dict group=", 2, ["group=dict", "group=list"], id="group"),
         param("+", 2, ["+group=", "+hydra", "+test_hydra/"], id="bare_plus"),
         param("+gro", 2, ["+group="], id="append_group_partial"),
         param("+group=di", 2, ["+group=dict"], id="append_group_partial_option"),
@@ -190,7 +179,7 @@ base_completion_list: List[str] = [
     ],
 )
 class TestRunCompletion:
-    def test_completion_plugin(self, line_prefix: str, num_tabs: int, line: str, expected: List[str]) -> None:
+    def test_completion_plugin(self, line_prefix: str, num_tabs: int, line: str, expected: list[str]) -> None:
         config_loader = create_config_loader()
         bc = DefaultCompletionPlugin(config_loader)
         ret = bc._query(config_name="config.yaml", line=line_prefix + line)
@@ -217,11 +206,11 @@ class TestRunCompletion:
     def test_shell_integration(
         self,
         shell: str,
-        prog: List[str],
+        prog: list[str],
         num_tabs: int,
         line_prefix: str,
         line: str,
-        expected: List[str],
+        expected: list[str],
     ) -> None:
         if shell == "fish" and not is_fish_supported():
             skip("fish is not installed or the version is too old")
@@ -286,7 +275,7 @@ class TestRunCompletion:
     ],
 )
 class TestMultirunCompletion:
-    def test_completion_plugin_multirun(self, line: str, expected: List[str]) -> None:
+    def test_completion_plugin_multirun(self, line: str, expected: list[str]) -> None:
         config_loader = create_config_loader()
         bc = DefaultCompletionPlugin(config_loader)
         ret = bc._query(config_name="config.yaml", line="--multirun " + line)
@@ -301,7 +290,7 @@ class TestMultirunCompletion:
         ("-c all ", base_completion_list),
     ],
 )
-def test_with_flags(line: str, expected: List[str]) -> None:
+def test_with_flags(line: str, expected: list[str]) -> None:
     config_loader = create_config_loader()
     bc = DefaultCompletionPlugin(config_loader)
     ret = bc._query(config_name="config.yaml", line=line)
@@ -321,7 +310,7 @@ def test_with_flags(line: str, expected: List[str]) -> None:
         ("group=dict toys.", ["toys.andy=", "toys.list.", "toys.slinky="]),
     ],
 )
-def test_missing_default_value(line: str, expected: List[str]) -> None:
+def test_missing_default_value(line: str, expected: list[str]) -> None:
     config_loader = create_config_loader()
     bc = DefaultCompletionPlugin(config_loader)
     ret = bc._query(config_name="missing_default", line=line)
@@ -354,7 +343,7 @@ def test_missing_default_value(line: str, expected: List[str]) -> None:
         ),
     ],
 )
-def test_searchpath_addition(line: str, expected: List[str]) -> None:
+def test_searchpath_addition(line: str, expected: list[str]) -> None:
     config_loader = create_config_loader()
     bc = DefaultCompletionPlugin(config_loader)
     ret = bc._query(config_name="additional_searchpath", line=line)
@@ -376,14 +365,14 @@ def test_searchpath_addition(line: str, expected: List[str]) -> None:
 )
 def test_file_completion(
     tmpdir: Path,
-    files: List[str],
+    files: list[str],
     line_prefix: str,
     key_eq: str,
     fname_prefix: str,
-    expected: List[str],
+    expected: list[str],
     relative: bool,
 ) -> None:
-    def create_files(in_files: List[str]) -> None:
+    def create_files(in_files: list[str]) -> None:
         for f in in_files:
             path = Path(f)
             dirname = path.parent
@@ -425,7 +414,6 @@ def test_file_completion(
         "f_o-o1=2.par",
         "python  foo.py",
         "python tutorials/hydra_app/example/hydra_app/main.py",
-        "python foo.py",
     ],
 )
 @mark.parametrize(

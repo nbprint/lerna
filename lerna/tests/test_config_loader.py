@@ -2,7 +2,7 @@
 import re
 from dataclasses import dataclass, field
 from textwrap import dedent
-from typing import Any, List
+from typing import Any
 
 from omegaconf import MISSING, OmegaConf, ValidationError, open_dict
 from pytest import mark, param, raises, warns
@@ -95,7 +95,7 @@ class TestConfigLoader:
             ),
         ],
     )
-    def test_override_compose_two_package_one_group(self, path: str, overrides: List[str], expected: Any) -> None:
+    def test_override_compose_two_package_one_group(self, path: str, overrides: list[str], expected: Any) -> None:
         config_loader = ConfigLoaderImpl(config_search_path=create_config_search_path(f"{path}/package_tests"))
         cfg = config_loader.load_configuration(
             config_name="two_packages_one_group",
@@ -154,7 +154,7 @@ class TestConfigLoader:
         # Test that accessing a key that is not there will fail
         with raises(AttributeError):
             # noinspection PyStatementEffect
-            cfg.not_here
+            _ = cfg.not_here
 
         # Test that bad overrides triggers the KeyError
         with raises(HydraException):
@@ -248,7 +248,7 @@ class TestConfigLoader:
             dedent(
                 """
                     This behavior is deprecated in Hydra 1.1 and will be removed in Hydra 1.2.
-                    See https://hydra.cc/docs/1.2/upgrades/1.0_to_1.1/automatic_schema_matching for migration instructions."""  # noqa: E501 line too long
+                    See https://hydra.cc/docs/1.2/upgrades/1.0_to_1.1/automatic_schema_matching for migration instructions."""
             )
         )
         with warns(UserWarning, match=msg):
@@ -343,13 +343,13 @@ class TestConfigLoader:
         assert isinstance(master_cfg.test_uncached, str)  # "2nd"
 
         master_cfg_cache = OmegaConf.get_cache(master_cfg)
-        assert "now" in master_cfg_cache.keys()
+        assert "now" in master_cfg_cache
         # oc.env is not cached as of OmegaConf 2.1
-        assert "oc.env" not in master_cfg_cache.keys()
+        assert "oc.env" not in master_cfg_cache
         assert master_cfg.test_env == "test_env"
-        assert "cached" in master_cfg_cache.keys()
+        assert "cached" in master_cfg_cache
         assert master_cfg.test_cached == "1st"  # use cached value
-        assert "uncached" not in master_cfg_cache.keys()
+        assert "uncached" not in master_cfg_cache
         assert master_cfg.test_uncached == "3rd"  # use `next` value
 
         sweep_cfg = config_loader.load_sweep_config(
@@ -364,10 +364,10 @@ class TestConfigLoader:
 
         sweep_cfg_cache = OmegaConf.get_cache(sweep_cfg)
         assert len(sweep_cfg_cache.keys()) == 2  # "now", and "cached"
-        assert "now" in sweep_cfg_cache.keys()
-        assert "oc.env" not in sweep_cfg_cache.keys()
-        assert "cached" in sweep_cfg_cache.keys()
-        assert "uncached" not in sweep_cfg_cache.keys()
+        assert "now" in sweep_cfg_cache
+        assert "oc.env" not in sweep_cfg_cache
+        assert "cached" in sweep_cfg_cache
+        assert "uncached" not in sweep_cfg_cache
         assert sweep_cfg_cache["now"] == master_cfg_cache["now"]
         assert sweep_cfg_cache["cached"] == master_cfg_cache["cached"]
         monkeypatch.setenv("TEST_ENV", "test_env2")
@@ -578,7 +578,6 @@ def test_complex_defaults(overrides: Any, expected: Any) -> None:
         ),
         # override
         param({"x": 20}, ["x=10"], {"x": 10}, id="override"),
-        param({"x": 20}, ["x=10"], {"x": 10}, id="override"),
         param({"x": None}, ["x=[1,2,3]"], {"x": [1, 2, 3]}, id="override:list"),
         param({"x": 20}, ["x=null"], {"x": None}, id="override_with_null"),
         param({"x": {"a": 10}}, ["x={a:20}"], {"x": {"a": 20}}, id="merge_dict"),
@@ -627,11 +626,6 @@ def test_complex_defaults(overrides: Any, expected: Any) -> None:
         param({"x": {"y": 10}}, ["~x"], {}, id="delete"),
         param({"x": {"y": 10}}, ["~x.y"], {"x": {}}, id="delete"),
         param({"x": {"y": 10}}, ["~x.y=10"], {"x": {}}, id="delete_strict"),
-        param({"x": 20}, ["~x"], {}, id="delete"),
-        param({"x": 20}, ["~x=20"], {}, id="delete_strict"),
-        param({"x": {"y": 10}}, ["~x"], {}, id="delete"),
-        param({"x": {"y": 10}}, ["~x.y"], {"x": {}}, id="delete"),
-        param({"x": {"y": 10}}, ["~x.y=10"], {"x": {}}, id="delete_strict"),
         param({"x": [1, 2, 3]}, ["~x"], {}, id="delete:list"),
         param({"x": [1, 2, 3]}, ["~x=[1,2,3]"], {}, id="delete:list"),
         param({"x": [1, 2, 3]}, ["~x.0"], {"x": [2, 3]}, id="delete:list_item"),
@@ -665,7 +659,7 @@ def test_complex_defaults(overrides: Any, expected: Any) -> None:
         ),
     ],
 )
-def test_apply_overrides_to_config(input_cfg: Any, overrides: List[str], expected: Any) -> None:
+def test_apply_overrides_to_config(input_cfg: Any, overrides: list[str], expected: Any) -> None:
     cfg = OmegaConf.create(input_cfg)
     OmegaConf.set_struct(cfg, True)
     parser = OverridesParser.create()

@@ -3,7 +3,7 @@
 # Source of truth for Hydra's version
 
 from textwrap import dedent
-from typing import Any, Optional
+from typing import Any
 
 from packaging.version import Version
 
@@ -19,13 +19,13 @@ __compat_version__: Version = Version("1.1")
 
 class VersionBase(metaclass=Singleton):
     def __init__(self) -> None:
-        self.version_base: Optional[Version] = _UNSPECIFIED_
+        self.version_base: Version | None = _UNSPECIFIED_
 
     def setbase(self, version: "Version") -> None:
         assert isinstance(version, Version), f"Unexpected Version type : {type(version)}"
         self.version_base = version
 
-    def getbase(self) -> Optional[Version]:
+    def getbase(self) -> Version | None:
         return self.version_base
 
     @staticmethod
@@ -53,7 +53,7 @@ def base_at_least(ver: str) -> bool:
     return _version_base >= _get_version(ver)
 
 
-def getbase() -> Optional[Version]:
+def getbase() -> Version | None:
     return VersionBase.instance().getbase()
 
 

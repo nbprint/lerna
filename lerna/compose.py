@@ -1,6 +1,5 @@
 # Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved
 from textwrap import dedent
-from typing import List, Optional
 
 from omegaconf import DictConfig, OmegaConf, open_dict
 
@@ -12,10 +11,10 @@ from ._internal.deprecation_warning import deprecation_warning
 
 
 def compose(
-    config_name: Optional[str] = None,
-    overrides: Optional[List[str]] = None,
+    config_name: str | None = None,
+    overrides: list[str] | None = None,
     return_hydra_config: bool = False,
-    strict: Optional[bool] = None,
+    strict: bool | None = None,
 ) -> DictConfig:
     """
     :param config_name: the name of the config
@@ -42,10 +41,9 @@ def compose(
     )
     assert isinstance(cfg, DictConfig)
 
-    if not return_hydra_config:
-        if "hydra" in cfg:
-            with open_dict(cfg):
-                del cfg["hydra"]
+    if not return_hydra_config and "hydra" in cfg:
+        with open_dict(cfg):
+            del cfg["hydra"]
 
     if strict is not None:
         if version.base_at_least("1.2"):

@@ -1,7 +1,8 @@
 # Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved
+from collections.abc import Callable
 from dataclasses import dataclass
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Callable
+from typing import TYPE_CHECKING, Any
 
 from omegaconf import MISSING
 
@@ -81,7 +82,7 @@ class ConvertMode(Enum):
     # Fully convert the OmegaConf config to primitive containers (dict, list and primitives).
     ALL = "all"
 
-    def __eq__(self, other: Any) -> Any:
+    def __eq__(self, other: object) -> Any:
         if isinstance(other, ConvertMode):
             return other.value == self.value
         elif isinstance(other, str):

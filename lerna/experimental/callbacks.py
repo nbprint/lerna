@@ -4,7 +4,7 @@ import copy
 import logging
 import pickle
 from pathlib import Path
-from typing import Any, List, Optional
+from typing import Any
 
 from omegaconf import DictConfig, OmegaConf, flag_override
 
@@ -66,8 +66,8 @@ class LogComposeCallback(Callback):
     def on_compose_config(
         self,
         config: DictConfig,
-        config_name: Optional[str],
-        overrides: List[str],
+        config_name: str | None,
+        overrides: list[str],
     ) -> None:
         gh = GlobalHydra.instance()
         config_loader = gh.config_loader()
@@ -86,7 +86,7 @@ class LogComposeCallback(Callback):
         non_hydra_defaults = [d.config_path for d in defaults_list.defaults if not d.package.startswith("hydra")]
         self.log.info(
             f"""====
-Composed config {config_dir}/{str(config_name)}
+Composed config {config_dir}/{config_name!s}
 {OmegaConf.to_yaml(config)}
 ----
 Includes overrides {overrides}

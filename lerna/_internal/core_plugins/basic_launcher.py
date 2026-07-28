@@ -1,8 +1,8 @@
 # Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved
 import logging
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Optional, Sequence
 
 from omegaconf import DictConfig, open_dict
 
@@ -31,9 +31,9 @@ ConfigStore.instance().store(group="hydra/launcher", name="basic", node=BasicLau
 class BasicLauncher(Launcher):
     def __init__(self) -> None:
         super().__init__()
-        self.config: Optional[DictConfig] = None
-        self.task_function: Optional[TaskFunction] = None
-        self.hydra_context: Optional[HydraContext] = None
+        self.config: DictConfig | None = None
+        self.task_function: TaskFunction | None = None
+        self.hydra_context: HydraContext | None = None
 
     def setup(
         self,
@@ -56,7 +56,7 @@ class BasicLauncher(Launcher):
         sweep_dir = self.config.hydra.sweep.dir
         Path(str(sweep_dir)).mkdir(parents=True, exist_ok=True)
         log.info(f"Launching {len(job_overrides)} jobs locally")
-        runs: List[JobReturn] = []
+        runs: list[JobReturn] = []
         for idx, overrides in enumerate(job_overrides):
             idx = initial_job_idx + idx
             lst = " ".join(filter_overrides(overrides))

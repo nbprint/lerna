@@ -9,7 +9,7 @@ chdir_hydra_root()
 def test_env_defaults(tmpdir: Path) -> None:
     cmd = [
         "lerna/tests/test_apps/custom_env_defaults/my_app.py",
-        f'hydra.run.dir="{str(tmpdir)}"',
+        f'hydra.run.dir="{tmpdir!s}"',
         "hydra.job.chdir=True",
     ]
     run_python_script(cmd)
