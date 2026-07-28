@@ -1,7 +1,7 @@
 # Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved
 from pathlib import Path
 from textwrap import dedent
-from typing import Any, List
+from typing import Any
 
 from omegaconf import OmegaConf
 from pytest import mark, param
@@ -28,10 +28,10 @@ def test_specializing_config_example(hydra_restore_singletons: Any, hydra_task_r
         overrides=["dataset=cifar10"],
         configure_logging=True,
     ) as task:
-        assert task.job_ret is not None and task.job_ret.cfg == dict(
-            dataset=dict(name="cifar10", path="/datasets/cifar10"),
-            model=dict(num_layers=5, type="alexnet"),
-        )
+        assert task.job_ret is not None and task.job_ret.cfg == {
+            "dataset": {"name": "cifar10", "path": "/datasets/cifar10"},
+            "model": {"num_layers": 5, "type": "alexnet"},
+        }
         verify_dir_outputs(task.job_ret, overrides=task.overrides)
 
 
@@ -64,7 +64,7 @@ def test_write_protect_config_node(tmpdir: Any) -> None:
         param(["db=mysql_extending_from_another_group"], id="from_different_group"),
     ],
 )
-def test_extending_configs(monkeypatch: Any, tmpdir: Path, overrides: List[str]) -> None:
+def test_extending_configs(monkeypatch: Any, tmpdir: Path, overrides: list[str]) -> None:
     monkeypatch.chdir("examples/patterns/extending_configs")
     cmd = [
         "my_app.py",
@@ -103,7 +103,7 @@ def test_extending_configs(monkeypatch: Any, tmpdir: Path, overrides: List[str])
         ),
     ],
 )
-def test_configuring_experiments(monkeypatch: Any, tmpdir: Path, overrides: List[str], expected: Any) -> None:
+def test_configuring_experiments(monkeypatch: Any, tmpdir: Path, overrides: list[str], expected: Any) -> None:
     monkeypatch.chdir("examples/patterns/configuring_experiments")
     cmd = [
         "my_app.py",
@@ -172,7 +172,7 @@ def test_configuring_experiments(monkeypatch: Any, tmpdir: Path, overrides: List
         ),
     ],
 )
-def test_multi_select(monkeypatch: Any, tmpdir: Path, overrides: List[str], expected: Any) -> None:
+def test_multi_select(monkeypatch: Any, tmpdir: Path, overrides: list[str], expected: Any) -> None:
     monkeypatch.chdir("examples/patterns/multi-select")
     cmd = [
         "my_app.py",

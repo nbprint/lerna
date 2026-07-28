@@ -1,7 +1,6 @@
 # Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved
 import importlib
 import warnings
-from typing import List, Optional
 
 from lerna.core.config_store import ConfigStore
 from lerna.core.object_type import ObjectType
@@ -17,7 +16,7 @@ class StructuredConfigSource(ConfigSource):
                 importlib.import_module(self.path)
             except Exception as e:
                 warnings.warn(f"Error importing {self.path} : some configs may not be available\n\n\tRoot cause: {e}\n")
-                raise e
+                raise
 
     @staticmethod
     def scheme() -> str:
@@ -47,8 +46,8 @@ class StructuredConfigSource(ConfigSource):
         type_ = ConfigStore.instance().get_type(filename)
         return type_ == ObjectType.CONFIG
 
-    def list(self, config_path: str, results_filter: Optional[ObjectType]) -> List[str]:
-        ret: List[str] = []
+    def list(self, config_path: str, results_filter: ObjectType | None) -> list[str]:
+        ret: list[str] = []
         files = ConfigStore.instance().list(config_path)
 
         for file in files:
@@ -58,4 +57,4 @@ class StructuredConfigSource(ConfigSource):
                 file_name=file,
                 results_filter=results_filter,
             )
-        return sorted(list(set(ret)))
+        return sorted(set(ret))

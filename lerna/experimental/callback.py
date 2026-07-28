@@ -1,6 +1,6 @@
 # Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved
 import logging
-from typing import Any, List, Optional
+from typing import Any
 
 from omegaconf import DictConfig
 
@@ -17,27 +17,23 @@ class Callback:
         Some `hydra.runtime` configs are not populated yet.
         See hydra.core.utils.run_job for more info.
         """
-        ...
 
     def on_run_end(self, config: DictConfig, **kwargs: Any) -> None:
         """
         Called in RUN mode after job/application code returns.
         """
-        ...
 
     def on_multirun_start(self, config: DictConfig, **kwargs: Any) -> None:
         """
         Called in MULTIRUN mode before any job starts.
         When using a launcher, this will be executed on local machine before any Sweeper/Launcher is initialized.
         """
-        ...
 
     def on_multirun_end(self, config: DictConfig, **kwargs: Any) -> None:
         """
         Called in MULTIRUN mode after all jobs returns.
         When using a launcher, this will be executed on local machine.
         """
-        ...
 
     def on_job_start(self, config: DictConfig, *, task_function: TaskFunction, **kwargs: Any) -> None:
         """
@@ -46,7 +42,6 @@ class Callback:
         on the remote server along with your application code. The `task_function` argument is the function
         decorated with `@hydra.main`.
         """
-        ...
 
     def on_job_end(self, config: DictConfig, job_return: JobReturn, **kwargs: Any) -> None:
         """
@@ -58,16 +53,14 @@ class Callback:
         `job_return` contains info that could be useful for logging or post-processing.
         See hydra.core.utils.JobReturn for more.
         """
-        ...
 
     def on_compose_config(
         self,
         config: DictConfig,
-        config_name: Optional[str],
-        overrides: List[str],
+        config_name: str | None,
+        overrides: list[str],
     ) -> None:
         """
         Called during the compose phase and before the config is returned to the user.
         config is the composed config with overrides applied.
         """
-        ...

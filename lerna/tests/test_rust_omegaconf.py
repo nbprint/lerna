@@ -24,8 +24,8 @@ class TestDictConfigBasic:
     def test_create_with_dict(self) -> None:
         cfg = DictConfig({"a": 1, "b": 2})
         assert len(cfg) == 2
-        assert "a" in cfg.keys()
-        assert "b" in cfg.keys()
+        assert "a" in cfg
+        assert "b" in cfg
 
     def test_getitem(self) -> None:
         cfg = DictConfig({"a": 1, "b": "hello", "c": True})
@@ -43,8 +43,8 @@ class TestDictConfigBasic:
     def test_delitem(self) -> None:
         cfg = DictConfig({"a": 1, "b": 2})
         del cfg["a"]
-        assert "a" not in cfg.keys()
-        assert "b" in cfg.keys()
+        assert "a" not in cfg
+        assert "b" in cfg
 
     def test_contains(self) -> None:
         cfg = DictConfig({"a": 1})

@@ -2,8 +2,9 @@
 import builtins
 import json
 import random
+from collections.abc import Callable
 from copy import copy
-from typing import Any, Callable, Dict, List, Optional, Union
+from typing import Any
 
 from lerna._internal.grammar.utils import is_type_matching
 from lerna.core.override_parser.types import (
@@ -17,18 +18,18 @@ from lerna.core.override_parser.types import (
     Sweep,
 )
 
-ElementType = Union[str, int, bool, float, List[Any], Dict[str, Any]]
+ElementType = str | int | bool | float | list[Any] | dict[str, Any]
 
 
 def apply_to_dict_values(
     # val
-    value: Dict[Any, Any],
+    value: dict[Any, Any],
     # func
     function: Callable[..., Any],
-) -> Dict[Any, Any]:
-    ret_dict: Dict[str, Any] = {}
-    for key, value in value.items():
-        ret_dict[key] = function(value)
+) -> dict[Any, Any]:
+    ret_dict: dict[str, Any] = {}
+    for key, item in value.items():
+        ret_dict[key] = function(item)
     return ret_dict
 
 
@@ -55,18 +56,18 @@ def cast_range(value: RangeSweep, function: Callable[..., Any]) -> RangeSweep:
     )
 
 
-CastType = Union[ParsedElementType, Sweep]
+CastType = ParsedElementType | Sweep
 
 
 def _list_to_simple_choice(*args: Any) -> ChoiceSweep:
-    choices: List[ParsedElementType] = []
+    choices: list[ParsedElementType] = []
     for arg in args:
         assert is_type_matching(arg, ParsedElementType)
         choices.append(arg)
     return ChoiceSweep(list=builtins.list(choices), simple_form=True)
 
 
-def _normalize_cast_value(*args: CastType, value: Optional[CastType]) -> CastType:
+def _normalize_cast_value(*args: CastType, value: CastType | None) -> CastType:
     if len(args) > 0 and value is not None:
         raise TypeError("cannot use both position and named arguments")
     if value is not None:
@@ -80,7 +81,7 @@ def _normalize_cast_value(*args: CastType, value: Optional[CastType]) -> CastTyp
     assert False
 
 
-def cast_int(*args: CastType, value: Optional[CastType] = None) -> Any:
+def cast_int(*args: CastType, value: CastType | None = None) -> Any:
     value = _normalize_cast_value(*args, value=value)
     if isinstance(value, QuotedString):
         return cast_int(value.text)
@@ -98,7 +99,7 @@ def cast_int(*args: CastType, value: Optional[CastType] = None) -> Any:
     return int(value)
 
 
-def cast_float(*args: CastType, value: Optional[CastType] = None) -> Any:
+def cast_float(*args: CastType, value: CastType | None = None) -> Any:
     value = _normalize_cast_value(*args, value=value)
     if isinstance(value, QuotedString):
         return cast_float(value.text)
@@ -116,7 +117,7 @@ def cast_float(*args: CastType, value: Optional[CastType] = None) -> Any:
     return float(value)
 
 
-def cast_str(*args: CastType, value: Optional[CastType] = None) -> Any:
+def cast_str(*args: CastType, value: CastType | None = None) -> Any:
     value = _normalize_cast_value(*args, value=value)
     if isinstance(value, QuotedString):
         return cast_str(value.text)
@@ -129,7 +130,7 @@ def cast_str(*args: CastType, value: Optional[CastType] = None) -> Any:
     elif isinstance(value, RangeSweep):
         return cast_range(value, cast_str)
     elif isinstance(value, IntervalSweep):
-        raise ValueError("Intervals cannot be cast to str")
+        raise ValueError("Intervals cannot be cast to str")  # noqa: TRY004
 
     assert isinstance(value, (int, float, bool, str))
     if isinstance(value, bool):
@@ -138,7 +139,7 @@ def cast_str(*args: CastType, value: Optional[CastType] = None) -> Any:
         return str(value)
 
 
-def extract_text(*args: Any, value: Optional[Any] = None) -> Any:
+def extract_text(*args: Any, value: Any | None = None) -> Any:
     value = _normalize_cast_value(*args, value=value)
     if isinstance(value, QuotedString):
         return value.text
@@ -154,7 +155,7 @@ def extract_text(*args: Any, value: Optional[Any] = None) -> Any:
         return value
 
 
-def cast_json_str(*args: Any, value: Optional[Any] = None) -> Any:
+def cast_json_str(*args: Any, value: Any | None = None) -> Any:
     value = _normalize_cast_value(*args, value=value)
     json_val = value
     if isinstance(value, QuotedString):
@@ -170,12 +171,12 @@ def cast_json_str(*args: Any, value: Optional[Any] = None) -> Any:
         json_range = cast_range(value, extract_text)
         return cast_range(json_range, json.dumps)
     elif isinstance(value, IntervalSweep):
-        raise ValueError("Intervals cannot be cast to json_str")
+        raise ValueError("Intervals cannot be cast to json_str")  # noqa: TRY004
 
     return json.dumps(json_val)
 
 
-def cast_bool(*args: CastType, value: Optional[CastType] = None) -> Any:
+def cast_bool(*args: CastType, value: CastType | None = None) -> Any:
     value = _normalize_cast_value(*args, value=value)
     if isinstance(value, QuotedString):
         return cast_bool(value.text)
@@ -188,7 +189,7 @@ def cast_bool(*args: CastType, value: Optional[CastType] = None) -> Any:
     elif isinstance(value, RangeSweep):
         return cast_range(value, cast_bool)
     elif isinstance(value, IntervalSweep):
-        raise ValueError("Intervals cannot be cast to bool")
+        raise ValueError("Intervals cannot be cast to bool")  # noqa: TRY004
 
     if isinstance(value, str):
         if value.lower() == "false":
@@ -200,7 +201,7 @@ def cast_bool(*args: CastType, value: Optional[CastType] = None) -> Any:
     return bool(value)
 
 
-def choice(*args: Union[str, int, float, bool, Dict[Any, Any], List[Any], ChoiceSweep]) -> ChoiceSweep:
+def choice(*args: str | float | bool | dict[Any, Any] | list[Any] | ChoiceSweep) -> ChoiceSweep:
     """
     A choice sweep over the specified values
     """
@@ -219,9 +220,9 @@ def choice(*args: Union[str, int, float, bool, Dict[Any, Any], List[Any], Choice
 
 
 def range(
-    start: Union[int, float],
-    stop: Optional[Union[int, float]] = None,
-    step: Union[int, float] = 1,
+    start: float,
+    stop: float | None = None,
+    step: float = 1,
 ) -> RangeSweep:
     """
     Range defines a sweep over a range of integer or floating-point values.
@@ -238,7 +239,7 @@ def range(
     return RangeSweep(start=start, stop=stop, step=step)
 
 
-def interval(start: Union[int, float], end: Union[int, float]) -> IntervalSweep:
+def interval(start: float, end: float) -> IntervalSweep:
     """
     A continuous interval between two floating point values.
     value=interval(x,y) is interpreted as x <= value < y
@@ -246,7 +247,7 @@ def interval(start: Union[int, float], end: Union[int, float]) -> IntervalSweep:
     return IntervalSweep(start=float(start), end=float(end))
 
 
-def tag(*args: Union[str, Union[Sweep]], sweep: Optional[Sweep] = None) -> Sweep:
+def tag(*args: str | Sweep, sweep: Sweep | None = None) -> Sweep:
     """
     Tags the sweep with a list of string tags.
     """
@@ -262,19 +263,21 @@ def tag(*args: Union[str, Union[Sweep]], sweep: Optional[Sweep] = None) -> Sweep
         tags = set()
         for tag_ in args[0:-1]:
             if not isinstance(tag_, str):
-                raise ValueError(f"tag arguments type must be string, got {type(tag_).__name__}")
+                raise ValueError(f"tag arguments type must be string, got {type(tag_).__name__}")  # noqa: TRY004
             tags.add(tag_)
         sweep.tags = tags
         return sweep
     else:
-        raise ValueError(f"Last argument to tag() must be a choice(), range() or interval(), got {type(sweep).__name__}")
+        raise ValueError(  # noqa: TRY004
+            f"Last argument to tag() must be a choice(), range() or interval(), got {type(sweep).__name__}"
+        )
 
 
 def shuffle(
-    *args: Union[ElementType, ChoiceSweep, RangeSweep],
-    sweep: Optional[Union[ChoiceSweep, RangeSweep]] = None,
-    list: Optional[List[Any]] = None,
-) -> Union[List[Any], ChoiceSweep, RangeSweep]:
+    *args: ElementType | ChoiceSweep | RangeSweep,
+    sweep: ChoiceSweep | RangeSweep | None = None,
+    list: list[Any] | None = None,
+) -> list[Any] | ChoiceSweep | RangeSweep:
     """
     Shuffle input list or sweep (does not support interval)
     """
@@ -302,9 +305,9 @@ def shuffle(
 
 
 def sort(
-    *args: Union[ElementType, ChoiceSweep, RangeSweep],
-    sweep: Optional[Union[ChoiceSweep, RangeSweep]] = None,
-    list: Optional[List[Any]] = None,
+    *args: ElementType | ChoiceSweep | RangeSweep,
+    sweep: ChoiceSweep | RangeSweep | None = None,
+    list: list[Any] | None = None,
     reverse: bool = False,
 ) -> Any:
     """
@@ -341,7 +344,7 @@ def sort(
             return _sort_sweep(cw, reverse)
 
 
-def _sort_sweep(sweep: Union[ChoiceSweep, RangeSweep], reverse: bool) -> Union[ChoiceSweep, RangeSweep]:
+def _sort_sweep(sweep: ChoiceSweep | RangeSweep, reverse: bool) -> ChoiceSweep | RangeSweep:
     sweep = copy(sweep)
 
     if isinstance(sweep, ChoiceSweep):
@@ -372,7 +375,7 @@ def _sort_sweep(sweep: Union[ChoiceSweep, RangeSweep], reverse: bool) -> Union[C
         assert False
 
 
-def glob(include: Union[List[str], str], exclude: Optional[Union[List[str], str]] = None) -> Glob:
+def glob(include: list[str] | str, exclude: list[str] | str | None = None) -> Glob:
     """
     A glob selects from all options in the config group.
     inputs are in glob format. e.g: *, foo*, *foo.

@@ -3,9 +3,10 @@
 import copy
 import functools
 import os
+from collections.abc import Callable, Sequence
 from enum import Enum
 from textwrap import dedent
-from typing import Any, Callable, Dict, List, Sequence, Tuple, Union
+from typing import Any
 
 from omegaconf import OmegaConf, SCMode
 from omegaconf._utils import is_structured_config
@@ -43,7 +44,6 @@ DEFAULT_BLOCKLISTED_MODULES = {
     "os.chmod",
     "os.chown",
     "os.chroot",
-    "os.fchdir",
     "os.lchflags",
     "os.lchmod",
     "os.lchown",
@@ -79,17 +79,14 @@ def _enhance_omegaconf_error(e: OmegaConfBaseException, cfg: Any) -> None:
     full_key and object_type context in errors.
     """
     # Only enhance if object_type is missing/None
-    if hasattr(e, "object_type") and e.object_type is None:
-        if OmegaConf.is_config(cfg):
-            obj_type = cfg._metadata.object_type
-            if obj_type is not None:
-                object.__setattr__(e, "object_type", obj_type)
+    if hasattr(e, "object_type") and e.object_type is None and OmegaConf.is_config(cfg):
+        obj_type = cfg._metadata.object_type
+        if obj_type is not None:
+            object.__setattr__(e, "object_type", obj_type)
 
     # Only enhance if full_key is missing/None
-    if hasattr(e, "full_key") and e.full_key is None:
-        # Try to get the key from the error if available
-        if hasattr(e, "key") and e.key is not None:
-            object.__setattr__(e, "full_key", str(e.key))
+    if hasattr(e, "full_key") and e.full_key is None and hasattr(e, "key") and e.key is not None:
+        object.__setattr__(e, "full_key", str(e.key))
 
 
 def _format_enhanced_error_message(e: OmegaConfBaseException) -> None:
@@ -139,7 +136,7 @@ def _find_bad_interpolation_key(cfg: Any, prefix: str = "") -> str | None:
         return None
 
     if OmegaConf.is_dict(cfg):
-        for key in cfg.keys():
+        for key in cfg:
             full_key = f"{prefix}.{key}" if prefix else str(key)
             try:
                 value = cfg[key]
@@ -193,7 +190,7 @@ def _is_target(x: Any) -> bool:
     return False
 
 
-def _extract_pos_args(input_args: Any, kwargs: Any) -> Tuple[Any, Any]:
+def _extract_pos_args(input_args: Any, kwargs: Any) -> tuple[Any, Any]:
     config_args = kwargs.pop(_Keys.ARGS, ())
     output_args = config_args
 
@@ -209,8 +206,8 @@ def _extract_pos_args(input_args: Any, kwargs: Any) -> Tuple[Any, Any]:
 def _call_target(
     _target_: Callable[..., Any],
     _partial_: bool,
-    args: Tuple[Any, ...],
-    kwargs: Dict[str, Any],
+    args: tuple[Any, ...],
+    kwargs: dict[str, Any],
     full_key: str,
 ) -> Any:
     """Call target (type) with args and kwargs."""
@@ -226,7 +223,7 @@ def _call_target(
             if OmegaConf.is_config(v):
                 v._set_parent(None)
     except Exception as e:
-        msg = f"Error in collecting args and kwargs for '{_convert_target_to_string(_target_)}':" + f"\n{repr(e)}"
+        msg = f"Error in collecting args and kwargs for '{_convert_target_to_string(_target_)}':" + f"\n{e!r}"
         if full_key:
             msg += f"\nfull_key: {full_key}"
 
@@ -236,7 +233,7 @@ def _call_target(
         try:
             return functools.partial(_target_, *args, **kwargs)
         except Exception as e:
-            msg = f"Error in creating partial({_convert_target_to_string(_target_)}, ...) object:" + f"\n{repr(e)}"
+            msg = f"Error in creating partial({_convert_target_to_string(_target_)}, ...) object:" + f"\n{e!r}"
             if full_key:
                 msg += f"\nfull_key: {full_key}"
             raise InstantiationException(msg) from e
@@ -244,7 +241,7 @@ def _call_target(
         try:
             return _target_(*args, **kwargs)
         except Exception as e:
-            msg = f"Error in call to target '{_convert_target_to_string(_target_)}':\n{repr(e)}"
+            msg = f"Error in call to target '{_convert_target_to_string(_target_)}':\n{e!r}"
             if full_key:
                 msg += f"\nfull_key: {full_key}"
             raise InstantiationException(msg) from e
@@ -257,7 +254,7 @@ def _convert_target_to_string(t: Any) -> Any:
         return t
 
 
-def _prepare_input_dict_or_list(d: Union[Dict[Any, Any], List[Any]]) -> Any:
+def _prepare_input_dict_or_list(d: dict[Any, Any] | list[Any]) -> Any:
     res: Any
     if isinstance(d, dict):
         res = {}
@@ -278,7 +275,7 @@ def _prepare_input_dict_or_list(d: Union[Dict[Any, Any], List[Any]]) -> Any:
     return res
 
 
-def _resolve_target(target: Union[str, type, Callable[..., Any]], full_key: str, call: bool = True) -> Union[type, Callable[..., Any], Any]:
+def _resolve_target(target: str | type | Callable[..., Any], full_key: str, call: bool = True) -> type | Callable[..., Any] | Any:
     """Resolve target string, type or callable into type or callable.
 
     If call is False, returns the resolved target without requiring it to be callable.
@@ -470,7 +467,7 @@ def instantiate(
         )
 
 
-def _convert_node(node: Any, convert: Union[ConvertMode, str]) -> Any:
+def _convert_node(node: Any, convert: ConvertMode | str) -> Any:
     if OmegaConf.is_config(node):
         if convert == ConvertMode.ALL:
             node = OmegaConf.to_container(node, resolve=True)
@@ -484,7 +481,7 @@ def _convert_node(node: Any, convert: Union[ConvertMode, str]) -> Any:
 def instantiate_node(
     node: Any,
     *args: Any,
-    convert: Union[str, ConvertMode] = ConvertMode.NONE,
+    convert: str | ConvertMode = ConvertMode.NONE,
     recursive: bool = True,
     partial: bool = False,
 ) -> Any:
@@ -499,9 +496,9 @@ def instantiate_node(
     if OmegaConf.is_dict(node):
         # using getitem instead of get(key, default) because OmegaConf will raise an exception
         # if the key type is incompatible on get.
-        convert = node[_Keys.CONVERT] if _Keys.CONVERT in node else convert
-        recursive = node[_Keys.RECURSIVE] if _Keys.RECURSIVE in node else recursive
-        partial = node[_Keys.PARTIAL] if _Keys.PARTIAL in node else partial
+        convert = node.get(_Keys.CONVERT, convert)
+        recursive = node.get(_Keys.RECURSIVE, recursive)
+        partial = node.get(_Keys.PARTIAL, partial)
 
     full_key = node._get_full_key(None)
 
@@ -544,7 +541,7 @@ def instantiate_node(
 
             kwargs = {}
             is_partial = node.get("_partial_", False) or partial
-            for key in node.keys():
+            for key in node:
                 if key not in exclude_keys:
                     if OmegaConf.is_missing(node, key) and is_partial:
                         continue

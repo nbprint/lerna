@@ -12,11 +12,12 @@ import string
 import subprocess
 import sys
 import tempfile
+from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from difflib import unified_diff
 from pathlib import Path
 from subprocess import PIPE, Popen
-from typing import Any, Callable, Dict, Iterator, List, Optional, Protocol, Tuple, Union
+from typing import Any, Protocol
 
 from omegaconf import Container, DictConfig, OmegaConf
 
@@ -27,7 +28,7 @@ from lerna.core.utils import JobReturn, validate_config_path
 from lerna.types import TaskFunction
 
 
-def normalize_path_for_override(path: Union[str, Path]) -> str:
+def normalize_path_for_override(path: str | Path) -> str:
     """
     Normalize a path for use in Hydra overrides.
 
@@ -49,14 +50,14 @@ class TaskTestFunction:
     """
 
     def __init__(self) -> None:
-        self.temp_dir: Optional[str] = None
-        self.overrides: Optional[List[str]] = None
-        self.calling_file: Optional[str] = None
-        self.calling_module: Optional[str] = None
-        self.config_path: Optional[str] = None
-        self.config_name: Optional[str] = None
-        self.hydra: Optional[Hydra] = None
-        self.job_ret: Optional[JobReturn] = None
+        self.temp_dir: str | None = None
+        self.overrides: list[str] | None = None
+        self.calling_file: str | None = None
+        self.calling_module: str | None = None
+        self.config_path: str | None = None
+        self.config_name: str | None = None
+        self.hydra: Hydra | None = None
+        self.job_ret: JobReturn | None = None
         self.configure_logging: bool = False
 
     def __call__(self, cfg: DictConfig) -> Any:
@@ -66,7 +67,7 @@ class TaskTestFunction:
 
         return 100
 
-    def __enter__(self) -> "TaskTestFunction":
+    def __enter__(self) -> "TaskTestFunction":  # noqa: PYI034
         try:
             validate_config_path(self.config_path)
 
@@ -92,7 +93,7 @@ class TaskTestFunction:
         finally:
             GlobalHydra().clear()
 
-    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
+    def __exit__(self, exc_type: object, exc_val: object, exc_tb: object) -> None:
         # release log file handles.
         if self.configure_logging:
             logging.shutdown()
@@ -103,11 +104,11 @@ class TaskTestFunction:
 class TTaskRunner(Protocol):
     def __call__(
         self,
-        calling_file: Optional[str],
-        calling_module: Optional[str],
-        config_path: Optional[str],
-        config_name: Optional[str],
-        overrides: Optional[List[str]] = None,
+        calling_file: str | None,
+        calling_module: str | None,
+        config_path: str | None,
+        config_name: str | None,
+        overrides: list[str] | None = None,
         configure_logging: bool = False,
     ) -> TaskTestFunction: ...
 
@@ -121,13 +122,13 @@ class SweepTaskFunction:
         """
         if sweep_dir is None,  we use a temp dir, else we will create dir with the path from sweep_dir.
         """
-        self.temp_dir: Optional[str] = None
-        self.overrides: Optional[List[str]] = None
-        self.calling_file: Optional[str] = None
-        self.calling_module: Optional[str] = None
-        self.task_function: Optional[TaskFunction] = None
-        self.config_path: Optional[str] = None
-        self.config_name: Optional[str] = None
+        self.temp_dir: str | None = None
+        self.overrides: list[str] | None = None
+        self.calling_file: str | None = None
+        self.calling_module: str | None = None
+        self.task_function: TaskFunction | None = None
+        self.config_path: str | None = None
+        self.config_name: str | None = None
         self.sweeps = None
         self.returns = None
         self.configure_logging: bool = False
@@ -140,7 +141,7 @@ class SweepTaskFunction:
             return self.task_function(cfg)
         return 100
 
-    def __enter__(self) -> "SweepTaskFunction":
+    def __enter__(self) -> "SweepTaskFunction":  # noqa: PYI034
         overrides = copy.deepcopy(self.overrides)
         assert overrides is not None
         if self.temp_dir:
@@ -171,7 +172,7 @@ class SweepTaskFunction:
 
         return self
 
-    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
+    def __exit__(self, exc_type: object, exc_val: object, exc_tb: object) -> None:
         if self.configure_logging:
             logging.shutdown()
         assert self.temp_dir is not None
@@ -179,21 +180,21 @@ class SweepTaskFunction:
 
 
 class TSweepRunner(Protocol):
-    returns: List[List[JobReturn]]
+    returns: list[list[JobReturn]]
 
     def __call__(
         self,
-        calling_file: Optional[str],
-        calling_module: Optional[str],
-        task_function: Optional[TaskFunction],
-        config_path: Optional[str],
-        config_name: Optional[str],
-        overrides: Optional[List[str]],
-        temp_dir: Optional[Path] = None,
+        calling_file: str | None,
+        calling_module: str | None,
+        task_function: TaskFunction | None,
+        config_path: str | None,
+        config_name: str | None,
+        overrides: list[str] | None,
+        temp_dir: Path | None = None,
     ) -> SweepTaskFunction: ...
 
 
-def chdir_hydra_root(subdir: Optional[str] = None) -> None:
+def chdir_hydra_root(subdir: str | None = None) -> None:
     """
     Change the cwd to the root of the hydra project.
     used from unit tests to make them runnable from anywhere in the tree.
@@ -226,7 +227,7 @@ def find_parent_dir_containing(target: str, max_up: int = 6, initial_dir: str = 
     return cur
 
 
-def verify_dir_outputs(job_return: JobReturn, overrides: Optional[List[str]] = None) -> None:
+def verify_dir_outputs(job_return: JobReturn, overrides: list[str] | None = None) -> None:
     """
     Verify that directory output makes sense
     """
@@ -242,7 +243,7 @@ def verify_dir_outputs(job_return: JobReturn, overrides: Optional[List[str]] = N
     assert OmegaConf.load(os.path.join(hydra_dir, "overrides.yaml")) == OmegaConf.create(overrides or [])
 
 
-def _get_statements(indent: str, statements: Union[None, str, List[str]]) -> str:
+def _get_statements(indent: str, statements: None | str | list[str]) -> str:
     if isinstance(statements, str):
         statements = [statements]
 
@@ -258,14 +259,14 @@ def _get_statements(indent: str, statements: Union[None, str, List[str]]) -> str
 def integration_test(
     tmpdir: Path,
     task_config: Any,
-    overrides: List[str],
-    prints: Union[str, List[str]],
-    expected_outputs: Union[str, List[str]],
-    prolog: Union[None, str, List[str]] = None,
+    overrides: list[str],
+    prints: str | list[str],
+    expected_outputs: str | list[str],
+    prolog: None | str | list[str] = None,
     filename: str = "task.py",
-    env_override: Optional[Dict[str, str]] = None,
+    env_override: dict[str, str] | None = None,
     clean_environment: bool = False,
-    generate_custom_cmd: Callable[..., List[str]] = lambda cmd, *args, **kwargs: cmd,
+    generate_custom_cmd: Callable[..., list[str]] = lambda cmd, *args, **kwargs: cmd,
 ) -> str:
     Path(tmpdir).mkdir(parents=True, exist_ok=True)
     if isinstance(expected_outputs, str):
@@ -355,7 +356,7 @@ def run_python_script(
     allow_warnings: bool = False,
     print_error: bool = True,
     raise_exception: bool = True,
-) -> Tuple[str, str]:
+) -> tuple[str, str]:
     if allow_warnings:
         cmd = [sys.executable] + cmd
     else:
@@ -368,8 +369,8 @@ def run_process(
     env: Any = None,
     print_error: bool = True,
     raise_exception: bool = True,
-    timeout: Optional[float] = None,
-) -> Tuple[str, str]:
+    timeout: float | None = None,
+) -> tuple[str, str]:
     try:
         process = subprocess.Popen(
             args=cmd,
@@ -387,11 +388,11 @@ def run_process(
             if raise_exception:
                 raise subprocess.CalledProcessError(returncode=process.returncode, cmd=cmd)
         return stdout, stderr
-    except Exception as e:
+    except Exception:
         if print_error:
             cmd = " ".join(cmd)
             sys.stderr.write(f"=== Error executing:\n{cmd}\n===================")
-        raise e
+        raise
 
 
 def normalize_newlines(s: str) -> str:

@@ -4,7 +4,7 @@ import re
 import subprocess
 from pathlib import Path
 from textwrap import dedent
-from typing import Any, List
+from typing import Any
 
 try:
     from _pytest.python_api import RaisesContext
@@ -35,7 +35,7 @@ chdir_hydra_root()
         ),
     ],
 )
-def test_tutorial_simple_cli_app(tmpdir: Path, args: List[str], output_conf: DictConfig) -> None:
+def test_tutorial_simple_cli_app(tmpdir: Path, args: list[str], output_conf: DictConfig) -> None:
     cmd = [
         "examples/tutorials/basic/your_first_hydra_app/1_simple_cli/my_app.py",
         f'hydra.run.dir="{normalize_path_for_override(tmpdir)}"',
@@ -53,7 +53,7 @@ def test_tutorial_working_directory(tmpdir: Path) -> None:
         "hydra.job.chdir=True",
     ]
     result, _err = run_python_script(cmd)
-    working_directory, output_directory = result.split("\n")
+    working_directory, _output_directory = result.split("\n")
     assert working_directory == f"Working directory : {tmpdir}"
 
 
@@ -84,7 +84,7 @@ def test_tutorial_working_directory_original_cwd(tmpdir: Path) -> None:
         (["hydra.verbose=[__main__]"], ["Info level message", "Debug level message"]),
     ],
 )
-def test_tutorial_logging(tmpdir: Path, args: List[str], expected: List[str]) -> None:
+def test_tutorial_logging(tmpdir: Path, args: list[str], expected: list[str]) -> None:
     cmd = [
         "examples/tutorials/basic/running_your_hydra_app/4_logging/my_app.py",
         f'hydra.run.dir="{normalize_path_for_override(tmpdir)}"',
@@ -107,7 +107,7 @@ def test_tutorial_logging(tmpdir: Path, args: List[str], expected: List[str]) ->
         )
     ],
 )
-def test_tutorial_config_file(tmpdir: Path, args: List[str], output_conf: Any) -> None:
+def test_tutorial_config_file(tmpdir: Path, args: list[str], output_conf: Any) -> None:
     cmd = [
         "examples/tutorials/basic/your_first_hydra_app/2_config_file/my_app.py",
         f'hydra.run.dir="{normalize_path_for_override(tmpdir)}"',
@@ -128,7 +128,7 @@ def test_tutorial_config_file(tmpdir: Path, args: List[str], output_conf: Any) -
         (["dataset.path=abc"], raises(subprocess.CalledProcessError)),
     ],
 )
-def test_tutorial_config_file_bad_key(tmpdir: Path, args: List[str], expected: Any) -> None:
+def test_tutorial_config_file_bad_key(tmpdir: Path, args: list[str], expected: Any) -> None:
     """Similar to the previous test, but also tests exception values"""
 
     cmd = [
@@ -164,7 +164,7 @@ def test_tutorial_config_file_bad_key(tmpdir: Path, args: List[str], expected: A
         ),
     ],
 )
-def test_tutorial_config_groups(tmpdir: Path, args: List[str], output_conf: DictConfig) -> None:
+def test_tutorial_config_groups(tmpdir: Path, args: list[str], output_conf: DictConfig) -> None:
     cmd = [
         "examples/tutorials/basic/your_first_hydra_app/4_config_groups/my_app.py",
         f'hydra.run.dir="{normalize_path_for_override(tmpdir)}"',
@@ -203,7 +203,7 @@ def test_tutorial_config_groups(tmpdir: Path, args: List[str], output_conf: Dict
         ),
     ],
 )
-def test_tutorial_defaults(tmpdir: Path, args: List[str], expected: DictConfig) -> None:
+def test_tutorial_defaults(tmpdir: Path, args: list[str], expected: DictConfig) -> None:
     cmd = [
         "examples/tutorials/basic/your_first_hydra_app/5_defaults/my_app.py",
         f'hydra.run.dir="{normalize_path_for_override(tmpdir)}"',
@@ -298,7 +298,7 @@ def test_sweeping_example(hydra_restore_singletons: Any, hydra_sweep_runner: TSw
         )
     ],
 )
-def test_advanced_ad_hoc_composition(monkeypatch: Any, tmpdir: Path, args: List[str], expected: Any) -> None:
+def test_advanced_ad_hoc_composition(monkeypatch: Any, tmpdir: Path, args: list[str], expected: Any) -> None:
     monkeypatch.setenv("USER", "test_user")
     cmd = [
         "examples/advanced/ad_hoc_composition/hydra_compose_example.py",

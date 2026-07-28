@@ -1,7 +1,6 @@
 # Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved
 import os
 from os.path import realpath
-from typing import List, Optional, Tuple
 
 from pytest import mark
 
@@ -10,7 +9,7 @@ from lerna._internal.utils import compute_search_path_dir
 from lerna.core.config_search_path import SearchPathElement, SearchPathQuery
 
 
-def create_search_path(base_list: List[Tuple[str, str]]) -> ConfigSearchPathImpl:
+def create_search_path(base_list: list[tuple[str, str]]) -> ConfigSearchPathImpl:
     csp = ConfigSearchPathImpl()
     csp.config_search_path = [SearchPathElement(x[0], x[1]) for x in base_list]
     return csp
@@ -18,7 +17,7 @@ def create_search_path(base_list: List[Tuple[str, str]]) -> ConfigSearchPathImpl
 
 def to_tuples_list(
     search_path: ConfigSearchPathImpl,
-) -> List[Tuple[Optional[str], Optional[str]]]:
+) -> list[tuple[str | None, str | None]]:
     return [(x.provider, x.path) for x in search_path.config_search_path]
 
 
@@ -32,7 +31,7 @@ def to_tuples_list(
         ([("a", "10"), ("b", "20"), ("a", "30")], ("a", "10"), 0),
     ],
 )
-def test_find_last_match(input_list: List[Tuple[str, str]], reference: str, expected_idx: int) -> None:
+def test_find_last_match(input_list: list[tuple[str, str]], reference: str, expected_idx: int) -> None:
     csp = create_search_path(input_list)
     assert csp.find_last_match(SearchPathQuery(reference[0], reference[1])) == expected_idx
 
@@ -47,7 +46,7 @@ def test_find_last_match(input_list: List[Tuple[str, str]], reference: str, expe
         ([("a", "10"), ("b", "20"), ("a", "30")], ("a", "10"), 0),
     ],
 )
-def test_find_first_match(input_list: List[Tuple[str, str]], reference: str, expected_idx: int) -> None:
+def test_find_first_match(input_list: list[tuple[str, str]], reference: str, expected_idx: int) -> None:
     csp = create_search_path(input_list)
     sp = SearchPathQuery(reference[0], reference[1])
     assert csp.find_first_match(sp) == expected_idx
@@ -87,11 +86,11 @@ def test_find_first_match(input_list: List[Tuple[str, str]], reference: str, exp
     ],
 )
 def test_append(
-    base_list: List[Tuple[str, str]],
+    base_list: list[tuple[str, str]],
     provider: str,
     path: str,
     anchor_provider: SearchPathQuery,
-    result_list: List[Tuple[str, str]],
+    result_list: list[tuple[str, str]],
 ) -> None:
     csp = create_search_path(base_list)
     csp.append(provider=provider, path=path, anchor=anchor_provider)
@@ -132,11 +131,11 @@ def test_append(
     ],
 )
 def test_prepend(
-    base_list: List[Tuple[str, str]],
+    base_list: list[tuple[str, str]],
     provider: str,
     path: str,
     anchor_provider: SearchPathQuery,
-    result_list: List[Tuple[str, str]],
+    result_list: list[tuple[str, str]],
 ) -> None:
     csp = create_search_path(base_list)
     csp.prepend(provider=provider, path=path, anchor=anchor_provider)

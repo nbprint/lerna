@@ -798,9 +798,11 @@ key: value
 
         GlobalHydra.instance().clear()
         try:
-            with initialize_config_dir(config_dir=str(patch_sweep_config_dir), version_base=None):
-                with pytest.raises(ConfigCompositionException, match="_patch_ does not support sweep"):
-                    compose(config_name="config")
+            with (
+                initialize_config_dir(config_dir=str(patch_sweep_config_dir), version_base=None),
+                pytest.raises(ConfigCompositionException, match="_patch_ does not support sweep"),
+            ):
+                compose(config_name="config")
         finally:
             GlobalHydra.instance().clear()
 
@@ -812,9 +814,11 @@ key: value
 
         GlobalHydra.instance().clear()
         try:
-            with initialize_config_dir(config_dir=str(patch_nonexistent_delete_dir), version_base=None):
-                with pytest.raises(ConfigCompositionException, match="does not exist"):
-                    compose(config_name="config")
+            with (
+                initialize_config_dir(config_dir=str(patch_nonexistent_delete_dir), version_base=None),
+                pytest.raises(ConfigCompositionException, match="does not exist"),
+            ):
+                compose(config_name="config")
         finally:
             GlobalHydra.instance().clear()
 
@@ -825,9 +829,11 @@ key: value
 
         GlobalHydra.instance().clear()
         try:
-            with initialize_config_dir(config_dir=str(patch_empty_scope_dir), version_base=None):
-                with pytest.raises(Exception, match="_patch_@ requires a package name"):
-                    compose(config_name="config")
+            with (
+                initialize_config_dir(config_dir=str(patch_empty_scope_dir), version_base=None),
+                pytest.raises(ValueError, match="_patch_@ requires a package name"),
+            ):
+                compose(config_name="config")
         finally:
             GlobalHydra.instance().clear()
 

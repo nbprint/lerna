@@ -1,6 +1,6 @@
 # Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved
 import warnings
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any
 
 from omegaconf import DictConfig, OmegaConf
 
@@ -21,16 +21,16 @@ class CallbacksCache(metaclass=Singleton):
     def instance() -> "CallbacksCache":
         return Singleton.instance(CallbacksCache)  # type: ignore
 
-    cache: Dict[int, "Callbacks"]
+    cache: dict[int, "Callbacks"]
 
     def __init__(self) -> None:
         self.cache = {}
 
 
 class Callbacks:
-    callbacks: List[Any]
+    callbacks: list[Any]
 
-    def __init__(self, config: Optional[DictConfig] = None, check_cache: bool = True) -> None:
+    def __init__(self, config: DictConfig | None = None, check_cache: bool = True) -> None:
         if config is None:
             return
         cache = CallbacksCache.instance().cache
@@ -53,7 +53,7 @@ class Callbacks:
         for c in callbacks:
             try:
                 getattr(c, function_name)(**kwargs)
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 warnings.warn(f"Callback {type(c).__name__}.{function_name} raised {type(e).__name__}: {e}")
 
     def on_run_start(self, config: DictConfig, **kwargs: Any) -> None:
@@ -88,8 +88,8 @@ class Callbacks:
     def on_compose_config(
         self,
         config: DictConfig,
-        config_name: Optional[str],
-        overrides: List[str],
+        config_name: str | None,
+        overrides: list[str],
     ) -> None:
         self._notify(
             function_name="on_compose_config",

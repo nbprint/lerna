@@ -1,12 +1,14 @@
 # Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved
+import builtins
 import decimal
 import fnmatch
+from collections.abc import Callable, Iterator
 from copy import copy
 from dataclasses import dataclass, field
 from enum import Enum
 from random import shuffle
 from textwrap import dedent
-from typing import Any, Callable, Dict, Iterator, List, Optional, Set, Union, cast
+from typing import Any, cast
 
 from omegaconf import OmegaConf
 from omegaconf._utils import is_structured_config
@@ -82,23 +84,23 @@ class QuotedString:
 
 @dataclass
 class Sweep:
-    tags: Set[str] = field(default_factory=set)
+    tags: set[str] = field(default_factory=set)
 
 
 @dataclass
 class ChoiceSweep(Sweep):
     # simple form: a,b,c
     # explicit form: choices(a,b,c)
-    list: List["ParsedElementType"] = field(default_factory=list)
+    list: builtins.list["ParsedElementType"] = field(default_factory=list)
     simple_form: bool = False
     shuffle: bool = False
 
 
 @dataclass
 class FloatRange:
-    start: Union[decimal.Decimal, float]
-    stop: Union[decimal.Decimal, float]
-    step: Union[decimal.Decimal, float]
+    start: decimal.Decimal | float
+    stop: decimal.Decimal | float
+    step: decimal.Decimal | float
 
     def __post_init__(self) -> None:
         self.start = decimal.Decimal(self.start)
@@ -136,13 +138,13 @@ class RangeSweep(Sweep):
     Discrete range of numbers
     """
 
-    start: Optional[Union[int, float]] = None
-    stop: Optional[Union[int, float]] = None
-    step: Union[int, float] = 1
+    start: int | float | None = None
+    stop: int | float | None = None
+    step: int | float = 1
 
     shuffle: bool = False
 
-    def range(self) -> Union[range, FloatRange]:
+    def range(self) -> range | FloatRange:
         assert self.start is not None
         assert self.stop is not None
 
@@ -157,10 +159,10 @@ class RangeSweep(Sweep):
 
 @dataclass
 class IntervalSweep(Sweep):
-    start: Optional[float] = None
-    end: Optional[float] = None
+    start: float | None = None
+    end: float | None = None
 
-    def __eq__(self, other: Any) -> Any:
+    def __eq__(self, other: object) -> Any:
         if isinstance(other, IntervalSweep):
             eq = self.start == other.start and self.end == other.end and self.tags == other.tags
 
@@ -176,8 +178,8 @@ class IntervalSweep(Sweep):
 
 # Ideally we would use List[ElementType] and Dict[str, ElementType] but Python does not seem
 # to support recursive type definitions.
-ElementType = Union[str, int, float, bool, List[Any], Dict[str, Any]]
-ParsedElementType = Optional[Union[ElementType, QuotedString]]
+ElementType = str | int | float | bool | list[Any] | dict[str, Any]
+ParsedElementType = ElementType | QuotedString | None
 TransformerType = Callable[[ParsedElementType], Any]
 
 
@@ -213,15 +215,15 @@ class ListOperationType(Enum):
 class Key:
     # the config-group or config dot-path
     key_or_group: str
-    package: Optional[str] = None
+    package: str | None = None
 
 
 @dataclass
 class Glob:
-    include: List[str] = field(default_factory=list)
-    exclude: List[str] = field(default_factory=list)
+    include: list[str] = field(default_factory=list)
+    exclude: list[str] = field(default_factory=list)
 
-    def filter(self, names: List[str]) -> List[str]:
+    def filter(self, names: list[str]) -> list[str]:
         """Filter names based on include and exclude patterns."""
         if _HAS_RUST:
             # Use Rust implementation for performance
@@ -229,7 +231,7 @@ class Glob:
             return rust_glob.filter(names)
 
         # Fallback to Python implementation
-        def match(s: str, globs: List[str]) -> bool:
+        def match(s: str, globs: list[str]) -> bool:
             for g in globs:
                 if fnmatch.fnmatch(s, g):
                     return True
@@ -245,7 +247,7 @@ class Glob:
 
 @dataclass
 class ListExtensionOverrideValue:
-    values: List["ParsedElementType"]
+    values: list["ParsedElementType"]
 
 
 class Transformer:
@@ -275,29 +277,29 @@ class Override:
     key_or_group: str
 
     # The type of the value, None if there is no value
-    value_type: Optional[ValueType]
+    value_type: ValueType | None
 
     # The parsed value (component after the =).
-    _value: Union[ParsedElementType, ChoiceSweep, RangeSweep, IntervalSweep]
+    _value: ParsedElementType | ChoiceSweep | RangeSweep | IntervalSweep
 
     # Optional qualifying package
-    package: Optional[str] = None
+    package: str | None = None
 
     # Input line used to construct this
-    input_line: Optional[str] = None
+    input_line: str | None = None
 
     # Configs repo
-    config_loader: Optional[ConfigLoader] = None
+    config_loader: ConfigLoader | None = None
 
     # For EXTEND_LIST type: the specific list operation (defaults to APPEND)
-    list_operation: Optional[ListOperationType] = None
+    list_operation: ListOperationType | None = None
 
     # For INSERT and REMOVE_AT operations: the index
-    list_index: Optional[int] = None
+    list_index: int | None = None
 
     # Optional searchpath for glob sweeps (from hydra.searchpath config)
     # Used to ensure pkg:// sources are available when enumerating group options
-    searchpath: Optional[List[str]] = None
+    searchpath: list[str] | None = None
 
     def is_delete(self) -> bool:
         """
@@ -324,7 +326,7 @@ class Override:
         return self.type == OverrideType.EXTEND_LIST
 
     @staticmethod
-    def _convert_value(value: ParsedElementType) -> Optional[ElementType]:
+    def _convert_value(value: ParsedElementType) -> ElementType | None:
         if isinstance(value, list):
             return [Override._convert_value(x) for x in value]
         elif isinstance(value, dict):
@@ -341,7 +343,7 @@ class Override:
 
     def value(
         self,
-    ) -> Optional[Union[ElementType, ChoiceSweep, RangeSweep, IntervalSweep]]:
+    ) -> ElementType | ChoiceSweep | RangeSweep | IntervalSweep | None:
         """
         :return: the value. replaces Quoted strings by regular strings
         """
@@ -387,7 +389,7 @@ class Override:
 
             # Build searchpath override list if searchpath is set
             # This ensures pkg:// sources from hydra.searchpath are available for glob sweeps
-            overrides: Optional[List[str]] = None
+            overrides: list[str] | None = None
             if self.searchpath:
                 # Format as hydra.searchpath override
                 import json
@@ -434,7 +436,7 @@ class Override:
 
     def is_hydra_override(self) -> bool:
         kog = self.key_or_group
-        return kog.startswith("hydra.") or kog.startswith("hydra/")
+        return kog.startswith(("hydra.", "hydra/"))
 
     def get_key_element(self) -> str:
         def get_key() -> str:
@@ -507,13 +509,12 @@ class Override:
         return Override._get_value_element_as_str(self._value, space_after_sep=space_after_sep)
 
     def validate(self) -> None:
-        if not version.base_at_least("1.2"):
-            if self.package is not None and "_name_" in self.package:
-                url = "https://hydra.cc/docs/1.2/upgrades/1.0_to_1.1/changes_to_package_header"
-                deprecation_warning(
-                    message=dedent(
-                        f"""\
+        if not version.base_at_least("1.2") and self.package is not None and "_name_" in self.package:
+            url = "https://hydra.cc/docs/1.2/upgrades/1.0_to_1.1/changes_to_package_header"
+            deprecation_warning(
+                message=dedent(
+                    f"""\
                         In override {self.input_line}: _name_ keyword is deprecated in packages, see {url}
                         """
-                    ),
-                )
+                ),
+            )

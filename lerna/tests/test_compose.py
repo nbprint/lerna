@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
 from textwrap import dedent
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from omegaconf import MISSING, OmegaConf
 from pytest import fixture, mark, param, raises, warns
@@ -34,7 +34,7 @@ chdir_hydra_root()
 
 
 @fixture
-def initialize_hydra(config_path: Optional[str]) -> Any:
+def initialize_hydra(config_path: str | None) -> Any:
     init = None
     try:
         init = initialize(version_base=None, config_path=config_path)
@@ -138,13 +138,13 @@ class TestCompose:
     def test_compose_config(
         self,
         config_file: str,
-        overrides: List[str],
+        overrides: list[str],
         expected: Any,
     ) -> None:
         cfg = compose(config_file, overrides)
         assert cfg == expected
 
-    def test_strict_failure_global_strict(self, config_file: str, overrides: List[str], expected: Any) -> None:
+    def test_strict_failure_global_strict(self, config_file: str, overrides: list[str], expected: Any) -> None:
         # default strict True, call is unspecified
         overrides.append("fooooooooo=bar")
         with raises(HydraException):
@@ -231,7 +231,7 @@ def test_top_level_config_is_list() -> None:
     ],
 )
 class TestComposeInits:
-    def test_initialize_ctx(self, config_file: str, overrides: List[str], expected: Any) -> None:
+    def test_initialize_ctx(self, config_file: str, overrides: list[str], expected: Any) -> None:
         with initialize(
             version_base=None,
             config_path="../../examples/jupyter_notebooks/cloud_app/conf",
@@ -239,20 +239,22 @@ class TestComposeInits:
             ret = compose(config_file, overrides)
             assert ret == expected
 
-    def test_initialize_config_dir_ctx_with_relative_dir(self, config_file: str, overrides: List[str], expected: Any) -> None:
-        with raises(
-            HydraException,
-            match=re.escape("initialize_config_dir() requires an absolute config_dir as input"),
-        ):
-            with initialize_config_dir(
+    def test_initialize_config_dir_ctx_with_relative_dir(self, config_file: str, overrides: list[str], expected: Any) -> None:
+        with (
+            raises(
+                HydraException,
+                match=re.escape("initialize_config_dir() requires an absolute config_dir as input"),
+            ),
+            initialize_config_dir(
                 config_dir="../../examples/jupyter_notebooks/cloud_app/conf",
                 version_base=None,
                 job_name="job_name",
-            ):
-                ret = compose(config_file, overrides)
-                assert ret == expected
+            ),
+        ):
+            ret = compose(config_file, overrides)
+            assert ret == expected
 
-    def test_initialize_config_module_ctx(self, config_file: str, overrides: List[str], expected: Any) -> None:
+    def test_initialize_config_module_ctx(self, config_file: str, overrides: list[str], expected: Any) -> None:
         with initialize_config_module(
             config_module="examples.jupyter_notebooks.cloud_app.conf",
             version_base=None,
@@ -263,9 +265,11 @@ class TestComposeInits:
 
 
 def test_initialize_ctx_with_absolute_dir(hydra_restore_singletons: Any, tmpdir: Any) -> None:
-    with raises(HydraException, match=re.escape("config_path in initialize() must be relative")):
-        with initialize(version_base=None, config_path=str(tmpdir)):
-            compose(overrides=["+test_group=test"])
+    with (
+        raises(HydraException, match=re.escape("config_path in initialize() must be relative")),
+        initialize(version_base=None, config_path=str(tmpdir)),
+    ):
+        compose(overrides=["+test_group=test"])
 
 
 def test_initialize_config_dir_ctx_with_absolute_dir(hydra_restore_singletons: Any, tmpdir: Any) -> None:
@@ -286,7 +290,7 @@ def test_initialize_config_dir_ctx_with_absolute_dir(hydra_restore_singletons: A
 
 
 @mark.parametrize("job_name,expected", [(None, "test_compose"), ("test_job", "test_job")])
-def test_jobname_override_initialize_ctx(hydra_restore_singletons: Any, job_name: Optional[str], expected: str) -> None:
+def test_jobname_override_initialize_ctx(hydra_restore_singletons: Any, job_name: str | None, expected: str) -> None:
     with initialize(
         version_base=None,
         config_path="../../examples/jupyter_notebooks/cloud_app/conf",
@@ -330,14 +334,16 @@ def test_initialize_config_module_ctx(hydra_restore_singletons: Any) -> None:
 def test_missing_init_py_error(hydra_restore_singletons: Any) -> None:
     expected = "Primary config module 'lerna.test_utils.configs.missing_init_py' not found.\nCheck that it's correct and contains an __init__.py file"
 
-    with raises(Exception, match=re.escape(expected)):
-        with initialize_config_module(
+    with (
+        raises(Exception, match=re.escape(expected)),
+        initialize_config_module(
             config_module="lerna.test_utils.configs.missing_init_py",
             version_base=None,
-        ):
-            hydra = GlobalHydra.instance().hydra
-            assert hydra is not None
-            compose(config_name="test.yaml", overrides=[])
+        ),
+    ):
+        hydra = GlobalHydra.instance().hydra
+        assert hydra is not None
+        compose(config_name="test.yaml", overrides=[])
 
 
 def test_missing_bad_config_dir_error(hydra_restore_singletons: Any) -> None:
@@ -349,14 +355,16 @@ def test_missing_bad_config_dir_error(hydra_restore_singletons: Any) -> None:
 
     expected = f"Primary config directory not found.\nCheck that the config directory '{bad_dir}' exists and readable"
 
-    with raises(Exception, match=re.escape(expected)):
-        with initialize_config_dir(
+    with (
+        raises(Exception, match=re.escape(expected)),
+        initialize_config_dir(
             config_dir=bad_dir,
             version_base=None,
-        ):
-            hydra = GlobalHydra.instance().hydra
-            assert hydra is not None
-            compose(config_name="test.yaml", overrides=[])
+        ),
+    ):
+        hydra = GlobalHydra.instance().hydra
+        assert hydra is not None
+        compose(config_name="test.yaml", overrides=[])
 
 
 def test_initialize_with_module(hydra_restore_singletons: Any) -> None:
@@ -390,10 +398,10 @@ def test_initialization_root_module(monkeypatch: Any) -> None:
         param(["map.foo=bar"], raises(ConfigCompositionException), id="add_no_plus"),
     ],
 )
-def test_adding_to_sc_dict(hydra_restore_singletons: Any, overrides: List[str], expected: Any) -> None:
+def test_adding_to_sc_dict(hydra_restore_singletons: Any, overrides: list[str], expected: Any) -> None:
     @dataclass
     class Config:
-        map: Dict[str, str] = field(default_factory=dict)
+        map: dict[str, str] = field(default_factory=dict)
 
     ConfigStore.instance().store(name="config", node=Config)
 
@@ -431,7 +439,7 @@ def test_adding_to_sc_dict(hydra_restore_singletons: Any, overrides: List[str], 
         ),
     ],
 )
-def test_extending_list(hydra_restore_singletons: Any, overrides: List[str], expected: Any) -> None:
+def test_extending_list(hydra_restore_singletons: Any, overrides: list[str], expected: Any) -> None:
     @dataclass
     class Config:
         list_key: Any = field(default_factory=lambda: ["a", "b", "c"])
@@ -555,7 +563,7 @@ class TestConfigSearchPathOverride:
         self,
         init_configs: Any,
         config_name: str,
-        overrides: List[str],
+        overrides: list[str],
         expected: Any,
     ) -> None:
         cfg = compose(config_name=config_name, overrides=overrides)
@@ -615,7 +623,7 @@ class TestConfigSearchPathOverride:
         self,
         init_configs: Any,
         config_name: str,
-        overrides: List[str],
+        overrides: list[str],
         expected: Any,
     ) -> None:
         with expected:
@@ -640,19 +648,23 @@ def test_deprecated_compose(hydra_restore_singletons: Any) -> None:
 
     msg = "hydra.experimental.compose() is no longer experimental. Use hydra.compose()"
 
-    with initialize(version_base="1.1"):
-        with warns(
+    with (
+        initialize(version_base="1.1"),
+        warns(
             expected_warning=UserWarning,
             match=re.escape(msg),
-        ):
-            assert expr_compose() == {}
+        ),
+    ):
+        assert expr_compose() == {}
 
-    with initialize(version_base="1.2"):
-        with raises(
+    with (
+        initialize(version_base="1.2"),
+        raises(
             ImportError,
             match=re.escape(msg),
-        ):
-            assert expr_compose() == {}
+        ),
+    ):
+        assert expr_compose() == {}
 
 
 def test_deprecated_initialize(hydra_restore_singletons: Any) -> None:
@@ -661,14 +673,12 @@ def test_deprecated_initialize(hydra_restore_singletons: Any) -> None:
     msg = "hydra.experimental.initialize() is no longer experimental. Use hydra.initialize()"
 
     version.setbase("1.1")
-    with warns(expected_warning=UserWarning, match=re.escape(msg)):
-        with expr_initialize():
-            assert compose() == {}
+    with warns(expected_warning=UserWarning, match=re.escape(msg)), expr_initialize():
+        assert compose() == {}
 
     version.setbase("1.2")
-    with raises(ImportError, match=re.escape(msg)):
-        with expr_initialize():
-            assert compose() == {}
+    with raises(ImportError, match=re.escape(msg)), expr_initialize():
+        assert compose() == {}
 
 
 def test_deprecated_initialize_config_dir(hydra_restore_singletons: Any) -> None:
@@ -677,24 +687,28 @@ def test_deprecated_initialize_config_dir(hydra_restore_singletons: Any) -> None
     msg = "hydra.experimental.initialize_config_dir() is no longer experimental. Use hydra.initialize_config_dir()"
 
     version.setbase("1.1")
-    with warns(
-        expected_warning=UserWarning,
-        match=re.escape(msg),
-    ):
-        with expr_initialize_config_dir(
+    with (
+        warns(
+            expected_warning=UserWarning,
+            match=re.escape(msg),
+        ),
+        expr_initialize_config_dir(
             config_dir=str(Path(".").absolute()),
-        ):
-            assert compose() == {}
+        ),
+    ):
+        assert compose() == {}
 
     version.setbase("1.2")
-    with raises(
-        ImportError,
-        match=re.escape(msg),
-    ):
-        with expr_initialize_config_dir(
+    with (
+        raises(
+            ImportError,
+            match=re.escape(msg),
+        ),
+        expr_initialize_config_dir(
             config_dir=str(Path(".").absolute()),
-        ):
-            assert compose() == {}
+        ),
+    ):
+        assert compose() == {}
 
 
 def test_deprecated_initialize_config_module(hydra_restore_singletons: Any) -> None:
@@ -705,18 +719,22 @@ def test_deprecated_initialize_config_module(hydra_restore_singletons: Any) -> N
     msg = "hydra.experimental.initialize_config_module() is no longer experimental. Use hydra.initialize_config_module()"
 
     version.setbase("1.1")
-    with warns(expected_warning=UserWarning, match=re.escape(msg)):
-        with expr_initialize_config_module(
+    with (
+        warns(expected_warning=UserWarning, match=re.escape(msg)),
+        expr_initialize_config_module(
             config_module="examples.jupyter_notebooks.cloud_app.conf",
-        ):
-            assert compose() == {}
+        ),
+    ):
+        assert compose() == {}
 
     version.setbase("1.2")
-    with raises(ImportError, match=re.escape(msg)):
-        with expr_initialize_config_module(
+    with (
+        raises(ImportError, match=re.escape(msg)),
+        expr_initialize_config_module(
             config_module="examples.jupyter_notebooks.cloud_app.conf",
-        ):
-            assert compose() == {}
+        ),
+    ):
+        assert compose() == {}
 
 
 def test_initialize_without_config_path(tmpdir: Path) -> None:
@@ -731,9 +749,8 @@ def test_initialize_without_config_path(tmpdir: Path) -> None:
         config_path is not specified in hydra.initialize().
         See https://hydra.cc/docs/1.2/upgrades/1.0_to_1.1/changes_to_hydra_main_config_path for more information."""
     )
-    with warns(expected_warning=UserWarning) as record:
-        with initialize():
-            pass
+    with warns(expected_warning=UserWarning) as record, initialize():
+        pass
     assert len(record) == 2
     assert str(record[0].message) == expected0
     assert str(record[1].message) == expected1
@@ -761,7 +778,7 @@ def test_initialize_without_config_path(tmpdir: Path) -> None:
         ),
     ],
 )
-def test_error_assigning_null_to_logging_config(hydra_restore_singletons: Any, overrides: List[str], expected: Any) -> None:
+def test_error_assigning_null_to_logging_config(hydra_restore_singletons: Any, overrides: list[str], expected: Any) -> None:
     with expected:
         compose(overrides=overrides)
 
@@ -793,12 +810,12 @@ def test_deprecated_compose_strict_flag(strict: bool, hydra_restore_singletons: 
 def test_missing_node_with_defaults_list(hydra_restore_singletons: Any) -> None:
     @dataclass
     class Reducer:
-        defaults: List[Any] = field(default_factory=lambda: [])
+        defaults: list[Any] = field(default_factory=list)
 
     @dataclass
     class Trainer:
         reducer: Reducer = MISSING
-        defaults: List[Any] = field(default_factory=lambda: [{"/reducer": "base_reducer"}])
+        defaults: list[Any] = field(default_factory=lambda: [{"/reducer": "base_reducer"}])
 
     cs = ConfigStore.instance()
     cs.store(name="base_trainer", node=Trainer(), group="trainer")
@@ -817,9 +834,9 @@ def test_enum_with_removed_defaults_list(hydra_restore_singletons: Any) -> None:
 
     @dataclass
     class Conf:
-        enum_dict: Dict[Category, str] = field(default_factory=dict)
-        int_dict: Dict[int, str] = field(default_factory=dict)
-        str_dict: Dict[str, str] = field(default_factory=dict)
+        enum_dict: dict[Category, str] = field(default_factory=dict)
+        int_dict: dict[int, str] = field(default_factory=dict)
+        str_dict: dict[str, str] = field(default_factory=dict)
 
     cs = ConfigStore.instance()
     cs.store(name="conf", node=Conf)
