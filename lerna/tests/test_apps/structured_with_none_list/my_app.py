@@ -1,4 +1,5 @@
 # Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved
+import builtins
 from dataclasses import dataclass
 
 from omegaconf import DictConfig
@@ -9,7 +10,7 @@ from lerna.core.config_store import ConfigStore
 
 @dataclass
 class Config:
-    list: list[int] | None = None
+    list: builtins.list[int] | None = None
 
 
 cs = ConfigStore.instance()

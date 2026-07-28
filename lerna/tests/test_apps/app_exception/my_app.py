@@ -1,4 +1,4 @@
-# Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved
+# Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved  # ruff: noqa: B018
 from omegaconf import DictConfig
 
 import lerna
@@ -6,7 +6,7 @@ import lerna
 
 @lerna.main(version_base=None)
 def my_app(_: DictConfig) -> None:
-    _ = 1 / 0
+    1 / 0
 
 
 if __name__ == "__main__":
