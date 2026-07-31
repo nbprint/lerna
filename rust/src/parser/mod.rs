@@ -403,9 +403,12 @@ impl OverrideParser {
 
                 // Check if we stopped at a character that should be part of the value
                 if let Some(next) = self.peek() {
-                    // If next char is part of an identifier/value (not a delimiter),
-                    // fall back to unquoted value parsing
-                    if next == '_' || next.is_alphanumeric() {
+                    if next.is_alphanumeric()
+                        || matches!(
+                            next,
+                            '_' | '-' | '/' | ':' | '*' | '?' | '$' | '%' | '+' | '@' | '|' | '\\'
+                        )
+                    {
                         self.pos = saved_pos;
                         return self.parse_unquoted_value();
                     }
@@ -3025,6 +3028,19 @@ mod tests {
             result.value,
             Some(OverrideValue::Element(ParsedElement::String(
                 "value".to_string()
+            )))
+        );
+    }
+
+    #[test]
+    fn test_parse_unquoted_date() {
+        let result = OverrideParser::parse("+context.as_of=2024-12-25").unwrap();
+        assert_eq!(result.override_type, OverrideType::Add);
+        assert_eq!(result.key.key_or_group, "context.as_of");
+        assert_eq!(
+            result.value,
+            Some(OverrideValue::Element(ParsedElement::String(
+                "2024-12-25".to_string()
             )))
         );
     }

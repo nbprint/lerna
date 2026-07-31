@@ -62,6 +62,7 @@ def eq(item1: Any, item2: Any) -> bool:
         param("a b c\t-\t1 2 3", "a b c\t-\t1 2 3", id="value:str-ws-in"),
         param(" abc-123 ", "abc-123", id="value:str-ws-out"),
         param("123abc", "123abc", id="value:str-int-id"),
+        param("2024-12-25", "2024-12-25", id="value:str-date"),
         param(r"a\,b", "a,b", id="value:str-esc-comma"),
         param(r"a\:b", "a:b", id="value:str-esc-colon"),
         param(r"a\=b", "a=b", id="value:str-esc-equal"),
@@ -1131,6 +1132,14 @@ def test_parse_overrides() -> None:
     ]
     ret = parser.parse_overrides(overrides)
     assert ret == expected
+
+
+def test_parse_unquoted_date_override() -> None:
+    ret = parser.parse_override("+context.as_of=2024-12-25")
+
+    assert ret.is_add()
+    assert ret.key_or_group == "context.as_of"
+    assert ret.value() == "2024-12-25"
 
 
 @mark.parametrize(
