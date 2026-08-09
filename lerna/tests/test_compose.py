@@ -9,6 +9,7 @@ from textwrap import dedent
 from typing import Any
 
 from omegaconf import MISSING, OmegaConf
+from packaging.version import InvalidVersion
 from pytest import fixture, mark, param, raises, warns
 
 from lerna import (
@@ -75,8 +76,8 @@ def test_initialize_old_version_base(hydra_restore_singletons: Any) -> None:
 def test_initialize_bad_version_base(hydra_restore_singletons: Any) -> None:
     assert not GlobalHydra().is_initialized()
     with raises(
-        TypeError,
-        match="expected string or bytes-like object|'float' object is not iterable",
+        (TypeError, InvalidVersion),
+        match="expected string or bytes-like object|'float' object is not iterable|Invalid version: 1.1",
     ):
         initialize(version_base=1.1)  # type: ignore
 
