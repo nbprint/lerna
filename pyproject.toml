@@ -68,6 +68,10 @@ current_version = "2.0.4"
 commit = true
 tag = true
 commit_args = "-s"
+pre_commit_hooks = [
+    "cargo update --workspace",
+    "git add Cargo.lock",
+]
 
 [[tool.bumpversion.files]]
 filename = "lerna/__init__.py"
