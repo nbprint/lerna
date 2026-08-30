@@ -107,6 +107,7 @@ rustup target add aarch64-unknown-linux-gnu
 rustup target add x86_64-unknown-linux-gnu
 rustup show
 """
+before-build = "cargo clean --manifest-path {package}/Cargo.toml && rm -f {package}/lerna/*.so"
 environment = {PATH="$HOME/.cargo/bin:$PATH", CARGO_TERM_COLOR="always"}
 skip = "*i686* *musllinux*"
 
