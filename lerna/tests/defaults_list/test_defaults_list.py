@@ -6,7 +6,7 @@ from typing import Any
 from pytest import mark, param, raises, warns
 
 from lerna import version
-from lerna._internal.defaults_list import create_defaults_list
+from lerna._internal.defaults_list import Overrides, create_defaults_list
 from lerna.core.default_element import (
     ConfigDefault,
     GroupDefault,
@@ -23,6 +23,24 @@ chdir_hydra_root()
 
 # registers config source plugins
 Plugins.instance()
+
+
+def test_delete_root_config_name_is_a_config_override() -> None:
+    parser = OverridesParser.create()
+    overrides_list = parser.parse_overrides(overrides=["~empty"])
+
+    overrides = Overrides(repo=create_repo(), overrides_list=overrides_list)
+
+    assert overrides.config_overrides == overrides_list
+    assert overrides.deletions == {}
+
+
+def test_delete_config_path_rejects_explicit_null() -> None:
+    parser = OverridesParser.create()
+    overrides_list = parser.parse_overrides(overrides=["~group1/file1=null"])
+
+    with raises(ValueError, match="Config path deletion does not support a value"):
+        Overrides(repo=create_repo(), overrides_list=overrides_list)
 
 
 @mark.parametrize(
@@ -67,6 +85,25 @@ def test_loaded_defaults_list(config_path: str, expected_list: list[InputDefault
     result = repo.load_config(config_path=config_path)
     assert result is not None
     assert result.defaults_list == expected_list
+
+
+def test_unknown_keyword_in_defaults_list() -> None:
+    repo = create_repo()
+    with raises(
+        ValueError,
+        match=re.escape("In unknown_keyword: Unsupported keyword 'optioal' in defaults list"),
+    ):
+        repo.load_config(config_path="unknown_keyword")
+
+
+@mark.parametrize("config_name", ["empty_group", "whitespace_group"])
+def test_missing_group_name_in_defaults_list(config_name: str) -> None:
+    repo = create_repo()
+    with raises(
+        ValueError,
+        match=re.escape(f"In {config_name}: Missing group name in defaults list"),
+    ):
+        repo.load_config(config_path=config_name)
 
 
 @mark.parametrize(
@@ -1840,6 +1877,19 @@ def test_with_none_primary_with_hydra(
                 ResultDefault(config_path="two_config_items", package="", is_self=True),
             ],
             id="two_config_items",
+        ),
+        param(
+            "two_config_items",
+            ["~group1/file1"],
+            [
+                ResultDefault(
+                    config_path="group1/file2",
+                    package="group1",
+                    parent="two_config_items",
+                ),
+                ResultDefault(config_path="two_config_items", package="", is_self=True),
+            ],
+            id="two_config_items:delete_config_path",
         ),
     ],
 )

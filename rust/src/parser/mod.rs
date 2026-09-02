@@ -1688,16 +1688,40 @@ impl OverrideParser {
                             let want_descending = reverse;
 
                             if is_ascending == want_descending {
-                                // Need to flip the range
-                                // Calculate number of values and last value
-                                let n = ((stop - start) / step).floor();
-                                let last_val = start + (n - 1.0) * step;
+                                let distance = if step > 0.0 {
+                                    stop - start
+                                } else {
+                                    start - stop
+                                };
+                                if distance <= 0.0 {
+                                    return Ok(OverrideValue::RangeSweep(rs));
+                                }
+
+                                let ratio = distance / step.abs();
+                                let nearest = ratio.round();
+                                let tolerance = f64::EPSILON * ratio.abs().max(1.0) * 8.0;
+                                let count = if (ratio - nearest).abs() <= tolerance {
+                                    nearest
+                                } else {
+                                    ratio.ceil()
+                                };
+                                if count <= 1.0 {
+                                    return Ok(OverrideValue::RangeSweep(rs));
+                                }
+
+                                let last_val = start + (count - 1.0) * step;
+                                let reversed_step = -step;
+                                let reversed_stop = if rs.is_int {
+                                    start + reversed_step
+                                } else {
+                                    start + reversed_step / 2.0
+                                };
 
                                 Ok(OverrideValue::RangeSweep(RangeSweep {
                                     tags: rs.tags,
                                     start: Some(last_val),
-                                    stop: Some(start - step),
-                                    step: -step,
+                                    stop: Some(reversed_stop),
+                                    step: reversed_step,
                                     shuffle: false,
                                     is_int: rs.is_int,
                                 }))
@@ -3222,6 +3246,27 @@ mod tests {
             assert_eq!(sweep.start, Some(0.0));
             assert_eq!(sweep.stop, Some(100.0));
             assert_eq!(sweep.step, 10.0);
+        } else {
+            panic!("Expected range sweep");
+        }
+    }
+
+    #[test]
+    fn test_sort_non_landing_range() {
+        let result = OverrideParser::parse("x=sort(range(0,5,2),reverse=true)").unwrap();
+        if let Some(OverrideValue::RangeSweep(sweep)) = result.value {
+            assert_eq!(sweep.start, Some(4.0));
+            assert_eq!(sweep.stop, Some(-2.0));
+            assert_eq!(sweep.step, -2.0);
+        } else {
+            panic!("Expected range sweep");
+        }
+
+        let result = OverrideParser::parse("x=sort(range(4,-1,-2))").unwrap();
+        if let Some(OverrideValue::RangeSweep(sweep)) = result.value {
+            assert_eq!(sweep.start, Some(0.0));
+            assert_eq!(sweep.stop, Some(6.0));
+            assert_eq!(sweep.step, 2.0);
         } else {
             panic!("Expected range sweep");
         }

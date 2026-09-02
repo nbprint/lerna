@@ -13,7 +13,9 @@ from lerna._internal.core_plugins.importlib_resources_config_source import (
     ImportlibResourcesConfigSource,
 )
 from lerna._internal.core_plugins.structured_config_source import StructuredConfigSource
+from lerna.core.config_store import ConfigStore
 from lerna.core.default_element import GroupDefault, InputDefault
+from lerna.core.object_type import ObjectType
 from lerna.core.plugins import Plugins
 from lerna.core.singleton import Singleton
 from lerna.plugins.config_source import ConfigSource
@@ -56,6 +58,24 @@ def create_config_search_path(path: str) -> ConfigSearchPathImpl:
     csp = ConfigSearchPathImpl()
     csp.append(provider="test", path=path)
     return csp
+
+
+def test_config_store_empty_group_is_stored_at_root(hydra_restore_singletons: Any) -> None:
+    Plugins.instance()
+    cs = ConfigStore.instance()
+    cs.store(group="", name="empty_group_cfg", node={"age": 18})
+
+    assert "" not in cs.repo
+    stored = cs.repo["empty_group_cfg.yaml"]
+    assert stored.group is None
+    assert stored.node == {"age": 18}
+
+    repository = ConfigRepository(config_search_path=create_config_search_path("structured://"))
+    assert repository.config_exists("empty_group_cfg.yaml")
+    loaded = repository.load_config("empty_group_cfg.yaml")
+    assert loaded is not None
+    assert loaded.config == {"age": 18}
+    assert "" not in repository.get_group_options("", ObjectType.GROUP)
 
 
 @mark.parametrize(

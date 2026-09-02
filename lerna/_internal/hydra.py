@@ -18,6 +18,7 @@ from lerna.core.plugins import Plugins
 from lerna.core.utils import (
     JobReturn,
     JobRuntime,
+    JobStatus,
     configure_log,
     run_job,
     setup_globals,
@@ -105,6 +106,7 @@ class Hydra:
             overrides=overrides,
             with_log_configuration=with_log_configuration,
             run_mode=RunMode.RUN,
+            activate_config_repository=True,
         )
         if cfg.hydra.mode is None:
             cfg.hydra.mode = RunMode.RUN
@@ -114,14 +116,23 @@ class Hydra:
         callbacks = Callbacks(cfg)
         callbacks.on_run_start(config=cfg, config_name=config_name)
 
-        ret = run_job(
-            hydra_context=HydraContext(config_loader=self.config_loader, callbacks=callbacks),
-            task_function=task_function,
-            config=cfg,
-            job_dir_key="hydra.run.dir",
-            job_subdir_key=None,
-            configure_logging=with_log_configuration,
-        )
+        try:
+            ret = run_job(
+                hydra_context=HydraContext(config_loader=self.config_loader, callbacks=callbacks),
+                task_function=task_function,
+                config=cfg,
+                job_dir_key="hydra.run.dir",
+                job_subdir_key=None,
+                configure_logging=with_log_configuration,
+            )
+        except KeyboardInterrupt as e:
+            job_return = getattr(e, "job_return", None)
+            if not isinstance(job_return, JobReturn):
+                job_return = JobReturn()
+                job_return.status = JobStatus.FAILED
+                job_return.return_value = e
+            callbacks.on_run_end(config=cfg, config_name=config_name, job_return=job_return)
+            raise
         callbacks.on_run_end(config=cfg, config_name=config_name, job_return=ret)
 
         # access the result to trigger an exception in case the job failed.
@@ -141,6 +152,7 @@ class Hydra:
             overrides=overrides,
             with_log_configuration=with_log_configuration,
             run_mode=RunMode.MULTIRUN,
+            activate_config_repository=True,
         )
 
         callbacks = Callbacks(cfg)
@@ -153,7 +165,11 @@ class Hydra:
         )
         task_overrides = OmegaConf.to_container(cfg.hydra.overrides.task, resolve=False)
         assert isinstance(task_overrides, list)
-        ret = sweeper.sweep(arguments=task_overrides)
+        try:
+            ret = sweeper.sweep(arguments=task_overrides)
+        except KeyboardInterrupt:
+            callbacks.on_multirun_end(config=cfg, config_name=config_name)
+            raise
         callbacks.on_multirun_end(config=cfg, config_name=config_name)
         return ret
 
@@ -555,6 +571,7 @@ class Hydra:
         from_shell: bool = True,
         validate_sweep_overrides: bool = True,
         run_callback: bool = True,
+        activate_config_repository: bool = False,
     ) -> DictConfig:
         """
         :param config_name:
@@ -568,13 +585,22 @@ class Hydra:
         :return:
         """
 
-        cfg = self.config_loader.load_configuration(
-            config_name=config_name,
-            overrides=overrides,
-            run_mode=run_mode,
-            from_shell=from_shell,
-            validate_sweep_overrides=validate_sweep_overrides,
-        )
+        if activate_config_repository and isinstance(self.config_loader, ConfigLoaderImpl):
+            cfg = self.config_loader._load_configuration_with_active_repository(
+                config_name=config_name,
+                overrides=overrides,
+                run_mode=run_mode,
+                from_shell=from_shell,
+                validate_sweep_overrides=validate_sweep_overrides,
+            )
+        else:
+            cfg = self.config_loader.load_configuration(
+                config_name=config_name,
+                overrides=overrides,
+                run_mode=run_mode,
+                from_shell=from_shell,
+                validate_sweep_overrides=validate_sweep_overrides,
+            )
         if with_log_configuration:
             configure_log(cfg.hydra.hydra_logging, cfg.hydra.verbose)
             global log

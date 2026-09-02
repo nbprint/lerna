@@ -7,9 +7,8 @@ import sys
 import traceback
 import warnings
 from collections.abc import Sequence
-from dataclasses import dataclass
 from os.path import dirname, join, normpath, realpath
-from types import FrameType, TracebackType
+from types import TracebackType
 from typing import Any
 
 from omegaconf.errors import OmegaConfBaseException
@@ -252,42 +251,33 @@ def run_and_report(func: Any) -> Any:
                         sys.exit(1)
 
                     # strip OmegaConf frames from bottom of stack
-                    end: TracebackType | None = tb
-                    num_frames = 0
-                    while end is not None:
-                        frame = end.tb_frame
+                    filtered_traceback: list[TracebackType] = []
+                    current_tb: TracebackType | None = tb
+                    while current_tb is not None:
+                        frame = current_tb.tb_frame
                         mdl = inspect.getmodule(frame)
                         name = mdl.__name__ if mdl is not None else ""
                         if name.startswith("omegaconf."):
                             break
-                        end = end.tb_next
-                        num_frames = num_frames + 1
+                        filtered_traceback.append(current_tb)
+                        current_tb = current_tb.tb_next
 
-                    @dataclass
-                    class FakeTracebackType:
-                        tb_next: Any = None  # Optional["FakeTracebackType"]
-                        tb_frame: FrameType | None = None
-                        tb_lasti: int | None = None
-                        tb_lineno: int | None = None
-
-                    iter_tb = tb
-                    final_tb = FakeTracebackType()
-                    cur = final_tb
-                    added = 0
-                    while True:
-                        cur.tb_lasti = iter_tb.tb_lasti
-                        cur.tb_lineno = iter_tb.tb_lineno
-                        cur.tb_frame = iter_tb.tb_frame
-
-                        if added == num_frames - 1:
-                            break
-                        added = added + 1
-                        cur.tb_next = FakeTracebackType()
-                        cur = cur.tb_next
-                        assert iter_tb.tb_next is not None
-                        iter_tb = iter_tb.tb_next
-
-                    traceback.print_exception(None, value=ex, tb=final_tb)  # type: ignore
+                    final_tb: TracebackType | None = None
+                    for traceback_frame in reversed(filtered_traceback):
+                        final_tb = TracebackType(
+                            final_tb,
+                            traceback_frame.tb_frame,
+                            traceback_frame.tb_lasti,
+                            traceback_frame.tb_lineno,
+                        )
+                    exception_hook = sys.excepthook
+                    if final_tb is None or exception_hook is sys.__excepthook__ or not callable(exception_hook):
+                        traceback.print_exception(None, value=ex, tb=final_tb)
+                    else:
+                        try:
+                            exception_hook(type(ex), ex, final_tb)
+                        except Exception:  # noqa: BLE001
+                            traceback.print_exception(None, value=ex, tb=final_tb)
                 sys.stderr.write("\nSet the environment variable HYDRA_FULL_ERROR=1 for a complete stack trace.\n")
             except Exception as ex2:  # noqa: BLE001
                 sys.stderr.write("An error occurred during Hydra's exception formatting:" + os.linesep + repr(ex2) + os.linesep)
@@ -573,7 +563,7 @@ def get_args_parser() -> argparse.ArgumentParser:
 
 
 def get_args(args: Sequence[str] | None = None) -> Any:
-    return get_args_parser().parse_args(args=args)
+    return get_args_parser().parse_intermixed_args(args=args)
 
 
 def get_column_widths(matrix: list[list[str]]) -> list[int]:

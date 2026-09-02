@@ -9,6 +9,13 @@ from lerna._internal import utils
 from lerna.tests import data
 
 
+def test_get_args_accepts_overrides_around_flags() -> None:
+    args = utils.get_args(["task=1", "--multirun", "db=mysql"])
+
+    assert args.multirun
+    assert args.overrides == ["task=1", "db=mysql"]
+
+
 @mark.parametrize(
     "matrix,expected",
     [

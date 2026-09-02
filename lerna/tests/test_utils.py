@@ -5,6 +5,7 @@ import os
 import re
 from pathlib import Path
 from textwrap import dedent
+from types import TracebackType
 from typing import Any, NoReturn
 from unittest.mock import patch
 
@@ -181,6 +182,15 @@ class TestRunAndReport:
 
             run_job()
 
+        @staticmethod
+        def direct_omegaconf_job_wrapper() -> None:
+            def run_job() -> None:
+                from omegaconf import OmegaConf
+
+                OmegaConf.resolve(123)  # type: ignore
+
+            run_job()
+
     def test_success(self) -> None:
         assert run_and_report(self.DemoFunctions.success_func) == 123
 
@@ -276,6 +286,69 @@ class TestRunAndReport:
         mock_stderr.seek(0)
         stderr_output = mock_stderr.read()
         assert_regex_match(expected_traceback_regex, stderr_output)
+
+    def test_simplified_traceback_with_only_omegaconf_frames(self) -> None:
+        mock_stderr = io.StringIO()
+        with (
+            patch("lerna._internal.utils.is_under_debugger", return_value=False),
+            raises(SystemExit, match="1"),
+            patch("sys.stderr", new=mock_stderr),
+        ):
+            run_and_report(self.DemoFunctions.direct_omegaconf_job_wrapper)
+
+        stderr_output = mock_stderr.getvalue()
+        assert "ValueError: Invalid config type (int)" in stderr_output
+        assert "An error occurred during Hydra's exception formatting" not in stderr_output
+
+    @mark.parametrize(
+        "demo_func,expected_frames",
+        [
+            param(DemoFunctions.run_job_wrapper, ["nested_error"], id="strip_run_job_from_top_of_stack"),
+            param(DemoFunctions.omegaconf_job_wrapper, ["job_calling_omconf"], id="strip_omegaconf_from_bottom_of_stack"),
+        ],
+    )
+    def test_custom_excepthook_receives_sanitized_traceback(self, demo_func: Any, expected_frames: list[str]) -> None:
+        captured: list[tuple[type[BaseException], BaseException, TracebackType]] = []
+
+        def custom_excepthook(
+            exception_type: type[BaseException],
+            exception: BaseException,
+            tb: TracebackType,
+        ) -> None:
+            captured.append((exception_type, exception, tb))
+
+        with (
+            raises(SystemExit, match="1"),
+            patch("lerna._internal.utils.is_under_debugger", return_value=False),
+            patch("sys.excepthook", new=custom_excepthook),
+        ):
+            run_and_report(demo_func)
+
+        assert len(captured) == 1
+        exception_type, exception, tb = captured[0]
+        assert exception_type is type(exception)
+
+        frames = []
+        current_tb: TracebackType | None = tb
+        while current_tb is not None:
+            frames.append(current_tb.tb_frame.f_code.co_name)
+            current_tb = current_tb.tb_next
+        assert frames == expected_frames
+
+    def test_custom_excepthook_failure_uses_default_renderer(self) -> None:
+        def broken_excepthook(*args: Any) -> NoReturn:
+            raise RuntimeError("hook failed")
+
+        mock_stderr = io.StringIO()
+        with (
+            raises(SystemExit, match="1"),
+            patch("lerna._internal.utils.is_under_debugger", return_value=False),
+            patch("sys.excepthook", new=broken_excepthook),
+            patch("sys.stderr", new=mock_stderr),
+        ):
+            run_and_report(self.DemoFunctions.run_job_wrapper)
+
+        assert "AssertionError: nested_err" in mock_stderr.getvalue()
 
     def test_simplified_traceback_failure(self) -> None:
         """

@@ -1,5 +1,7 @@
 # Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved
+import logging
 import sys
+from pathlib import Path
 from typing import Any
 
 from omegaconf import OmegaConf, open_dict
@@ -30,3 +32,22 @@ def test_py_version_resolver(hydra_restore_singletons: Any, monkeypatch: Any) ->
     assert OmegaConf.create({"key": "${python_version:major}"}).key == "3"
     assert OmegaConf.create({"key": "${python_version:minor}"}).key == "3.8"
     assert OmegaConf.create({"key": "${python_version:micro}"}).key == "3.8.2"
+
+
+def test_log_job_error_to_file(tmp_path: Path) -> None:
+    path = tmp_path / "job.log"
+    handler = logging.FileHandler(path)
+    root = logging.getLogger()
+    root.addHandler(handler)
+    try:
+        try:
+            raise ValueError("job failed for test")
+        except ValueError:
+            utils._log_job_error_to_file()
+    finally:
+        root.removeHandler(handler)
+        handler.close()
+
+    content = path.read_text()
+    assert "Job failed" in content
+    assert "ValueError: job failed for test" in content

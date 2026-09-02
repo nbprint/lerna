@@ -12,6 +12,7 @@ from omegaconf import Container, DictConfig, ListConfig, OmegaConf, flag_overrid
 from omegaconf.errors import (
     ConfigAttributeError,
     ConfigKeyError,
+    MissingMandatoryValue,
     OmegaConfBaseException,
 )
 
@@ -58,6 +59,7 @@ class ConfigLoaderImpl(ConfigLoader):
     ) -> None:
         self.config_search_path = config_search_path
         self.repository = ConfigRepository(config_search_path=config_search_path)
+        self._active_repository: IConfigRepository | None = None
 
     @staticmethod
     def validate_sweep_overrides_legal(
@@ -128,6 +130,41 @@ class ConfigLoaderImpl(ConfigLoader):
         from_shell: bool = True,
         validate_sweep_overrides: bool = True,
     ) -> DictConfig:
+        return self._load_configuration(
+            config_name=config_name,
+            overrides=overrides,
+            run_mode=run_mode,
+            from_shell=from_shell,
+            validate_sweep_overrides=validate_sweep_overrides,
+            activate_config_repository=False,
+        )
+
+    def _load_configuration_with_active_repository(
+        self,
+        config_name: str | None,
+        overrides: list[str],
+        run_mode: RunMode,
+        from_shell: bool = True,
+        validate_sweep_overrides: bool = True,
+    ) -> DictConfig:
+        return self._load_configuration(
+            config_name=config_name,
+            overrides=overrides,
+            run_mode=run_mode,
+            from_shell=from_shell,
+            validate_sweep_overrides=validate_sweep_overrides,
+            activate_config_repository=True,
+        )
+
+    def _load_configuration(
+        self,
+        config_name: str | None,
+        overrides: list[str],
+        run_mode: RunMode,
+        from_shell: bool,
+        validate_sweep_overrides: bool,
+        activate_config_repository: bool,
+    ) -> DictConfig:
         try:
             return self._load_configuration_impl(
                 config_name=config_name,
@@ -135,6 +172,7 @@ class ConfigLoaderImpl(ConfigLoader):
                 run_mode=run_mode,
                 from_shell=from_shell,
                 validate_sweep_overrides=validate_sweep_overrides,
+                activate_config_repository=activate_config_repository,
             )
         except OmegaConfBaseException as e:
             raise ConfigCompositionException().with_traceback(sys.exc_info()[2]) from e
@@ -219,6 +257,7 @@ class ConfigLoaderImpl(ConfigLoader):
         run_mode: RunMode,
         from_shell: bool = True,
         validate_sweep_overrides: bool = True,
+        activate_config_repository: bool = False,
     ) -> DictConfig:
         from lerna import __version__, version
 
@@ -287,6 +326,9 @@ class ConfigLoaderImpl(ConfigLoader):
         )
         cfg.hydra.job.config_name = config_name
 
+        if activate_config_repository:
+            self._active_repository = caching_repo
+
         return cfg
 
     def load_sweep_config(self, master_config: DictConfig, sweep_overrides: list[str]) -> DictConfig:
@@ -299,13 +341,50 @@ class ConfigLoaderImpl(ConfigLoader):
             overrides=overrides,
             run_mode=RunMode.RUN,
         )
-
         # Copy old config cache to ensure we get the same resolved values (for things
         # like timestamps etc). Since `oc.env` does not cache environment variables
         # (but the deprecated `env` resolver did), the entire config should be copied
         OmegaConf.copy_cache(from_config=master_config, to_config=sweep_config)
 
+        ConfigLoaderImpl._ensure_sweep_config_controller_unchanged(
+            master_config=master_config,
+            sweep_config=sweep_config,
+        )
+
         return sweep_config
+
+    @staticmethod
+    def _ensure_sweep_config_controller_unchanged(master_config: DictConfig, sweep_config: DictConfig) -> None:
+        controller_groups = (
+            ("hydra/launcher", "launcher"),
+            ("hydra/sweeper", "sweeper"),
+        )
+        master_choices = master_config.hydra.runtime.choices
+        sweep_choices = sweep_config.hydra.runtime.choices
+        for group, node in controller_groups:
+            master_choice = master_choices.get(group)
+            sweep_choice = sweep_choices.get(group)
+            if master_choice != sweep_choice:
+                raise ConfigCompositionException(
+                    f"'{group}' must be selected before the sweep starts, "
+                    f"but a swept job config changed it from "
+                    f"'{master_choice}' to '{sweep_choice}'. Select it in "
+                    "the primary config or from the command line."
+                )
+
+            structural_equality = getattr(OmegaConf, "structural_equality", None)
+            unchanged = (
+                structural_equality(master_config.hydra[node], sweep_config.hydra[node])
+                if structural_equality is not None
+                else OmegaConf.to_container(master_config.hydra[node], resolve=False)
+                == OmegaConf.to_container(sweep_config.hydra[node], resolve=False)
+            )
+            if not unchanged:
+                raise ConfigCompositionException(
+                    f"'hydra.{node}' must be configured before the sweep starts, "
+                    "but a swept job config changed it. Configure it in the "
+                    "primary config or from the command line."
+                )
 
     def get_search_path(self) -> ConfigSearchPath:
         return self.config_search_path
@@ -322,24 +401,49 @@ class ConfigLoaderImpl(ConfigLoader):
             value = override.value()
             try:
                 if override.is_delete():
-                    config_val = OmegaConf.select(cfg, key, throw_on_missing=False)
-                    if config_val is None:
+                    config_val_not_found = object()
+                    config_val_missing = object()
+                    last_dot = key.rfind(".")
+                    parent: Container = cfg
+                    parent_missing = False
+                    if last_dot != -1:
+                        selected_parent = OmegaConf.select(
+                            cfg,
+                            key[0:last_dot],
+                            default=config_val_not_found,
+                            throw_on_missing=False,
+                        )
+                        if isinstance(selected_parent, Container):
+                            parent = selected_parent
+                        else:
+                            parent_missing = True
+
+                    try:
+                        config_val = OmegaConf.select(
+                            cfg,
+                            key,
+                            default=config_val_not_found,
+                            throw_on_missing=True,
+                        )
+                    except MissingMandatoryValue:
+                        config_val = config_val_missing
+
+                    if parent_missing or config_val is config_val_not_found:
                         raise ConfigCompositionException(f"Could not delete from config. '{override.key_or_group}' does not exist.")
-                    elif value is not None and value != config_val:
+                    config_val_for_match = "???" if config_val is config_val_missing else config_val
+                    if override.value_type is not None and value != config_val_for_match:
                         raise ConfigCompositionException(
-                            f"Could not delete from config. The value of '{override.key_or_group}' is {config_val} and not {value}."
+                            f"Could not delete from config. The value of '{override.key_or_group}' is {config_val_for_match} and not {value}."
                         )
 
-                    last_dot = key.rfind(".")
                     with open_dict(cfg):
                         if last_dot == -1:
                             del cfg[key]
                         else:
-                            node = OmegaConf.select(cfg, key[0:last_dot])
                             node_key: str | int = key[last_dot + 1 :]
-                            if isinstance(node, ListConfig):
+                            if isinstance(parent, ListConfig):
                                 node_key = int(node_key)
-                            del node[node_key]
+                            del parent[node_key]
 
                 elif override.is_add():
                     if OmegaConf.select(cfg, key, throw_on_missing=False) is None or isinstance(value, (dict, list)):
@@ -521,6 +625,8 @@ class ConfigLoaderImpl(ConfigLoader):
         config_name: str | None = None,
         overrides: list[str] | None = None,
     ) -> list[str]:
+        if config_name is None and overrides is None and self._active_repository is not None:
+            return self._active_repository.get_group_options(group_name, results_filter)
         if overrides is None:
             overrides = []
         _, caching_repo = self._parse_overrides_and_create_caching_repo(config_name, overrides)
@@ -706,6 +812,8 @@ class ConfigLoaderImpl(ConfigLoader):
         return cfg
 
     def get_sources(self) -> list[ConfigSource]:
+        if self._active_repository is not None:
+            return self._active_repository.get_sources()
         return self.repository.get_sources()
 
     def compute_defaults_list(

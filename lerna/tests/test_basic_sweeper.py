@@ -8,7 +8,7 @@ from pytest import mark, param
 
 from lerna._internal.core_plugins.basic_sweeper import BasicSweeper
 from lerna.core.override_parser.overrides_parser import OverridesParser
-from lerna.test_utils.test_utils import assert_multiline_regex_search, run_process
+from lerna.test_utils.test_utils import assert_multiline_regex_search, normalize_path_for_override, run_process
 
 
 @mark.parametrize(
@@ -100,3 +100,43 @@ def test_partial_failure(
     ).strip()
 
     assert_multiline_regex_search(expected_err_regex, err)
+
+
+def test_glob_uses_primary_config_searchpath(tmpdir: Any) -> None:
+    cmd = [
+        sys.executable,
+        "lerna/tests/test_apps/glob_searchpath/my_app.py",
+        "+group1=glob(file*)",
+        f'hydra.sweep.dir="{normalize_path_for_override(tmpdir)}"',
+        "hydra.job.chdir=False",
+        "--multirun",
+    ]
+    out, _ = run_process(cmd=cmd, print_error=False)
+
+    assert "Launching 2 jobs locally" in out
+    assert "foo=10" in out
+    assert "foo=20" in out
+
+
+def test_multiple_failures_log_to_own_job_files(tmpdir: Any) -> None:
+    cmd = [
+        sys.executable,
+        "lerna/tests/test_apps/app_can_fail/my_app.py",
+        "--multirun",
+        "+divisor=0,1,x",
+        f'hydra.run.dir="{tmpdir!s}"',
+        f'hydra.sweep.dir="{tmpdir!s}"',
+        "hydra.job.chdir=True",
+    ]
+    run_process(cmd=cmd, print_error=False, raise_exception=False)
+
+    succeeded_log = (tmpdir / "1" / "my_app.log").read()
+    assert "Job failed" not in succeeded_log
+
+    zero_division_log = (tmpdir / "0" / "my_app.log").read()
+    assert "Job failed" in zero_division_log
+    assert "ZeroDivisionError: division by zero" in zero_division_log
+
+    type_error_log = (tmpdir / "2" / "my_app.log").read()
+    assert "Job failed" in type_error_log
+    assert "TypeError" in type_error_log

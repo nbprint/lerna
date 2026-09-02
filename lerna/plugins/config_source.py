@@ -114,10 +114,11 @@ class ConfigSource(Plugin):
 
     @staticmethod
     def _normalize_file_name(filename: str) -> str:
-        # Handle .yml deprecation warning (version-specific)
-        if not version.base_at_least("1.2") and filename.endswith(".yml"):
+        if filename.endswith(".yml"):
+            if version.base_at_least("1.2"):
+                raise ConfigLoadError("Unsupported config file extension '.yml'. Hydra config files must use the '.yaml' extension.")
             deprecation_warning("Support for .yml files is deprecated. Use .yaml extension for Hydra config files")
-            return filename  # Keep .yml as-is for < 1.2
+            return filename
 
         # Use Rust for normalization when available
         if _HAS_RUST:

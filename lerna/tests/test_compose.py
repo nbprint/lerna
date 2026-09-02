@@ -30,6 +30,7 @@ from lerna.errors import (
     OverrideParseException,
 )
 from lerna.test_utils.test_utils import chdir_hydra_root
+from lerna.types import RunMode
 
 chdir_hydra_root()
 
@@ -641,6 +642,28 @@ class TestConfigSearchPathOverride:
             match=re.escape("provider=hydra.searchpath in command-line, path=fakeconf is not available."),
         ):
             compose(config_name=config_name, overrides=[override])
+
+    def test_compose_searchpath_does_not_change_active_repository(self, init_configs: Any) -> None:
+        gh = GlobalHydra.instance()
+        assert gh.hydra is not None
+        cfg = gh.hydra.compose_config(
+            config_name="with_sp",
+            overrides=["+group1=file1"],
+            run_mode=RunMode.RUN,
+            from_shell=False,
+            activate_config_repository=True,
+        )
+        assert cfg.foo == 10
+
+        config_loader = gh.hydra.config_loader
+        options = config_loader.get_group_options("group1")
+        sources = [(source.provider, source.path) for source in config_loader.get_sources()]
+        assert options == ["abc.cde", "file1", "file2"]
+        assert ("hydra.searchpath in main", "lerna.test_utils.configs") in sources
+
+        assert compose(config_name="without_sp") == {}
+        assert config_loader.get_group_options("group1") == options
+        assert [(source.provider, source.path) for source in config_loader.get_sources()] == sources
 
 
 def test_deprecated_compose(hydra_restore_singletons: Any) -> None:
