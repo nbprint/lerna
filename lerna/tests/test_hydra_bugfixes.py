@@ -88,6 +88,13 @@ class TestConfigDefaultRelativePaths:
         cfg.update_parent("any/parent", "")
         assert cfg.get_config_path() == "absolute/path"
 
+    def test_interpolation_resolves_before_parent_path(self):
+        cfg = ConfigDefault(path="${selected}")
+        cfg.update_parent("group1", "")
+        cfg.resolve_interpolation(OmegaConf.create({"selected": "file1"}))
+        assert cfg.path == "file1"
+        assert cfg.get_config_path() == "group1/file1"
+
 
 class TestGroupDefaultRelativePaths:
     """Test GroupDefault with relative paths for Hydra #2878."""

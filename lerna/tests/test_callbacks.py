@@ -2,6 +2,7 @@
 import copy
 import os
 import pickle
+import subprocess
 import sys
 from pathlib import Path
 from textwrap import dedent
@@ -134,6 +135,48 @@ def test_app_with_callbacks(
         from_name="Expected output",
         to_name="Actual output",
     )
+
+
+def test_callbacks_on_keyboard_interrupt(tmpdir: Path) -> None:
+    app_path = "lerna/tests/test_apps/app_with_callbacks/keyboard_interrupt/my_app.py"
+    cmd = [
+        sys.executable,
+        app_path,
+        f'hydra.run.dir="{normalize_path_for_override(tmpdir)}"',
+        "hydra.job.chdir=True",
+        "hydra.hydra_logging.formatters.simple.format='[HYDRA] %(message)s'",
+        "hydra.job_logging.formatters.simple.format='[JOB] %(message)s'",
+    ]
+    process = subprocess.run(cmd, capture_output=True, text=True, check=False)
+    result = process.stdout
+
+    expected_job_return = "status=FAILED exc=KeyboardInterrupt task_name=my_app has_cfg=True has_working_dir=True"
+    assert result.count("custom_callback on_job_end") == 1
+    assert result.count("custom_callback on_run_end") == 1
+    assert f"[JOB] custom_callback on_job_end {expected_job_return}" in result
+    assert f"[JOB] custom_callback on_run_end {expected_job_return}" in result
+    assert process.returncode != 0
+    assert "KeyboardInterrupt" in process.stderr
+
+
+def test_multirun_callbacks_on_keyboard_interrupt(tmpdir: Path) -> None:
+    app_path = "lerna/tests/test_apps/app_with_callbacks/keyboard_interrupt/my_app.py"
+    cmd = [
+        sys.executable,
+        app_path,
+        "-m",
+        f'hydra.sweep.dir="{normalize_path_for_override(tmpdir)}"',
+        "hydra.job.chdir=True",
+        "hydra.hydra_logging.formatters.simple.format='[HYDRA] %(message)s'",
+        "hydra.job_logging.formatters.simple.format='[JOB] %(message)s'",
+    ]
+    process = subprocess.run(cmd, capture_output=True, text=True, check=False)
+    result = process.stdout
+
+    assert result.count("custom_callback on_job_end") == 1
+    assert result.count("custom_callback on_multirun_end") == 1
+    assert process.returncode != 0
+    assert "KeyboardInterrupt" in process.stderr
 
 
 @mark.parametrize("multirun", [True, False])

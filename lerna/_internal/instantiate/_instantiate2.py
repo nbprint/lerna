@@ -1,65 +1,31 @@
 # Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved
 
 import copy
-import functools
-import os
+import inspect
 from collections.abc import Callable, Sequence
 from enum import Enum
 from textwrap import dedent
 from typing import Any
 
-from omegaconf import OmegaConf, SCMode
+from omegaconf import AnyNode, OmegaConf, SCMode
 from omegaconf._utils import is_structured_config
 from omegaconf.errors import OmegaConfBaseException
 
+from lerna._internal.deprecation_warning import deprecation_warning
+from lerna._internal.target_policy import (
+    _authorize_discovery_path,
+    _authorize_resolved_target_identity,
+    _authorize_target_invocation,
+    _authorize_target_name,
+    _DeferredTarget,
+    _get_os_alias_target,
+    _get_resolved_target_name_for_check,
+    _mediate_target_result,
+    _with_full_key,
+)
 from lerna._internal.utils import _locate
 from lerna.errors import InstantiationException
 from lerna.types import ConvertMode, TargetConf
-
-DEFAULT_BLOCKLISTED_MODULES = {
-    "builtins.exec",
-    "builtins.eval",
-    "builtins.__import__",
-    "builtins.exit",
-    "builtins.quit",
-    "os.environ.OMP_NUM_THREADS",
-    "os.kill",
-    "os.system",
-    "os.putenv",
-    "os.remove",
-    "os.removedirs",
-    "os.rmdir",
-    "os.fchdir",
-    "os.setuid",
-    "os.fork",
-    "os.forkpty",
-    "os.killpg",
-    "os.rename",
-    "os.renames",
-    "os.truncate",
-    "os.replace",
-    "os.unlink",
-    "os.fchmod",
-    "os.fchown",
-    "os.chmod",
-    "os.chown",
-    "os.chroot",
-    "os.lchflags",
-    "os.lchmod",
-    "os.lchown",
-    "os.getcwd",
-    "os.chdir",
-    "shutil.rmtree",
-    "shutil.move",
-    "shutil.chown",
-    "subprocess.Popen",
-    "builtins.help",
-    "sys.modules.ipdb",
-    "sys.modules.joblib",
-    "sys.modules.resource",
-    "sys.modules.psutil",
-    "sys.modules.tkinter",
-}
 
 
 class _Keys(str, Enum):
@@ -190,6 +156,23 @@ def _is_target(x: Any) -> bool:
     return False
 
 
+def _warn_direct_functools_partial_target() -> None:
+    stacklevel = 1
+    frame = inspect.currentframe()
+    while frame is not None:
+        if frame.f_code.co_filename != __file__:
+            break
+        stacklevel += 1
+        frame = frame.f_back
+    deprecation_warning(
+        dedent("""\
+            Using '_target_: functools.partial' is deprecated. Set '_target_' to
+            the effective callable and use '_partial_: true' instead. Direct
+            functools.partial targets will become an error in Hydra 1.5."""),
+        stacklevel=stacklevel,
+    )
+
+
 def _extract_pos_args(input_args: Any, kwargs: Any) -> tuple[Any, Any]:
     config_args = kwargs.pop(_Keys.ARGS, ())
     output_args = config_args
@@ -229,22 +212,36 @@ def _call_target(
 
         raise InstantiationException(msg) from e
 
-    if _partial_:
-        try:
-            return functools.partial(_target_, *args, **kwargs)
-        except Exception as e:
-            msg = f"Error in creating partial({_convert_target_to_string(_target_)}, ...) object:" + f"\n{e!r}"
-            if full_key:
-                msg += f"\nfull_key: {full_key}"
-            raise InstantiationException(msg) from e
-    else:
-        try:
-            return _target_(*args, **kwargs)
-        except Exception as e:
+    resolved_target_name = _get_resolved_target_name_for_check(_target_)
+    _authorize_target_invocation(
+        _target_,
+        args,
+        kwargs,
+        full_key,
+        allow_incomplete_partial=_partial_,
+    )
+    discovery_path = _authorize_discovery_path(_target_, args, kwargs, full_key)
+
+    try:
+        if _partial_:
+            deferred = _DeferredTarget(_target_, *args, **kwargs)
+            deferred._hydra_resolved_from = discovery_path or resolved_target_name
+            deferred._hydra_full_key = full_key
+            return deferred
+        result = _target_(*args, **kwargs)
+    except Exception as e:
+        if _partial_:
+            msg = f"Error in creating partial({_convert_target_to_string(_target_)}, ...) object:\n{e!r}"
+        else:
             msg = f"Error in call to target '{_convert_target_to_string(_target_)}':\n{e!r}"
-            if full_key:
-                msg += f"\nfull_key: {full_key}"
-            raise InstantiationException(msg) from e
+        raise InstantiationException(_with_full_key(msg, full_key)) from e
+
+    return _mediate_target_result(
+        result,
+        discovery_path or resolved_target_name,
+        full_key,
+        resolved_from_is_alias=discovery_path is not None,
+    )
 
 
 def _convert_target_to_string(t: Any) -> Any:
@@ -282,27 +279,26 @@ def _resolve_target(target: str | type | Callable[..., Any], full_key: str, call
     This enables lookup of non-callable objects like torch.int64.
     (Lerna extension - fixes Hydra issue #2140)
     """
-    if isinstance(target, str):
-        if target in DEFAULT_BLOCKLISTED_MODULES:
-            allowlist = os.environ.get("HYDRA_INSTANTIATE_ALLOWLIST_OVERRIDE", "")
-            if target not in allowlist.split(":"):
-                msg = dedent(
-                    f"""\
-                    Target '{target}' is blocklisted and cannot be instantiated from config
-                    to prevent security vulnerabilities, set env var
-                    HYDRA_INSTANTIATE_ALLOWLIST_OVERRIDE={target}:<other allowlisted targets> to bypass"""
-                )
+    if isinstance(target, str) or callable(target):
+        target_name = target if isinstance(target, str) else _get_os_alias_target(_get_resolved_target_name_for_check(target))
+        _authorize_target_name(target_name, target_name, full_key)
+
+        resolved_name = target_name
+        if isinstance(target, str):
+            resolved_from = target
+            try:
+                target = _locate(target)
+            except Exception as e:
+                msg = f"Error locating target '{target}', set env var HYDRA_FULL_ERROR=1 to see chained exception."
                 if full_key:
                     msg += f"\nfull_key: {full_key}"
-                raise InstantiationException(msg)
+                raise InstantiationException(msg) from e
 
-        try:
-            target = _locate(target)
-        except Exception as e:
-            msg = f"Error locating target '{target}', set env var HYDRA_FULL_ERROR=1 to see chained exception."
-            if full_key:
-                msg += f"\nfull_key: {full_key}"
-            raise InstantiationException(msg) from e
+            if callable(target):
+                resolved_name = _authorize_resolved_target_identity(target, resolved_from, full_key)
+
+        if resolved_name == "functools.partial":
+            _warn_direct_functools_partial_target()
 
     # If _call_=False, return the target as-is without calling it (Hydra #2140)
     if not call:
@@ -478,6 +474,12 @@ def _convert_node(node: Any, convert: ConvertMode | str) -> Any:
     return node
 
 
+def _wrap_structured_config_as_object(value: Any) -> Any:
+    if is_structured_config(value):
+        return AnyNode(value, flags={"allow_objects": True})
+    return value
+
+
 def instantiate_node(
     node: Any,
     *args: Any,
@@ -523,7 +525,9 @@ def instantiate_node(
             return items
         else:
             # Otherwise, use ListConfig as container
-            lst = OmegaConf.create(items, flags={"allow_objects": True})
+            lst = OmegaConf.create([], flags={"allow_objects": True})
+            for item in items:
+                lst.append(_wrap_structured_config_as_object(item))
             lst._set_parent(node)
             return lst
 
@@ -564,7 +568,7 @@ def instantiate_node(
                 # Otherwise use DictConfig and resolve interpolations lazily.
                 cfg = OmegaConf.create({}, flags={"allow_objects": True})
                 for key, value in node.items():
-                    cfg[key] = instantiate_node(value, convert=convert, recursive=recursive)
+                    cfg[key] = _wrap_structured_config_as_object(instantiate_node(value, convert=convert, recursive=recursive))
                 cfg._set_parent(node)
                 cfg._metadata.object_type = node._metadata.object_type
                 if convert == ConvertMode.OBJECT:

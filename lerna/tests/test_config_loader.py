@@ -18,6 +18,7 @@ from lerna.errors import (
     HydraException,
     MissingConfigException,
 )
+from lerna.plugins.config_source import ConfigLoadError
 from lerna.test_utils.test_utils import chdir_hydra_root
 from lerna.tests.instantiate import UserGroup
 from lerna.types import RunMode
@@ -166,6 +167,17 @@ class TestConfigLoader:
 
     def test_load_yml_file(self, path: str, hydra_restore_singletons: Any) -> None:
         config_loader = ConfigLoaderImpl(config_search_path=create_config_search_path(path))
+        version.setbase("1.2")
+        with raises(
+            ConfigLoadError,
+            match=re.escape("Unsupported config file extension '.yml'. Hydra config files must use the '.yaml' extension."),
+        ):
+            config_loader.load_configuration(
+                config_name="config.yml",
+                overrides=[],
+                run_mode=RunMode.RUN,
+            )
+
         version.setbase("1.1")
         with warns(
             UserWarning,
@@ -181,6 +193,42 @@ class TestConfigLoader:
             del cfg["hydra"]
 
         assert cfg == {"yml_file_here": True}
+
+
+@mark.parametrize("controller", ["launcher", "sweeper"])
+def test_sweep_controller_config_must_be_unchanged(controller: str) -> None:
+    master = OmegaConf.create(
+        {
+            "hydra": {
+                "runtime": {"choices": {"hydra/launcher": "basic", "hydra/sweeper": "basic"}},
+                "launcher": {"setting": 1},
+                "sweeper": {"setting": 1},
+            }
+        }
+    )
+    sweep = OmegaConf.create(master)
+    sweep.hydra[controller].setting = 2
+
+    with raises(
+        ConfigCompositionException,
+        match=rf"hydra\.{controller}.*must be configured before the sweep starts",
+    ):
+        ConfigLoaderImpl._ensure_sweep_config_controller_unchanged(master, sweep)
+
+
+def test_sweep_controller_comparison_does_not_resolve_interpolations() -> None:
+    master = OmegaConf.create(
+        {
+            "hydra": {
+                "runtime": {"choices": {"hydra/launcher": "basic", "hydra/sweeper": "basic"}},
+                "launcher": {"setting": "${missing}"},
+                "sweeper": {"setting": 1},
+            }
+        }
+    )
+    sweep = OmegaConf.create(master)
+
+    ConfigLoaderImpl._ensure_sweep_config_controller_unchanged(master, sweep)
 
     def test_override_with_equals(self, path: str) -> None:
         config_loader = ConfigLoaderImpl(config_search_path=create_config_search_path(path))
@@ -630,6 +678,16 @@ def test_complex_defaults(overrides: Any, expected: Any) -> None:
         param({"x": [1, 2, 3]}, ["~x=[1,2,3]"], {}, id="delete:list"),
         param({"x": [1, 2, 3]}, ["~x.0"], {"x": [2, 3]}, id="delete:list_item"),
         param({"x": [1, 2, 3]}, ["~x.1"], {"x": [1, 3]}, id="delete:list_item_middle"),
+        param({"x": [None, 1]}, ["~x.0"], {"x": [1]}, id="delete:list_item_null"),
+        param({"x": [None, 1]}, ["~x.0=null"], {"x": [1]}, id="delete:list_item_null_strict"),
+        param({"x": [MISSING, 1]}, ["~x.0"], {"x": [1]}, id="delete:list_item_missing"),
+        param({"x": [MISSING, 1]}, ["~x.0=???"], {"x": [1]}, id="delete:list_item_missing_strict"),
+        param({"x": None}, ["~x"], {}, id="delete:null"),
+        param({"x": {"y": None}}, ["~x.y"], {"x": {}}, id="delete:null_nested"),
+        param({"x": None}, ["~x=null"], {}, id="delete:null_strict"),
+        param({"x": MISSING}, ["~x=???"], {}, id="delete:missing_strict"),
+        param({"x": MISSING}, ["~x"], {}, id="delete:missing"),
+        param({"x": {"y": MISSING}}, ["~x.y"], {"x": {}}, id="delete:missing_nested"),
         param(
             {"x": 20},
             ["~z"],
@@ -638,6 +696,18 @@ def test_complex_defaults(overrides: Any, expected: Any) -> None:
                 match=re.escape("Could not delete from config. 'z' does not exist."),
             ),
             id="delete_error_key",
+        ),
+        param(
+            {"x": MISSING},
+            ["~x.y"],
+            raises(HydraException, match=re.escape("Could not delete from config. 'x.y' does not exist.")),
+            id="delete_error_missing_parent",
+        ),
+        param(
+            {"x": None},
+            ["~x.y"],
+            raises(HydraException, match=re.escape("Could not delete from config. 'x.y' does not exist.")),
+            id="delete_error_null_parent",
         ),
         param(
             {"x": 20},

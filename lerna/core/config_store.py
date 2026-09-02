@@ -98,6 +98,10 @@ class ConfigStore(metaclass=Singleton):
         :param provider: the name of the module/app providing this config.
             Helps debugging.
         """
+        # An empty string group is treated as a config without a config group.
+        if group == "":
+            group = None
+
         # Convert node to dict for Rust storage
         cfg = OmegaConf.structured(node)
 

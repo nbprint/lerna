@@ -1382,13 +1382,28 @@ def test_tag_sweep(value: str, expected: str) -> None:
         ),
         param(
             "sort(range(1.5,-0.5,-0.5))",
-            RangeSweep(start=0.0, stop=2.0, step=0.5),
+            RangeSweep(start=0.0, stop=1.75, step=0.5),
             id="sort(range(1.5,-0.5,-0.5))",
         ),
         param(
             "sort(range(0,2,0.5),reverse=true)",
-            RangeSweep(start=1.5, stop=-0.5, step=-0.5),
+            RangeSweep(start=1.5, stop=-0.25, step=-0.5),
             id="range:sort:reverse)",
+        ),
+        param(
+            "sort(range(0,5,2),reverse=True)",
+            RangeSweep(start=4, stop=-2, step=-2),
+            id="sort:range:non_landing:reverse",
+        ),
+        param(
+            "sort(range(4,-1,-2))",
+            RangeSweep(start=0, stop=6, step=2),
+            id="sort:range:non_landing:ascending",
+        ),
+        param(
+            "sort(range(7,0,-3))",
+            RangeSweep(start=1, stop=10, step=3),
+            id="sort:range:non_landing:ascending2",
         ),
         param(
             "shuffle(range(1, 10))",

@@ -51,7 +51,10 @@ def configure_log(
             log_config, resolve=True
         )
         if conf["root"] is not None:
-            logging.config.dictConfig(conf)
+            # Imported lazily because target policy resolution imports core.utils.
+            from lerna._internal.logging_config import configure_logging
+
+            configure_logging(conf)
     else:
         # default logging to stdout
         root = logging.getLogger()
@@ -79,6 +82,21 @@ def _save_config(cfg: DictConfig, filename: str, output_dir: Path) -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
     with open(str(output_dir / filename), "w", encoding="utf-8") as file:
         file.write(OmegaConf.to_yaml(cfg))
+
+
+def _log_job_error_to_file() -> None:
+    record = log.makeRecord(
+        name=log.name,
+        level=logging.ERROR,
+        fn=__file__,
+        lno=0,
+        msg="Job failed",
+        args=(),
+        exc_info=sys.exc_info(),
+    )
+    for handler in logging.getLogger().handlers:
+        if isinstance(handler, logging.FileHandler) and record.levelno >= handler.level:
+            handler.handle(record)
 
 
 def filter_overrides(overrides: Sequence[str]) -> Sequence[str]:
@@ -140,7 +158,12 @@ def run_job(
             del task_cfg["hydra"]
 
         ret.cfg = task_cfg
-        hydra_cfg = copy.deepcopy(HydraConfig.instance().cfg)
+        hydra_cfg = HydraConfig.instance().cfg
+        assert isinstance(hydra_cfg, DictConfig)
+        env_set = hydra_cfg.hydra.job.env_set
+        with read_write(env_set):
+            OmegaConf.resolve(env_set)
+        hydra_cfg = copy.deepcopy(hydra_cfg)
         assert isinstance(hydra_cfg, DictConfig)
         ret.hydra_cfg = hydra_cfg
         overrides = OmegaConf.to_container(config.hydra.overrides.task)
@@ -181,20 +204,30 @@ def run_job(
             _save_config(hydra_cfg, "hydra.yaml", hydra_output)
             _save_config(config.hydra.overrides.task, "overrides.yaml", hydra_output)
 
+        interrupt: KeyboardInterrupt | None = None
         with env_override(hydra_cfg.hydra.job.env_set):
             callbacks.on_job_start(config=config, task_function=task_function)
             try:
                 ret.return_value = task_function(task_cfg)
                 ret.status = JobStatus.COMPLETED
             except Exception as e:  # noqa: BLE001
+                _log_job_error_to_file()
                 ret.return_value = e
                 ret.status = JobStatus.FAILED
+            except KeyboardInterrupt as e:
+                ret.return_value = e
+                ret.status = JobStatus.FAILED
+                interrupt = e
 
         ret.task_name = JobRuntime.instance().get("name")
 
         _flush_loggers()
 
         callbacks.on_job_end(config=config, job_return=ret)
+
+        if interrupt is not None:
+            setattr(interrupt, "job_return", ret)  # noqa: B010
+            raise interrupt
 
         return ret
     finally:

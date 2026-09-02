@@ -1,0 +1,3 @@
+defaults:
+  - override group1: file2
+  - group1: [file1, file2]

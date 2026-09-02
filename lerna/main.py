@@ -87,7 +87,7 @@ def main(
                 return task_function(cfg_passthrough)
             else:
                 args_parser = get_args_parser()
-                args = args_parser.parse_args()
+                args = args_parser.parse_intermixed_args()
 
                 # Merge decorator overrides with CLI overrides (CLI takes precedence)
                 # This implements Hydra issue #2459

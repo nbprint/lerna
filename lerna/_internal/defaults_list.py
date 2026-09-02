@@ -87,21 +87,25 @@ class Overrides:
             if override.is_sweep_override():
                 continue
             is_group = repo.group_exists(override.key_or_group)
+            is_config = repo.config_exists(override.key_or_group)
+            is_unambiguous_config_path = is_config and "/" in override.key_or_group
             value = override.value()
             is_dict = isinstance(override.value(), dict)
-            if is_dict or not is_group:
+            if override.is_delete() and (is_group or is_unambiguous_config_path):
+                key = override.get_key_element()[1:]
+                if is_group:
+                    if value is not None and not isinstance(value, str):
+                        raise ValueError(f"Config group override deletion value must be a string : {override}")
+                    self.deletions[key] = Deletion(name=value)
+                else:
+                    if override.input_line is not None and "=" in override.input_line:
+                        raise ValueError(f"Config path deletion does not support a value : {override}")
+                    self.deletions[key] = Deletion(name=None)
+            elif is_dict or not is_group:
                 self.config_overrides.append(override)
             elif override.is_force_add():
                 # This could probably be made to work if there is a compelling use case.
                 raise ConfigCompositionException(f"force-add of config groups is not supported: '{override.input_line}'")
-            elif override.is_delete():
-                key = override.get_key_element()[1:]
-                value = override.value()
-                if value is not None and not isinstance(value, str):
-                    raise ValueError(f"Config group override deletion value must be a string : {override}")
-
-                self.deletions[key] = Deletion(name=value)
-
             elif not isinstance(value, (str, list)):
                 raise ValueError(f"Config group override must be a string or a list. Got {type(value).__name__}")
             elif override.is_add():
@@ -230,22 +234,27 @@ class Overrides:
             self.known_choices_per_group[group].add(key)
 
     def is_deleted(self, default: InputDefault) -> bool:
-        if not isinstance(default, GroupDefault):
-            return False
-        key = default.get_override_key()
-        if key in self.deletions:
-            deletion = self.deletions[key]
-            if deletion.name is None:
-                return True
-            else:
+        if isinstance(default, GroupDefault):
+            key = default.get_override_key()
+            if key in self.deletions:
+                deletion = self.deletions[key]
+                if deletion.name is None:
+                    return True
                 return deletion.name == default.get_name()
+        elif isinstance(default, ConfigDefault):
+            key = default.get_config_path()
+            if key in self.deletions:
+                return self.deletions[key].name is None
         return False
 
     def delete(self, default: InputDefault) -> None:
-        assert isinstance(default, GroupDefault)
-        default.deleted = True
-
-        key = default.get_override_key()
+        if isinstance(default, GroupDefault):
+            default.deleted = True
+            key = default.get_override_key()
+        else:
+            assert isinstance(default, ConfigDefault)
+            default.deleted = True
+            key = default.get_config_path()
         self.deletions[key].used = True
 
 
@@ -434,10 +443,11 @@ def _update_overrides(
             pcp = parent.get_config_path()
             okey = last_override_seen.get_override_key()
             oval = last_override_seen.get_name()
+            dvalue = d.get_options() if isinstance(d, GroupDefault) and d.is_options() else d.get_name()
             raise ConfigCompositionException(
                 dedent(
                     f"""\
-                    In {pcp}: Override '{okey} : {oval}' is defined before '{d.get_override_key()}: {d.get_name()}'.
+                    In {pcp}: Override '{okey} : {oval}' is defined before '{d.get_override_key()}: {dvalue}'.
                     Overrides must be at the end of the defaults list"""
                 )
             )
