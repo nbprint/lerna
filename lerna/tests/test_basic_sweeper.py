@@ -8,7 +8,7 @@ from pytest import mark, param
 
 from lerna._internal.core_plugins.basic_sweeper import BasicSweeper
 from lerna.core.override_parser.overrides_parser import OverridesParser
-from lerna.test_utils.test_utils import assert_multiline_regex_search, run_process
+from lerna.test_utils.test_utils import assert_multiline_regex_search, normalize_path_for_override, run_process
 
 
 @mark.parametrize(
@@ -107,7 +107,7 @@ def test_glob_uses_primary_config_searchpath(tmpdir: Any) -> None:
         sys.executable,
         "lerna/tests/test_apps/glob_searchpath/my_app.py",
         "+group1=glob(file*)",
-        f"hydra.sweep.dir={tmpdir}",
+        f'hydra.sweep.dir="{normalize_path_for_override(tmpdir)}"',
         "hydra.job.chdir=False",
         "--multirun",
     ]
