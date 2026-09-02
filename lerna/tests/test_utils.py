@@ -319,6 +319,7 @@ class TestRunAndReport:
 
         with (
             raises(SystemExit, match="1"),
+            patch("lerna._internal.utils.is_under_debugger", return_value=False),
             patch("sys.excepthook", new=custom_excepthook),
         ):
             run_and_report(demo_func)
@@ -341,6 +342,7 @@ class TestRunAndReport:
         mock_stderr = io.StringIO()
         with (
             raises(SystemExit, match="1"),
+            patch("lerna._internal.utils.is_under_debugger", return_value=False),
             patch("sys.excepthook", new=broken_excepthook),
             patch("sys.stderr", new=mock_stderr),
         ):
