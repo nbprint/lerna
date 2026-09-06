@@ -60,12 +60,12 @@ jobs:
           persist-credentials: false
 
       - name: Setup Python
-        uses: actions-ext/python/setup@a3f3953ef26a519ab7b6a56b94d06fa1b31ab3f3
+        uses: actions-ext/python/setup@ec67f82b3bd863948308a41ecb9e70547cbb19c7
         with:
           version: ${{ matrix.python }}
 
       - name: Setup Rust
-        uses: actions-ext/rust/setup@3de300f3071e758a1dd8545b884288a35e5d7f81
+        uses: actions-ext/rust/setup@0f0b7c9ab3cdb6e9a1f79e2147974d6762ddafea
 
       - name: Install dependencies
         run: make develop
@@ -150,13 +150,13 @@ jobs:
         if: matrix.target == 'native' && runner.os != 'Linux'
 
       - name: Test wheel
-        uses: actions-ext/python/test-wheel@a3f3953ef26a519ab7b6a56b94d06fa1b31ab3f3
+        uses: actions-ext/python/test-wheel@ec67f82b3bd863948308a41ecb9e70547cbb19c7
         with:
           module: lerna
         if: matrix.target == 'native' && runner.os == 'Linux'
 
       - name: Test source distribution
-        uses: actions-ext/python/test-sdist@a3f3953ef26a519ab7b6a56b94d06fa1b31ab3f3
+        uses: actions-ext/python/test-sdist@ec67f82b3bd863948308a41ecb9e70547cbb19c7
         with:
           module: lerna
         if: matrix.name == 'ubuntu-latest'
