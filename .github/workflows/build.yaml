@@ -31,9 +31,9 @@ jobs:
     strategy:
       matrix:
         include:
-          - name: ubuntu-latest
+          - name: ubuntu-24.04
             dist_path: dist
-            os: ubuntu-latest
+            os: ubuntu-24.04
             python: "3.11"
             target: native
           - name: ubuntu-24.04-arm
@@ -41,14 +41,14 @@ jobs:
             os: ubuntu-24.04-arm
             python: "3.11"
             target: native
-          - name: macos-latest
+          - name: macos-26
             dist_path: dist
-            os: macos-latest
+            os: macos-26
             python: "3.11"
             target: native
-          - name: windows-latest
+          - name: windows-2025
             dist_path: dist
-            os: windows-latest
+            os: windows-2025
             python: "3.11"
             target: native
           
@@ -77,7 +77,7 @@ jobs:
 
       - name: Checks
         run: make checks
-        if: matrix.name == 'ubuntu-latest'
+        if: matrix.name == 'ubuntu-24.04'
 
       - name: Build
         run: make build
@@ -102,10 +102,10 @@ jobs:
         uses: EnricoMi/publish-unit-test-result-action@d0a4676d0e0b938bc201470d88276b7c74c712b3  # v2.24.0
         with:
           files: '**/junit.xml'
-        if: matrix.name == 'ubuntu-latest'
+        if: matrix.name == 'ubuntu-24.04'
 
       - name: Upload coverage
-        uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f  # v7.0.0
+        uses: codecov/codecov-action@0b35c9ecc4f0529d0eb674914510c22f85b196b4  # v7.1.0
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
         if: matrix.target == 'native'
@@ -127,7 +127,7 @@ jobs:
         shell: bash
         env:
           CIBW_ARCHS_LINUX: native
-        if: matrix.name == 'ubuntu-latest'
+        if: matrix.name == 'ubuntu-24.04'
 
       - name: Build distributions (Linux ARM64)
         run: |
@@ -159,7 +159,7 @@ jobs:
         uses: actions-ext/python/test-sdist@ec67f82b3bd863948308a41ecb9e70547cbb19c7
         with:
           module: lerna
-        if: matrix.name == 'ubuntu-latest'
+        if: matrix.name == 'ubuntu-24.04'
 
       - name: Upload distributions
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1

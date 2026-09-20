@@ -117,9 +117,8 @@ archs = "arm64"
 
 [tool.cibuildwheel.windows]
 environment = {PATH="$UserProfile\\.cargo\bin;$PATH", CARGO_TERM_COLOR="always"}
-skip = "*win32 *arm_64"
+skip = "*win32 *arm64"
 test-command = "echo 'TODO'"
-
 
 [tool.coverage.run]
 branch = true
