@@ -5,6 +5,7 @@ from omegaconf import DictConfig, OmegaConf, open_dict
 
 from lerna import version
 from lerna.core.global_hydra import GlobalHydra
+from lerna.provenance import CompositionResult
 from lerna.types import RunMode
 
 from ._internal.deprecation_warning import deprecation_warning
@@ -60,3 +61,37 @@ def compose(
             OmegaConf.set_struct(cfg, strict)
 
     return cfg
+
+
+def compose_with_provenance(
+    config_name: str | None = None,
+    overrides: list[str] | None = None,
+    return_hydra_config: bool = False,
+) -> CompositionResult:
+    """Compose a config and return unresolved values with composition provenance."""
+    from lerna._internal.callbacks import Callbacks
+    from lerna._internal.config_loader_impl import ConfigLoaderImpl
+
+    if overrides is None:
+        overrides = []
+
+    assert GlobalHydra().is_initialized(), "GlobalHydra is not initialized, use @lerna.main() or call an initialization method first"
+    hydra = GlobalHydra.instance().hydra
+    assert hydra is not None
+    loader = hydra.config_loader
+    if not isinstance(loader, ConfigLoaderImpl):
+        raise TypeError("compose_with_provenance() requires Lerna's ConfigLoaderImpl")
+
+    cfg, result = loader.load_configuration_with_provenance(
+        config_name=config_name,
+        overrides=overrides,
+        run_mode=RunMode.RUN,
+        from_shell=False,
+        validate_sweep_overrides=True,
+    )
+    Callbacks(cfg, check_cache=False).on_compose_config(config=cfg, config_name=config_name, overrides=overrides)
+
+    if not return_hydra_config and "hydra" in cfg:
+        with open_dict(cfg):
+            del cfg["hydra"]
+    return result

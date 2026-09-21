@@ -268,6 +268,14 @@ pub enum ListOperationType {
     RemoveValue = 5,
     /// Clear the list
     Clear = 6,
+    /// Append values that are not already present
+    AppendUnique = 7,
+    /// Remove every occurrence of each value
+    RemoveAll = 8,
+    /// Extend from a list selected by an interpolation
+    ExtendFrom = 9,
+    /// Delete a range of items using Python slice bounds
+    DeleteSlice = 10,
 }
 
 impl std::fmt::Display for ListOperationType {
@@ -279,6 +287,10 @@ impl std::fmt::Display for ListOperationType {
             ListOperationType::RemoveAt => write!(f, "REMOVE_AT"),
             ListOperationType::RemoveValue => write!(f, "REMOVE_VALUE"),
             ListOperationType::Clear => write!(f, "CLEAR"),
+            ListOperationType::AppendUnique => write!(f, "APPEND_UNIQUE"),
+            ListOperationType::RemoveAll => write!(f, "REMOVE_ALL"),
+            ListOperationType::ExtendFrom => write!(f, "EXTEND_FROM"),
+            ListOperationType::DeleteSlice => write!(f, "DELETE_SLICE"),
         }
     }
 }
@@ -292,6 +304,8 @@ pub struct ListExtension {
     pub values: Vec<ParsedElement>,
     /// Index for insert/remove_at operations
     pub index: Option<i64>,
+    /// Optional stop index for delete_slice operations
+    pub end_index: Option<i64>,
 }
 
 /// A glob choice sweep (pattern-based selection)

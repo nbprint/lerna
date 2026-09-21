@@ -28,10 +28,11 @@ from lerna.core.config_search_path import ConfigSearchPath
 from lerna.core.default_element import ResultDefault
 from lerna.core.object_type import ObjectType
 from lerna.core.override_parser.overrides_parser import OverridesParser
-from lerna.core.override_parser.types import Override, ValueType
+from lerna.core.override_parser.types import ListExtensionOverrideValue, ListOperationType, Override, ValueType
 from lerna.core.utils import JobRuntime
 from lerna.errors import ConfigCompositionException, MissingConfigException
 from lerna.plugins.config_source import ConfigLoadError, ConfigResult, ConfigSource
+from lerna.provenance import CompositionResult, _CompositionTracker
 from lerna.types import RunMode
 
 from .deprecation_warning import deprecation_warning
@@ -156,6 +157,26 @@ class ConfigLoaderImpl(ConfigLoader):
             activate_config_repository=True,
         )
 
+    def load_configuration_with_provenance(
+        self,
+        config_name: str | None,
+        overrides: list[str],
+        run_mode: RunMode,
+        from_shell: bool = True,
+        validate_sweep_overrides: bool = True,
+    ) -> tuple[DictConfig, CompositionResult]:
+        tracker = _CompositionTracker()
+        cfg = self._load_configuration(
+            config_name=config_name,
+            overrides=overrides,
+            run_mode=run_mode,
+            from_shell=from_shell,
+            validate_sweep_overrides=validate_sweep_overrides,
+            activate_config_repository=False,
+            provenance_tracker=tracker,
+        )
+        return cfg, tracker.result(cfg)
+
     def _load_configuration(
         self,
         config_name: str | None,
@@ -164,6 +185,7 @@ class ConfigLoaderImpl(ConfigLoader):
         from_shell: bool,
         validate_sweep_overrides: bool,
         activate_config_repository: bool,
+        provenance_tracker: _CompositionTracker | None = None,
     ) -> DictConfig:
         try:
             return self._load_configuration_impl(
@@ -173,6 +195,7 @@ class ConfigLoaderImpl(ConfigLoader):
                 from_shell=from_shell,
                 validate_sweep_overrides=validate_sweep_overrides,
                 activate_config_repository=activate_config_repository,
+                provenance_tracker=provenance_tracker,
             )
         except OmegaConfBaseException as e:
             raise ConfigCompositionException().with_traceback(sys.exc_info()[2]) from e
@@ -258,6 +281,7 @@ class ConfigLoaderImpl(ConfigLoader):
         from_shell: bool = True,
         validate_sweep_overrides: bool = True,
         activate_config_repository: bool = False,
+        provenance_tracker: _CompositionTracker | None = None,
     ) -> DictConfig:
         from lerna import __version__, version
 
@@ -277,7 +301,17 @@ class ConfigLoaderImpl(ConfigLoader):
 
         config_overrides = defaults_list.config_overrides
 
-        cfg = self._compose_config_from_defaults_list(defaults=defaults_list.defaults, repo=caching_repo)
+        if provenance_tracker is not None:
+            for default in defaults_list.defaults:
+                if default.override_key is not None:
+                    group = default.override_key.split("@", 1)[0]
+                    provenance_tracker.set_available_options(group, caching_repo.get_group_options(group))
+
+        cfg = self._compose_config_from_defaults_list(
+            defaults=defaults_list.defaults,
+            repo=caching_repo,
+            provenance_tracker=provenance_tracker,
+        )
 
         # Set config root to struct mode.
         # Note that this will close any dictionaries (including dicts annotated as Dict[K, V].
@@ -288,10 +322,20 @@ class ConfigLoaderImpl(ConfigLoader):
         OmegaConf.set_readonly(cfg.hydra, False)
 
         # Apply defaults-list _patch_ operations before user CLI overrides.
-        ConfigLoaderImpl._apply_overrides_to_config(defaults_list.config_patch_overrides, cfg)
+        ConfigLoaderImpl._apply_overrides_to_config(
+            defaults_list.config_patch_overrides,
+            cfg,
+            provenance_tracker=provenance_tracker,
+            origin="patch",
+        )
 
         # Apply command line overrides after enabling strict flag
-        ConfigLoaderImpl._apply_overrides_to_config(config_overrides, cfg)
+        ConfigLoaderImpl._apply_overrides_to_config(
+            config_overrides,
+            cfg,
+            provenance_tracker=provenance_tracker,
+            origin="cli",
+        )
         app_overrides = []
         for override in parsed_overrides:
             if override.is_hydra_override():
@@ -390,7 +434,56 @@ class ConfigLoaderImpl(ConfigLoader):
         return self.config_search_path
 
     @staticmethod
-    def _apply_overrides_to_config(overrides: list[Override], cfg: DictConfig) -> None:
+    def _resolved_list_value(cfg: DictConfig, key: str, value: Any) -> Any:
+        comparison_cfg = copy.deepcopy(cfg)
+        comparison_list = OmegaConf.select(comparison_cfg, key, throw_on_missing=True)
+        assert isinstance(comparison_list, ListConfig)
+        comparison_list.append(value)
+        resolved = comparison_list[-1]
+        if OmegaConf.is_config(resolved):
+            return OmegaConf.to_container(resolved, resolve=True)
+        return resolved
+
+    @staticmethod
+    def _absolute_interpolation_path(destination: str, interpolation: str) -> str:
+        path = interpolation[2:-1]
+        if not path.startswith("."):
+            return path
+
+        relative = len(path) - len(path.lstrip("."))
+        suffix = path[relative:]
+        parent_parts = destination.split(".")[:-1]
+        keep = len(parent_parts) - relative + 1
+        keep = max(keep, 0)
+        return ".".join(parent_parts[:keep] + ([suffix] if suffix else []))
+
+    @staticmethod
+    def _copy_with_source_interpolations(value: Any, source_path: str) -> Any:
+        relative_pattern = re.compile(r"\$\{(\.+)([^{}]+)\}")
+
+        def copy_value(item: Any, item_path: str) -> Any:
+            if isinstance(item, DictConfig):
+                return {key: copy_value(node, f"{item_path}.{key}") for key, node in item.items_ex(resolve=False)}
+            if isinstance(item, ListConfig):
+                return [copy_value(node, f"{item_path}.{index}") for index, node in enumerate(item._iter_ex(resolve=False))]
+            raw = item._value() if hasattr(item, "_value") else item
+            if not isinstance(raw, str):
+                return copy.deepcopy(raw)
+
+            def replace(match: re.Match[str]) -> str:
+                return "${" + ConfigLoaderImpl._absolute_interpolation_path(item_path, "${" + match.group(1) + match.group(2) + "}") + "}"
+
+            return relative_pattern.sub(replace, raw)
+
+        return copy_value(value, source_path)
+
+    @staticmethod
+    def _apply_overrides_to_config(
+        overrides: list[Override],
+        cfg: DictConfig,
+        provenance_tracker: _CompositionTracker | None = None,
+        origin: str = "cli",
+    ) -> None:
         for override in overrides:
             if override.package is not None:
                 raise ConfigCompositionException(
@@ -399,6 +492,7 @@ class ConfigLoaderImpl(ConfigLoader):
 
             key = override.key_or_group
             value = override.value()
+            provenance_state = provenance_tracker.before_override(override, cfg) if provenance_tracker is not None else None
             try:
                 if override.is_delete():
                     config_val_not_found = object()
@@ -464,12 +558,15 @@ class ConfigLoaderImpl(ConfigLoader):
                 elif override.is_list_extend():
                     config_val = OmegaConf.select(cfg, key, throw_on_missing=True)
                     if not OmegaConf.is_list(config_val):
+                        if override.list_operation == ListOperationType.EXTEND_FROM:
+                            source_expression = value[0]
+                            assert isinstance(source_expression, str)
+                            source_path = ConfigLoaderImpl._absolute_interpolation_path(key, source_expression)
+                            raise ConfigCompositionException(f"Cannot extend list from source '{source_path}': destination '{key}' is not a list.")
                         raise ConfigCompositionException(
                             f"Could not append to config list. The existing value of '{override.key_or_group}' is {config_val} which is not a list."
                         )
                     # Extract value from ListExtensionOverrideValue if needed
-                    from lerna.core.override_parser.types import ListExtensionOverrideValue, ListOperationType
-
                     extend_value = value.values if isinstance(value, ListExtensionOverrideValue) else value
 
                     # Apply the appropriate list operation based on override.list_operation
@@ -499,6 +596,12 @@ class ConfigLoaderImpl(ConfigLoader):
                             raise ConfigCompositionException(
                                 f"Cannot remove item at index {idx} from list '{override.key_or_group}' (length={len(config_val)})"
                             )
+                    elif list_op == ListOperationType.DELETE_SLICE:
+                        start = override.list_index if override.list_index is not None else 0
+                        stop = override.list_end_index
+                        normalized_start, normalized_stop, _ = slice(start, stop).indices(len(config_val))
+                        for index in range(normalized_stop - 1, normalized_start - 1, -1):
+                            del config_val[index]
                     elif list_op == ListOperationType.REMOVE_VALUE:
                         # Remove first occurrence of value
                         for val in extend_value:
@@ -513,6 +616,41 @@ class ConfigLoaderImpl(ConfigLoader):
                     elif list_op == ListOperationType.CLEAR:
                         # Clear all items from the list
                         config_val.clear()
+                    elif list_op == ListOperationType.APPEND_UNIQUE:
+                        resolved_existing = [OmegaConf.to_container(item, resolve=True) if OmegaConf.is_config(item) else item for item in config_val]
+                        for item in extend_value:
+                            resolved_item = ConfigLoaderImpl._resolved_list_value(cfg, key, item)
+                            if resolved_item not in resolved_existing:
+                                config_val.append(item)
+                                resolved_existing.append(resolved_item)
+                    elif list_op == ListOperationType.REMOVE_ALL:
+                        for value_to_remove in extend_value:
+                            resolved_value = ConfigLoaderImpl._resolved_list_value(cfg, key, value_to_remove)
+                            for index in range(len(config_val) - 1, -1, -1):
+                                item = config_val[index]
+                                resolved_item = OmegaConf.to_container(item, resolve=True) if OmegaConf.is_config(item) else item
+                                if resolved_item == resolved_value:
+                                    del config_val[index]
+                    elif list_op == ListOperationType.EXTEND_FROM:
+                        source_expression = extend_value[0]
+                        assert isinstance(source_expression, str)
+                        source_path = ConfigLoaderImpl._absolute_interpolation_path(key, source_expression)
+                        source_missing = object()
+                        try:
+                            source = OmegaConf.select(cfg, source_path, default=source_missing, throw_on_missing=True)
+                        except MissingMandatoryValue as ex:
+                            raise ConfigCompositionException(
+                                f"Cannot extend list at destination '{key}': source '{source_path}' is a mandatory missing value."
+                            ) from ex
+                        if source is source_missing:
+                            raise ConfigCompositionException(f"Cannot extend list: source '{source_path}' for destination '{key}' does not exist.")
+                        if not isinstance(source, ListConfig):
+                            raise ConfigCompositionException(f"Cannot extend list: source '{source_path}' for destination '{key}' is not a list.")
+                        snapshot = [
+                            ConfigLoaderImpl._copy_with_source_interpolations(source._get_node(index), f"{source_path}.{index}")
+                            for index in range(len(source))
+                        ]
+                        config_val.extend(snapshot)
                 else:
                     try:
                         OmegaConf.update(cfg, key, value, merge=True)
@@ -520,6 +658,8 @@ class ConfigLoaderImpl(ConfigLoader):
                         raise ConfigCompositionException(
                             f"Could not override '{override.key_or_group}'.\nTo append to your config use +{override.input_line}"
                         ) from ex
+                if provenance_tracker is not None and provenance_state is not None:
+                    provenance_tracker.after_override(override, cfg, origin, provenance_state)
             except OmegaConfBaseException as ex:
                 raise ConfigCompositionException(f"Error merging override {override.input_line}").with_traceback(sys.exc_info()[2]) from ex
 
@@ -788,10 +928,17 @@ class ConfigLoaderImpl(ConfigLoader):
         self,
         defaults: list[ResultDefault],
         repo: IConfigRepository,
+        provenance_tracker: _CompositionTracker | None = None,
     ) -> DictConfig:
         # Try Rust-accelerated compose first
         rust_result = self._try_rust_compose(defaults, repo)
         if rust_result is not None:
+            if provenance_tracker is not None:
+                for default in defaults:
+                    assert default.config_path is not None
+                    loaded = repo.load_config(default.config_path)
+                    assert loaded is not None
+                    provenance_tracker.record_default(default, self._embed_result_config(copy.copy(loaded), default.package))
             self._strip_defaults(rust_result)
             return rust_result
 
@@ -800,6 +947,8 @@ class ConfigLoaderImpl(ConfigLoader):
         with flag_override(cfg, "no_deepcopy_set_nodes", True):
             for default in defaults:
                 loaded = self._load_single_config(default=default, repo=repo)
+                if provenance_tracker is not None:
+                    provenance_tracker.record_default(default, loaded)
                 try:
                     cfg.merge_with(loaded.config)
                 except OmegaConfBaseException as e:

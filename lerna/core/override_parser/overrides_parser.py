@@ -264,6 +264,10 @@ def _parse_list_operation(operation_str: str) -> ListOperationType:
         "REMOVE_AT": ListOperationType.REMOVE_AT,
         "REMOVE_VALUE": ListOperationType.REMOVE_VALUE,
         "CLEAR": ListOperationType.CLEAR,
+        "APPEND_UNIQUE": ListOperationType.APPEND_UNIQUE,
+        "REMOVE_ALL": ListOperationType.REMOVE_ALL,
+        "EXTEND_FROM": ListOperationType.EXTEND_FROM,
+        "DELETE_SLICE": ListOperationType.DELETE_SLICE,
     }
     return operation_map.get(operation_str, ListOperationType.APPEND)
 
@@ -313,6 +317,7 @@ def _rust_dict_to_override(
     # Initialize list operation fields (only used for EXTEND_LIST type)
     list_operation: ListOperationType | None = None
     list_index: int | None = None
+    list_end_index: int | None = None
 
     if raw_value is None:
         value: Any = None
@@ -404,6 +409,7 @@ def _rust_dict_to_override(
             operation_str = raw_value.get("operation", "APPEND")
             list_operation = _parse_list_operation(operation_str)
             list_index = raw_value.get("index")
+            list_end_index = raw_value.get("end_index")
         else:
             # Regular dict value
             value = raw_value
@@ -420,6 +426,7 @@ def _rust_dict_to_override(
         config_loader=config_loader,
         list_operation=list_operation,
         list_index=list_index,
+        list_end_index=list_end_index,
         searchpath=searchpath,
     )
     override.validate()

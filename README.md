@@ -120,25 +120,37 @@ python app.py 'tags=prepend(first)'
 # Insert at specific index
 python app.py 'tags=insert(0,first_item)'
 
+# Extend from another config list
+python app.py 'tags=extend(${defaults.tags})'
+
 # Remove by index
-python app.py 'tags=remove_at(0)'      # Remove first
-python app.py 'tags=remove_at(-1)'     # Remove last
+python app.py 'tags=pop(0)'      # Remove first
+python app.py 'tags=pop(-1)'     # Remove last
 
 # Remove by value
-python app.py 'tags=remove_value(old_tag)'
+python app.py 'tags=remove(old_tag)'
+
+# Delete a slice (equivalent to del tags[1:3])
+python app.py 'tags=delete_slice(1,3)'
 
 # Clear entire list
-python app.py 'tags=list_clear()'
+python app.py 'tags=clear()'
 ```
 
-| Function            | Description            | Example Result         |
-| ------------------- | ---------------------- | ---------------------- |
-| `append(...)`       | Add items to end       | `[a, b]` → `[a, b, c]` |
-| `prepend(...)`      | Add items to beginning | `[b, c]` → `[a, b, c]` |
-| `insert(idx, val)`  | Insert at index        | `[a, c]` → `[a, b, c]` |
-| `remove_at(idx)`    | Remove by index        | `[a, b, c]` → `[b, c]` |
-| `remove_value(val)` | Remove first match     | `[a, b, c]` → `[a, c]` |
-| `list_clear()`      | Clear all items        | `[a, b, c]` → `[]`     |
+| Function                     | Description                             | Example result         |
+| ---------------------------- | --------------------------------------- | ---------------------- |
+| `append(value)`              | Add value to end                        | `[a, b]` → `[a, b, c]` |
+| `extend(${path})`            | Add items from another config list      | `[a]` → `[a, b, c]`    |
+| `insert(index, value)`       | Insert value at index                   | `[a, c]` → `[a, b, c]` |
+| `pop(index)`                 | Remove item at index                    | `[a, b, c]` → `[b, c]` |
+| `remove(value)`              | Remove first matching value             | `[a, b, c]` → `[a, c]` |
+| `clear()`                    | Remove all items                        | `[a, b, c]` → `[]`     |
+| `prepend(...)`               | Add values to beginning                 | `[b, c]` → `[a, b, c]` |
+| `append_unique(...)`         | Append values not already present       | `[a, b]` → `[a, b, c]` |
+| `remove_all(...)`            | Remove every match                      | `[a, b, a]` → `[b]`    |
+| `delete_slice(start, stop?)` | Delete a range using Python slice rules | `[a, b, c]` → `[a]`    |
+
+`remove_at`, `remove_value`, `list_clear`, and `extend_from` remain available as compatibility aliases for `pop`, `remove`, `clear`, and `extend`, respectively.
 
 These functions use shell-safe syntax (quote the entire override) and work on bash, zsh, fish, PowerShell, and cmd.
 
@@ -223,8 +235,8 @@ defaults:
   - _patch_:
     - ~unwanted_key                # delete a key
     - ~status=deprecated           # delete key only if value matches
-    - items=remove_value(stale)    # remove a list item by value
-    - items=remove_at(0)           # remove a list item by index
+    - items=remove(stale)          # remove a list item by value
+    - items=pop(0)                 # remove a list item by index
     - +new_key=injected            # add a new key
     - setting=new_value            # change a value
 ```
@@ -240,21 +252,47 @@ defaults:
 
 For root-level configs (no `@` package), bare keys and `_here_` are equivalent since the parent package is empty.
 
-**Supported operations** (uses lerna's full override syntax):
+Patch entries accept the existing override string syntax or a structured mapping. Both forms execute in sequence and use the same package-scoping rules.
 
-| Operation            | Syntax                | Description                              |
-| -------------------- | --------------------- | ---------------------------------------- |
-| Delete key           | `~key`                | Remove key from config                   |
-| Conditional delete   | `~key=value`          | Remove key only if current value matches |
-| Change value         | `key=value`           | Set key to new value                     |
-| Add key              | `+key=value`          | Add new key (error if exists)            |
-| Force-add key        | `++key=value`         | Set key (create if missing)              |
-| List append          | `key=append(v)`       | Add item to end of list                  |
-| List prepend         | `key=prepend(v)`      | Add item to start of list                |
-| List insert          | `key=insert(i,v)`     | Insert item at index                     |
-| List remove by index | `key=remove_at(i)`    | Remove item at index                     |
-| List remove by value | `key=remove_value(v)` | Remove first matching item               |
-| List clear           | `key=list_clear()`    | Remove all list items                    |
+| Operation            | String entry                  | Structured entry                                    |
+| -------------------- | ----------------------------- | --------------------------------------------------- |
+| Change value         | `key=value`                   | `{op: change, path: key, value: value}`             |
+| Add key              | `+key=value`                  | `{op: add, path: key, value: value}`                |
+| Force-add key        | `++key=value`                 | `{op: force_add, path: key, value: value}`          |
+| Delete key           | `~key`                        | `{op: delete, path: key}`                           |
+| Conditional delete   | `~key=value`                  | `{op: delete, path: key, value: value}`             |
+| List append          | `key=append(a,b)`             | `{op: append, path: key, values: [a, b]}`           |
+| List extend          | `key=extend(${source.items})` | `{op: extend, path: key, value: "${source.items}"}` |
+| List prepend         | `key=prepend(a,b)`            | `{op: prepend, path: key, values: [a, b]}`          |
+| List insert          | `key=insert(1,a,b)`           | `{op: insert, path: key, index: 1, values: [a, b]}` |
+| Remove first match   | `key=remove(a)`               | `{op: remove, path: key, value: a}`                 |
+| Remove by index      | `key=pop(1)`                  | `{op: pop, path: key, index: 1}`                    |
+| Clear list           | `key=clear()`                 | `{op: clear, path: key}`                            |
+| Append unique values | `key=append_unique(a,b)`      | `{op: append_unique, path: key, values: [a, b]}`    |
+| Remove all matches   | `key=remove_all(a,b)`         | `{op: remove_all, path: key, values: [a, b]}`       |
+| Delete slice         | `key=delete_slice(1,3)`       | `{op: delete_slice, path: key, start: 1, stop: 3}`  |
+
+In `delete_slice(start, stop?)`, omitting `stop` deletes from `start` through the end. Negative and out-of-range indexes follow Python slice behavior.
+
+Structured `value` and `values` fields preserve YAML mappings, lists, booleans, nulls, and interpolations without serializing them through the override grammar. A mapping or list in `values` is one item. `extend()` is the operation that splices the selected source list into the destination; nested lists inside the source remain nested.
+
+```yaml
+defaults:
+  - _patch_@gateway:
+    - op: append
+      path: modules
+      values:
+        - /modules/rest
+        - /modules/outputs
+    - op: change
+      path: settings
+      value:
+        enabled: true
+        retries: 3
+        label: null
+```
+
+`append_unique()` resolves values for structural comparison but preserves the unresolved value when it appends it. Existing duplicates remain. `remove_all()` removes every occurrence of each argument. `extend()` snapshots its source before copying, so extending a list from itself is well-defined.
 
 **Example with packaged config:**
 
@@ -265,7 +303,7 @@ defaults:
   - _self_
   - _patch_@vendor:
     - ~debug_mode           # bare key → targets vendor.debug_mode
-    - items=remove_value(x) # bare key → targets vendor.items
+    - items=remove(x)       # bare key → targets vendor.items
 
 # Multiple scoped patches can target different packages:
 # - _patch_@db:
@@ -275,6 +313,27 @@ defaults:
 ```
 
 **Nested patches:** `_patch_` directives in sub-configs accumulate naturally. If `lib/refined.yaml` has its own `_patch_` that removes `beta`, and your root config adds `_patch_@lib:` to remove `gamma`, both patches apply — `beta` and `gamma` are both removed from the final config.
+
+#### Composition provenance
+
+`compose_with_provenance()` returns a `CompositionResult` containing the unresolved composed config and its composition metadata. Consumers such as [csp-gateway](https://github.com/Point72/csp-gateway) and [ccflow](https://github.com/Point72/ccflow) can build configuration explanations without importing from `lerna._internal`, patching YAML loaders, or disabling Rust YAML parsing.
+
+```python
+from lerna import compose_with_provenance, initialize_config_dir
+
+with initialize_config_dir(config_dir="conf", version_base=None):
+  result = compose_with_provenance("config", overrides=["gateway.modules=append(metrics)"])
+
+print(result.config)                         # unresolved DictConfig
+print(result.resolved_copy())                # independently resolved copy
+print(result.selected_defaults)              # composition order and sources
+print(result.available_options["gateway"])  # options seen for the group
+print(result.provenance("gateway.modules[0]"))
+print(result.patch_operations)               # config-authored operations
+print(result.cli_overrides)                  # command-line operations
+```
+
+Node provenance includes the source identifier, source config, package, source key, origin, and operation index. List-item provenance follows surviving items as list operations move their indexes. Patch history retains removed items and their provenance.
 
 #### Relative Path in Defaults Fix ([#2878](https://github.com/facebookresearch/hydra/issues/2878))
 

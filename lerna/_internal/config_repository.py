@@ -212,10 +212,13 @@ class ConfigRepository(IConfigRepository):
                     elif isinstance(patch_value, list):
                         operations = []
                         for v in patch_value:
+                            if isinstance(v, DictConfig):
+                                operations.append(copy.deepcopy(v))
+                                continue
                             vv = v._value()
                             if not isinstance(vv, str):
                                 raise ValueError(  # noqa: TRY004
-                                    f"Unsupported _patch_ item value in defaults : {type(vv).__name__}, nested list items must be strings"
+                                    f"Unsupported _patch_ item value in defaults : {type(vv).__name__}, nested list items must be strings or mappings"
                                 )
                             operations.append(vv)
                     else:

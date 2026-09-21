@@ -206,9 +206,16 @@ class ListOperationType(Enum):
     APPEND = 1  # Append items to end (default)
     PREPEND = 2  # Prepend items to beginning
     INSERT = 3  # Insert item at index
-    REMOVE_AT = 4  # Remove item at index
-    REMOVE_VALUE = 5  # Remove first matching value
+    POP = 4  # Remove item at index
+    REMOVE_AT = POP  # Compatibility alias for POP
+    REMOVE = 5  # Remove first matching value
+    REMOVE_VALUE = REMOVE  # Compatibility alias for REMOVE
     CLEAR = 6  # Clear the list
+    APPEND_UNIQUE = 7  # Append values not already present
+    REMOVE_ALL = 8  # Remove every occurrence of each value
+    EXTEND = 9  # Extend from a list selected by interpolation
+    EXTEND_FROM = EXTEND  # Compatibility alias for EXTEND
+    DELETE_SLICE = 10  # Delete items selected by Python slice bounds
 
 
 @dataclass
@@ -297,9 +304,18 @@ class Override:
     # For INSERT and REMOVE_AT operations: the index
     list_index: int | None = None
 
+    # Optional stop index for DELETE_SLICE operations
+    list_end_index: int | None = None
+
     # Optional searchpath for glob sweeps (from hydra.searchpath config)
     # Used to ensure pkg:// sources are available when enumerating group options
     searchpath: list[str] | None = None
+
+    # Config containing this override when it came from a defaults-list patch.
+    source_config_path: str | None = None
+
+    # Package relative to which a defaults-list patch was authored.
+    source_package: str | None = None
 
     def is_delete(self) -> bool:
         """

@@ -1422,9 +1422,17 @@ impl OverrideParser {
             "append" => self.build_list_append(args),
             "prepend" => self.build_list_prepend(args),
             "insert" => self.build_list_insert(args),
-            "remove_at" => self.build_list_remove_at(args),
+            "pop" => self.build_list_remove_at(args, "pop"),
+            "remove_at" => self.build_list_remove_at(args, "remove_at"),
+            "remove" => self.build_list_remove(args),
             "remove_value" => self.build_list_remove_value(args),
-            "list_clear" => self.build_list_clear(args),
+            "clear" => self.build_list_clear(args, "clear"),
+            "list_clear" => self.build_list_clear(args, "list_clear"),
+            "append_unique" => self.build_list_append_unique(args),
+            "remove_all" => self.build_list_remove_all(args),
+            "extend" => self.build_list_extend_from(args, "extend"),
+            "extend_from" => self.build_list_extend_from(args, "extend_from"),
+            "delete_slice" => self.build_list_delete_slice(args),
             "int" | "float" | "str" | "bool" | "json_str" => {
                 if args.is_empty() {
                     return Err(ParseError {
@@ -2394,6 +2402,7 @@ impl OverrideParser {
             operation: ListOperationType::Append,
             values: args,
             index: None,
+            end_index: None,
         }))
     }
 
@@ -2402,6 +2411,7 @@ impl OverrideParser {
             operation: ListOperationType::Prepend,
             values: args,
             index: None,
+            end_index: None,
         }))
     }
 
@@ -2433,14 +2443,18 @@ impl OverrideParser {
             operation: ListOperationType::Insert,
             values,
             index: Some(index),
+            end_index: None,
         }))
     }
 
-    fn build_list_remove_at(&self, args: Vec<ParsedElement>) -> ParseResult<OverrideValue> {
-        // remove_at(index) - requires exactly 1 argument
+    fn build_list_remove_at(
+        &self,
+        args: Vec<ParsedElement>,
+        function_name: &str,
+    ) -> ParseResult<OverrideValue> {
         if args.len() != 1 {
             return Err(ParseError {
-                message: "remove_at() requires exactly 1 argument: remove_at(index)".to_string(),
+                message: format!("{function_name}() requires exactly 1 integer index"),
                 position: self.pos,
             });
         }
@@ -2450,7 +2464,7 @@ impl OverrideParser {
             ParsedElement::Int(i) => *i,
             _ => {
                 return Err(ParseError {
-                    message: "remove_at() argument must be an integer index".to_string(),
+                    message: format!("{function_name}() argument must be an integer index"),
                     position: self.pos,
                 })
             }
@@ -2460,6 +2474,23 @@ impl OverrideParser {
             operation: ListOperationType::RemoveAt,
             values: vec![],
             index: Some(index),
+            end_index: None,
+        }))
+    }
+
+    fn build_list_remove(&self, args: Vec<ParsedElement>) -> ParseResult<OverrideValue> {
+        if args.len() != 1 {
+            return Err(ParseError {
+                message: "remove() requires exactly 1 value".to_string(),
+                position: self.pos,
+            });
+        }
+
+        Ok(OverrideValue::ListExtension(ListExtension {
+            operation: ListOperationType::RemoveValue,
+            values: args,
+            index: None,
+            end_index: None,
         }))
     }
 
@@ -2476,14 +2507,18 @@ impl OverrideParser {
             operation: ListOperationType::RemoveValue,
             values: args,
             index: None,
+            end_index: None,
         }))
     }
 
-    fn build_list_clear(&self, args: Vec<ParsedElement>) -> ParseResult<OverrideValue> {
-        // list_clear() - no arguments
+    fn build_list_clear(
+        &self,
+        args: Vec<ParsedElement>,
+        function_name: &str,
+    ) -> ParseResult<OverrideValue> {
         if !args.is_empty() {
             return Err(ParseError {
-                message: "list_clear() takes no arguments".to_string(),
+                message: format!("{function_name}() takes no arguments"),
                 position: self.pos,
             });
         }
@@ -2492,6 +2527,89 @@ impl OverrideParser {
             operation: ListOperationType::Clear,
             values: vec![],
             index: None,
+            end_index: None,
+        }))
+    }
+
+    fn build_list_append_unique(&self, args: Vec<ParsedElement>) -> ParseResult<OverrideValue> {
+        if args.is_empty() {
+            return Err(ParseError {
+                message: "append_unique() requires at least 1 argument".to_string(),
+                position: self.pos,
+            });
+        }
+
+        Ok(OverrideValue::ListExtension(ListExtension {
+            operation: ListOperationType::AppendUnique,
+            values: args,
+            index: None,
+            end_index: None,
+        }))
+    }
+
+    fn build_list_remove_all(&self, args: Vec<ParsedElement>) -> ParseResult<OverrideValue> {
+        if args.is_empty() {
+            return Err(ParseError {
+                message: "remove_all() requires at least 1 argument".to_string(),
+                position: self.pos,
+            });
+        }
+
+        Ok(OverrideValue::ListExtension(ListExtension {
+            operation: ListOperationType::RemoveAll,
+            values: args,
+            index: None,
+            end_index: None,
+        }))
+    }
+
+    fn build_list_extend_from(
+        &self,
+        args: Vec<ParsedElement>,
+        function_name: &str,
+    ) -> ParseResult<OverrideValue> {
+        if args.len() != 1
+            || !matches!(&args[0], ParsedElement::String(value) if value.starts_with("${") && value.ends_with('}'))
+        {
+            return Err(ParseError {
+                message: format!("{function_name}() requires exactly one interpolation"),
+                position: self.pos,
+            });
+        }
+
+        Ok(OverrideValue::ListExtension(ListExtension {
+            operation: ListOperationType::ExtendFrom,
+            values: args,
+            index: None,
+            end_index: None,
+        }))
+    }
+
+    fn build_list_delete_slice(&self, args: Vec<ParsedElement>) -> ParseResult<OverrideValue> {
+        if args.is_empty() || args.len() > 2 {
+            return Err(ParseError {
+                message: "delete_slice() requires 1 or 2 integer indexes".to_string(),
+                position: self.pos,
+            });
+        }
+
+        let indexes: Result<Vec<i64>, ParseError> = args
+            .iter()
+            .map(|arg| match arg {
+                ParsedElement::Int(index) => Ok(*index),
+                _ => Err(ParseError {
+                    message: "delete_slice() arguments must be integer indexes".to_string(),
+                    position: self.pos,
+                }),
+            })
+            .collect();
+        let indexes = indexes?;
+
+        Ok(OverrideValue::ListExtension(ListExtension {
+            operation: ListOperationType::DeleteSlice,
+            values: vec![],
+            index: Some(indexes[0]),
+            end_index: indexes.get(1).copied(),
         }))
     }
 
