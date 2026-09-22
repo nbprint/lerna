@@ -1,4 +1,5 @@
 # Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved
+import builtins
 import copy
 import logging
 import os
@@ -6,12 +7,13 @@ import re
 import sys
 from collections.abc import Sequence
 from contextlib import contextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 from os.path import splitext
 from pathlib import Path
 from textwrap import dedent
+from types import FrameType, FunctionType, TracebackType
 from typing import Any, cast
 
 from omegaconf import DictConfig, OmegaConf, open_dict, read_write
@@ -240,6 +242,9 @@ def _run_job(
             except Exception as e:  # noqa: BLE001
                 _log_job_error_to_file()
                 ret.return_value = e
+                ret._remote_traceback = _serialize_traceback(e.__traceback__)
+                ret._remote_exception_chain = _serialize_exception_chain(e)
+                ret._remote_exception_group = _serialize_exception_group(e)
                 ret.status = JobStatus.FAILED
             except KeyboardInterrupt as e:
                 ret.return_value = e
@@ -301,6 +306,174 @@ class JobStatus(Enum):
     FAILED = 2
 
 
+class _SyntheticTraceback(Exception):
+    pass
+
+
+_TRACEBACK_STUB = compile("raise _SyntheticTraceback", "<remote traceback>", "exec")
+_SerializedTraceback = list[tuple[str, str, int]]
+_SerializedExceptionChain = list[tuple[str, "_SerializedExceptionNode"]]
+_SerializedExceptionNode = tuple[
+    str,
+    str,
+    str,
+    bool,
+    _SerializedTraceback,
+    _SerializedExceptionChain,
+    list["_SerializedExceptionNode"],
+]
+_SerializedExceptionGroup = list[_SerializedExceptionNode]
+
+
+def _serialize_traceback(tb: TracebackType | None) -> _SerializedTraceback:
+    result = []
+    while tb is not None:
+        code = tb.tb_frame.f_code
+        result.append((code.co_filename, code.co_name, tb.tb_lineno))
+        tb = tb.tb_next
+    return result
+
+
+def _safe_exception_message(error: BaseException) -> str:
+    try:
+        return str(error)
+    except BaseException:  # noqa: BLE001
+        return "<exception message unavailable>"
+
+
+def _serialize_exception_chain(error: BaseException, ancestors: set[int] | None = None) -> _SerializedExceptionChain:
+    seen = set() if ancestors is None else set(ancestors)
+    seen.add(id(error))
+    if error.__cause__ is not None:
+        relation = "cause"
+        chained = error.__cause__
+    elif error.__context__ is not None and not error.__suppress_context__:
+        relation = "context"
+        chained = error.__context__
+    else:
+        return []
+    if id(chained) in seen:
+        return []
+    return [(relation, _serialize_exception_node(chained, seen))]
+
+
+def _exception_group_members(error: BaseException) -> Sequence[BaseException]:
+    group_type = getattr(builtins, "BaseExceptionGroup", None)
+    if group_type is None or not isinstance(error, group_type):
+        return ()
+    return cast(Sequence[BaseException], error.exceptions)
+
+
+def _serialize_exception_node(error: BaseException, ancestors: set[int] | None = None) -> _SerializedExceptionNode:
+    seen = set() if ancestors is None else set(ancestors)
+    seen.add(id(error))
+    error_type = type(error)
+    members = _exception_group_members(error)
+    message = cast(str, error.message) if members and hasattr(error, "message") else _safe_exception_message(error)
+    return (
+        error_type.__module__,
+        error_type.__qualname__,
+        message,
+        isinstance(error, Exception),
+        _serialize_traceback(error.__traceback__),
+        _serialize_exception_chain(error, seen),
+        [_serialize_exception_node(child, seen) for child in members],
+    )
+
+
+def _serialize_exception_group(
+    error: BaseException,
+) -> _SerializedExceptionGroup | None:
+    members = _exception_group_members(error)
+    if not members:
+        return None
+    return [_serialize_exception_node(member, {id(error)}) for member in members]
+
+
+def _create_synthetic_frame(filename: str, name: str, lineno: int) -> FrameType:
+    code = _TRACEBACK_STUB.replace(
+        co_filename=filename,
+        co_name=name,
+        co_firstlineno=lineno,
+    )
+    if hasattr(code, "co_qualname"):
+        code = code.replace(co_qualname=name)
+    function = FunctionType(code, {"_SyntheticTraceback": _SyntheticTraceback})
+    try:
+        function()
+    except _SyntheticTraceback as error:
+        tb = error.__traceback__
+        assert tb is not None and tb.tb_next is not None
+        return tb.tb_next.tb_frame
+    raise AssertionError("Synthetic traceback frame was not created")
+
+
+def _deserialize_traceback(
+    serialized: Sequence[tuple[str, str, int]],
+) -> TracebackType | None:
+    result: TracebackType | None = None
+    for filename, name, lineno in reversed(serialized):
+        frame = _create_synthetic_frame(filename, name, lineno)
+        result = TracebackType(result, frame, -1, lineno)
+    return result
+
+
+def _deserialize_exception_chain(
+    serialized: _SerializedExceptionChain,
+) -> tuple[str, BaseException] | None:
+    if not serialized:
+        return None
+    relation, node = serialized[0]
+    return relation, _deserialize_exception_node(node)
+
+
+def _deserialize_exception_node(serialized: _SerializedExceptionNode) -> BaseException:
+    module, qualname, message, is_exception, tb, chain, group = serialized
+    children = [_deserialize_exception_node(child) for child in group]
+    name = qualname.rsplit(".", maxsplit=1)[-1]
+    if children:
+        group_name = "ExceptionGroup" if is_exception else "BaseExceptionGroup"
+        group_base = cast(Any, getattr(builtins, group_name))
+        error_type = type(
+            name,
+            (group_base,),
+            {"__module__": module, "__qualname__": qualname},
+        )
+        error = error_type(message, children)
+    else:
+        base = Exception if is_exception else BaseException
+        error_type = type(
+            name,
+            (base,),
+            {"__module__": module, "__qualname__": qualname},
+        )
+        error = error_type(message)
+    error.__traceback__ = _deserialize_traceback(tb)
+    if chain:
+        relation, chained = cast(tuple[str, BaseException], _deserialize_exception_chain(chain))
+        if relation == "cause":
+            error.__cause__ = chained
+        else:
+            error.__context__ = chained
+    return error
+
+
+def _restore_exception_node(error: BaseException, serialized: _SerializedExceptionNode) -> None:
+    _, _, _, _, remote_traceback, remote_chain, remote_group = serialized
+    error.__traceback__ = _deserialize_traceback(remote_traceback)
+    if remote_chain:
+        relation, chained = cast(tuple[str, BaseException], _deserialize_exception_chain(remote_chain))
+        if relation == "cause":
+            error.__cause__ = chained
+        else:
+            error.__context__ = chained
+
+    members = _exception_group_members(error)
+    if len(members) == len(remote_group):
+        for member, child in zip(members, remote_group):
+            _restore_exception_node(member, child)
+
+
 @dataclass
 class JobReturn:
     overrides: Sequence[str] | None = None
@@ -310,6 +483,9 @@ class JobReturn:
     task_name: str | None = None
     status: JobStatus = JobStatus.UNKNOWN
     _return_value: Any = None
+    _remote_traceback: _SerializedTraceback | None = field(default=None, repr=False, compare=False)
+    _remote_exception_chain: _SerializedExceptionChain | None = field(default=None, repr=False, compare=False)
+    _remote_exception_group: _SerializedExceptionGroup | None = field(default=None, repr=False, compare=False)
 
     @property
     def return_value(self) -> Any:
@@ -318,6 +494,19 @@ class JobReturn:
             return self._return_value
         else:
             sys.stderr.write(f"Error executing job with overrides: {self.overrides}" + os.linesep)
+            if self._remote_traceback is not None and isinstance(self._return_value, BaseException) and self._return_value.__traceback__ is None:
+                if self._remote_exception_chain:
+                    relation, chained = cast(tuple[str, BaseException], _deserialize_exception_chain(self._remote_exception_chain))
+                    if relation == "cause":
+                        self._return_value.__cause__ = chained
+                    else:
+                        self._return_value.__context__ = chained
+                if self._remote_exception_group:
+                    members = _exception_group_members(self._return_value)
+                    if len(members) == len(self._remote_exception_group):
+                        for member, child in zip(members, self._remote_exception_group, strict=False):
+                            _restore_exception_node(member, child)
+                raise self._return_value.with_traceback(_deserialize_traceback(self._remote_traceback))
             raise self._return_value
 
     @return_value.setter

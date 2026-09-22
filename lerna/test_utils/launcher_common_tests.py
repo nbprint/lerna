@@ -6,6 +6,7 @@ Common test functions testing launchers
 import copy
 import os
 import re
+import traceback
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
@@ -86,6 +87,48 @@ class LauncherTestSuite:
             ),
         ):
             pass
+
+    def test_failure_preserves_task_traceback(
+        self,
+        hydra_sweep_runner: TSweepRunner,
+        launcher_name: str,
+        overrides: list[str],
+        tmpdir: Path,
+    ) -> None:
+        def task_func(_: DictConfig) -> None:
+            try:
+                raise ValueError("launcher cause")
+            except ValueError as cause:
+                raise RuntimeError("launcher failure") from cause
+
+        sweep = hydra_sweep_runner(
+            calling_file=None,
+            calling_module="lerna.test_utils.a_module",
+            task_function=task_func,
+            config_path="configs",
+            config_name="compose.yaml",
+            overrides=["hydra/launcher=" + launcher_name] + overrides,
+            temp_dir=tmpdir,
+        )
+        try:
+            with sweep:
+                pass
+        except RuntimeError as error:
+            failure = error
+        else:
+            assert sweep.returns is not None
+            with raises(RuntimeError, match="launcher failure") as exc_info:
+                _ = sweep.returns[0][0].return_value
+            failure = exc_info.value
+
+        assert str(failure) == "launcher failure"
+        frames = traceback.extract_tb(failure.__traceback__)
+        assert any(frame.name == "task_func" and Path(frame.filename).name == Path(__file__).name for frame in frames)
+        formatted = "".join(traceback.TracebackException.from_exception(failure).format())
+        assert "ValueError: launcher cause" in formatted
+        assert "The above exception was the direct cause" in formatted
+        assert "in task_func" in formatted
+        assert "RuntimeError: launcher failure" in formatted
 
     def test_sweep_1_job_strict(
         self,
