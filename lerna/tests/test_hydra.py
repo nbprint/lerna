@@ -12,6 +12,9 @@ from omegaconf import DictConfig, OmegaConf
 from pytest import mark, param, raises
 
 from lerna import MissingConfigException, version
+from lerna.core.hydra_config import HydraConfig
+from lerna.core.plugins import Plugins
+from lerna.experimental.callback import Callback
 from lerna.test_utils.test_utils import (
     TSweepRunner,
     TTaskRunner,
@@ -1885,3 +1888,76 @@ def test_hydra_runtime_choice_1882(tmpdir: Path) -> None:
         from_name="Expected output",
         to_name="Actual output",
     )
+
+
+RESOLVED: dict[str, Any] = {}
+
+
+class ControllerProbe(Callback):
+    """Records controller-side ${hydra:...} resolution during multirun startup."""
+
+    def on_multirun_start(self, config: DictConfig, **kwargs: Any) -> None:
+        RESOLVED["controller_cwd"] = HydraConfig.get().runtime.cwd
+
+
+def test_multirun_controller_resolution_and_restore(
+    hydra_restore_singletons: Any,
+    hydra_sweep_runner: TSweepRunner,
+    tmpdir: Path,
+) -> None:
+    """Controller-side ${hydra:...} resolves and HydraConfig is restored afterwards."""
+    RESOLVED.clear()
+    assert not HydraConfig.initialized()
+    seen: dict[str, Any] = {}
+
+    def task(cfg: DictConfig) -> None:
+        seen["job_id"] = HydraConfig.get().job.id
+
+    with hydra_sweep_runner(
+        calling_file="lerna/tests/test_apps/simple_app/my_app.py",
+        calling_module=None,
+        config_path=None,
+        config_name=None,
+        task_function=task,
+        overrides=[
+            "+x=1",
+            "+hydra.callbacks.probe._target_=lerna.tests.test_hydra.ControllerProbe",
+        ],
+        temp_dir=tmpdir,
+    ):
+        pass
+
+    assert RESOLVED.get("controller_cwd") == os.getcwd()
+    assert seen["job_id"] == "0"
+    assert not HydraConfig.initialized()
+
+
+def test_multirun_restores_hydra_config_when_sweep_raises(
+    hydra_restore_singletons: Any,
+    hydra_sweep_runner: TSweepRunner,
+    tmpdir: Path,
+    monkeypatch: Any,
+) -> None:
+    """HydraConfig must be restored even when the sweep raises."""
+    assert not HydraConfig.initialized()
+
+    def boom(*args: Any, **kwargs: Any) -> Any:
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr(Plugins, "instantiate_sweeper", boom)
+
+    with (
+        raises(RuntimeError, match="boom"),
+        hydra_sweep_runner(
+            calling_file="lerna/tests/test_apps/simple_app/my_app.py",
+            calling_module=None,
+            config_path=None,
+            config_name=None,
+            task_function=None,
+            overrides=["+x=1"],
+            temp_dir=tmpdir,
+        ),
+    ):
+        pass
+
+    assert not HydraConfig.initialized()

@@ -44,6 +44,7 @@ def simple_stdout_log_config(level: int = logging.INFO) -> None:
 def configure_log(
     log_config: DictConfig,
     verbose_config: bool | str | Sequence[str] = False,
+    execution_whitelist: Any = None,
 ) -> None:
     assert isinstance(verbose_config, (bool, str)) or OmegaConf.is_list(verbose_config)
     if log_config is not None:
@@ -51,10 +52,10 @@ def configure_log(
             log_config, resolve=True
         )
         if conf["root"] is not None:
-            # Imported lazily because target policy resolution imports core.utils.
+            # Imported lazily because execution policy resolution imports core.utils.
             from lerna._internal.logging_config import configure_logging
 
-            configure_logging(conf)
+            configure_logging(conf, execution_whitelist)
     else:
         # default logging to stdout
         root = logging.getLogger()
@@ -121,6 +122,28 @@ def _check_hydra_context(hydra_context: HydraContext | None) -> None:
 
 
 def run_job(
+    task_function: TaskFunction,
+    config: DictConfig,
+    job_dir_key: str,
+    job_subdir_key: str | None,
+    hydra_context: HydraContext,
+    configure_logging: bool = True,
+) -> "JobReturn":
+    # Imported lazily because execution_policy's resolver imports core.utils.
+    from lerna._internal.execution_policy import execution_whitelist
+
+    with execution_whitelist(hydra_context.execution_whitelist, reset=True):
+        return _run_job(
+            task_function=task_function,
+            config=config,
+            job_dir_key=job_dir_key,
+            job_subdir_key=job_subdir_key,
+            hydra_context=hydra_context,
+            configure_logging=configure_logging,
+        )
+
+
+def _run_job(
     task_function: TaskFunction,
     config: DictConfig,
     job_dir_key: str,
@@ -196,7 +219,11 @@ def run_job(
             ret.working_dir = os.getcwd()
 
         if configure_logging:
-            configure_log(config.hydra.job_logging, config.hydra.verbose)
+            configure_log(
+                config.hydra.job_logging,
+                config.hydra.verbose,
+                execution_whitelist=hydra_context.execution_whitelist,
+            )
 
         if config.hydra.output_subdir is not None:
             hydra_output = Path(config.hydra.runtime.output_dir) / Path(config.hydra.output_subdir)

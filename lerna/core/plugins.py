@@ -14,6 +14,7 @@ from typing import Any
 
 from omegaconf import DictConfig
 
+from lerna._internal.execution_policy import _trusted_internal_target
 from lerna._internal.sources_registry import SourcesRegistry
 from lerna.core.singleton import Singleton
 from lerna.plugins.completion_plugin import CompletionPlugin
@@ -111,7 +112,13 @@ class Plugins(metaclass=Singleton):
             if classname not in self.class_name_to_class:
                 raise RuntimeError(f"Unknown plugin class : '{classname}'")
             clazz = self.class_name_to_class[classname]
-            plugin = instantiate(config=config, _target_=clazz)
+            with _trusted_internal_target(classname):
+                plugin = instantiate(
+                    config=config,
+                    _target_=clazz,
+                    _execution_whitelist_=classname,
+                    _recursive_=False,
+                )
             assert isinstance(plugin, Plugin)
 
         except ImportError as e:

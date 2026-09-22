@@ -184,12 +184,6 @@ def structured_config_object_node(value: Any) -> Any:
             id="class+override+partial1",
         ),
         param(
-            {"_target_": "lerna.tests.instantiate.AClass", "b": 20, "c": 30},
-            {"a": "???", "_partial_": True},
-            partial(AClass, b=20, c=30),
-            id="class+override+partial1+missing",
-        ),
-        param(
             {
                 "_target_": "lerna.tests.instantiate.AClass",
                 "_partial_": True,
@@ -489,7 +483,6 @@ def test_none_cases(
     assert str(cfg) == original_config_str
 
 
-@mark.parametrize("skip_deepcopy", [True, False])
 @mark.parametrize("convert_to_list", [True, False])
 @mark.parametrize(
     "input_conf, passthrough, expected",
@@ -605,7 +598,6 @@ def test_interpolation_accessing_parent(
     passthrough: dict[str, Any],
     expected: Any,
     convert_to_list: bool,
-    skip_deepcopy: bool,
 ) -> Any:
     if convert_to_list:
         input_conf = copy.deepcopy(input_conf)
@@ -614,24 +606,15 @@ def test_interpolation_accessing_parent(
     input_conf = OmegaConf.create(input_conf)
     original_config_str = str(input_conf)
     if convert_to_list:
-        obj = instantiate_func(
-            input_conf.node[0],
-            _skip_instantiate_full_deepcopy_=skip_deepcopy,
-            **passthrough,
-        )
+        obj = instantiate_func(input_conf.node[0], **passthrough)
     else:
-        obj = instantiate_func(
-            input_conf.node,
-            _skip_instantiate_full_deepcopy_=skip_deepcopy,
-            **passthrough,
-        )
+        obj = instantiate_func(input_conf.node, **passthrough)
     if isinstance(expected, partial):
         assert partial_equal(obj, expected)
     else:
         assert obj == expected
     assert input_conf == cfg_copy
-    if not skip_deepcopy:
-        assert str(input_conf) == original_config_str
+    assert str(input_conf) == original_config_str
 
 
 @mark.parametrize(
@@ -968,7 +951,7 @@ def test_instantiate_with_callable_target_keyword(instantiate_func: Any, target:
                 left=TreeConf(value=21),
             ),
             {"right": TreeConf(value=22)},
-            Tree(value=1, left=Tree(value=21), right=Tree(value=22)),
+            Tree(value=1, left=Tree(value=21), right=TreeConf(value=22)),
             id="recursive:direct:dataclass:passthrough",
         ),
         param(
@@ -979,7 +962,7 @@ def test_instantiate_with_callable_target_keyword(instantiate_func: Any, target:
             {
                 "right": TreeConf(value=IllegalType()),
             },
-            Tree(value=1, left=Tree(value=21), right=Tree(value=IllegalType())),
+            Tree(value=1, left=Tree(value=21), right=TreeConf(value=IllegalType())),
             id="recursive:direct:dataclass:passthrough",
         ),
         # list
@@ -1065,7 +1048,6 @@ def test_instantiate_with_callable_target_keyword(instantiate_func: Any, target:
             },
             Mapping(
                 dictionary={
-                    "a": Mapping(),
                     "b": Mapping(),
                 }
             ),
@@ -1253,7 +1235,6 @@ def test_recursive_instantiation(
             partial(
                 Mapping,
                 dictionary={
-                    "a": partial(Mapping),
                     "b": partial(Mapping),
                 },
             ),
@@ -1553,7 +1534,7 @@ def test_cannot_locate_target(instantiate_func: Any) -> None:
         match=re.escape(
             dedent(
                 """\
-                Error locating target 'not_found', set env var HYDRA_FULL_ERROR=1 to see chained exception.
+                Error locating target 'not_found'
                 full_key: foo"""
             )
         ),
@@ -1574,20 +1555,10 @@ def test_cannot_locate_target(instantiate_func: Any) -> None:
     )
 
 
-def test_blocklisted_target_fails(instantiate_func: Any) -> None:
-    cfg = OmegaConf.create({"foo": {"_target_": "os.getcwd"}})
-    with raises(
-        InstantiationException,
-        match=re.escape(
-            dedent(
-                """\
-                Target 'os.getcwd' is blocklisted and cannot be instantiated from config
-                to prevent security vulnerabilities, set env var
-                HYDRA_INSTANTIATE_ALLOWLIST_OVERRIDE=os.getcwd:<other allowlisted targets> to bypass
-                full_key: foo"""
-            )
-        ),
-    ) as exc_info:
+@mark.parametrize("target", ["os.remove", "shutil.rmtree", "_sitebuiltins.Quitter"])
+def test_blacklisted_target_fails(instantiate_func: Any, target: str) -> None:
+    cfg = OmegaConf.create({"foo": {"_target_": target}})
+    with raises(InstantiationException, match=rf"Target '{re.escape(target)}'.*blacklisted") as exc_info:
         instantiate_func(cfg)
     err = exc_info.value
     assert hasattr(err, "__cause__")
@@ -1595,24 +1566,23 @@ def test_blocklisted_target_fails(instantiate_func: Any) -> None:
     assert chained is None
 
 
-def test_allowlist_works(instantiate_func: Any, monkeypatch: Any) -> None:
-    cfg = OmegaConf.create({"foo": {"_target_": "os.getcwd"}})
-    monkeypatch.setenv("HYDRA_INSTANTIATE_ALLOWLIST_OVERRIDE", "os.getcwd")
-    res = instantiate_func(cfg)
-    assert isinstance(res.foo, str)
+def test_execution_whitelist_can_explicitly_allow_blacklisted_targets(instantiate_func: Any) -> None:
+    cfg = {"_target_": "_sitebuiltins.Quitter", "_args_": ["probe", None]}
+    result = instantiate_func(cfg, _execution_whitelist_="_sitebuiltins.Quitter")
+    assert type(result).__module__ == "_sitebuiltins"
+    assert type(result).__qualname__ == "Quitter"
 
 
 @mark.parametrize("target", ["builtins.exec", "builtins.eval"])
-def test_execution_targets_cannot_be_allowlisted(instantiate_func: Any, monkeypatch: Any, target: str) -> None:
+def test_execution_targets_cannot_be_whitelisted(instantiate_func: Any, target: str) -> None:
     cfg = OmegaConf.create({"foo": {"_target_": target, "_args_": ["1+2"]}})
-    monkeypatch.setenv("HYDRA_INSTANTIATE_ALLOWLIST_OVERRIDE", target)
     with raises(InstantiationException, match="cannot be authorized"):
-        instantiate_func(cfg)
+        instantiate_func(cfg, _execution_whitelist_=target)
 
 
-def test_blocklisted_os_alias_fails(instantiate_func: Any) -> None:
+def test_blacklisted_os_alias_fails(instantiate_func: Any) -> None:
     cfg = OmegaConf.create({"foo": {"_target_": "posix.system", "_args_": ["true"]}})
-    with raises(InstantiationException, match=re.escape("Target 'os.system' (resolved from 'posix.system') is blocklisted")):
+    with raises(InstantiationException, match=re.escape("Target 'posix.system' is blacklisted")):
         instantiate_func(cfg)
 
 

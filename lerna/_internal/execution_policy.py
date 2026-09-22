@@ -1,0 +1,1774 @@
+# SPDX-FileCopyrightText: Contributors to Hydra
+# SPDX-License-Identifier: MIT
+
+import copy
+import functools
+import hashlib
+import itertools
+import json
+import operator
+import os
+import sys
+import types
+from collections.abc import Callable, Iterator, Mapping, Sequence
+from contextlib import contextmanager, nullcontext
+from contextvars import Context, ContextVar
+from textwrap import dedent
+from typing import (
+    Any,
+    NamedTuple,
+    SupportsIndex,
+    cast,
+)
+
+from lerna._internal.utils import _locate
+from lerna.errors import InstantiationException
+
+# Threat model: declarative instantiation and logging configuration may be
+# untrusted. Installed Python code and execution whitelists supplied by trusted
+# Python code are trusted. This policy prevents configuration from changing
+# Hydra's authorization state or existing Python code; it is not a Python
+# sandbox. UNSAFE_DISABLE_EXECUTION_CHECKS explicitly disables these checks.
+
+# This blacklist is a best-effort, defense-in-depth stopgap that refuses the
+# most obvious dangerous _target_ values on the legacy (no _execution_whitelist_)
+# path. It is NOT a security boundary and is intentionally not exhaustive.
+#
+# Known limitation - indirect dispatch: user-defined targets can invoke a
+# blocked method without ever naming it as a _target_. The method name is data,
+# not a target, so name-based blocking cannot see it. Hydra blocks the generic
+# standard-library dispatch primitives identified here, but cannot exhaustively
+# identify equivalent application wrappers. An execution whitelist supplied from
+# trusted Python code is the real security boundary.
+# Generally problematic targets are refused on the legacy path, but trusted
+# Python code may authorize them with an execution whitelist. Keep this set
+# for operations whose effect is fully named and bounded by the target itself.
+DEFAULT_BLACKLISTED_MODULES = frozenset(
+    {
+        "_sitebuiltins.Quitter",
+        "builtins.exit",
+        "builtins.quit",
+        "os.kill",
+        "os.remove",
+        "os.removedirs",
+        "os.rmdir",
+        "os.fchdir",
+        "os.setuid",
+        "os.fork",
+        "os.forkpty",
+        "os.killpg",
+        "os.rename",
+        "os.renames",
+        "os.truncate",
+        "os.replace",
+        "os.unlink",
+        "os.fchmod",
+        "os.fchown",
+        "os.chmod",
+        "os.chown",
+        "os.chroot",
+        "os.lchflags",
+        "os.lchmod",
+        "os.lchown",
+        "os.chdir",
+        "shutil.rmtree",
+        "shutil.move",
+        "shutil.chown",
+    }
+)
+
+# These dispatchers execute caller-supplied callables and return their results
+# directly or through a container, iterator, or deferred result. That allows
+# selection, wrapping, and invocation to happen outside instantiate's immediate
+# callable-result authorization.
+CALLBACK_DISPATCH_TARGETS = frozenset(
+    {
+        "builtins.filter",
+        "builtins.map",
+        "concurrent.futures._base.Executor.map",
+        "concurrent.futures._base.Executor.submit",
+        "concurrent.futures.process.ProcessPoolExecutor.map",
+        "concurrent.futures.process.ProcessPoolExecutor.submit",
+        "concurrent.futures.thread.ThreadPoolExecutor.submit",
+        "functools.reduce",
+        "itertools.accumulate",
+        "itertools.dropwhile",
+        "itertools.filterfalse",
+        "itertools.groupby",
+        "itertools.starmap",
+        "itertools.takewhile",
+        "multiprocessing.pool.Pool._map_async",
+        "multiprocessing.pool.Pool.apply",
+        "multiprocessing.pool.Pool.apply_async",
+        "multiprocessing.pool.Pool.imap",
+        "multiprocessing.pool.Pool.imap_unordered",
+        "multiprocessing.pool.Pool.map",
+        "multiprocessing.pool.Pool.map_async",
+        "multiprocessing.pool.Pool.starmap",
+        "multiprocessing.pool.Pool.starmap_async",
+        "_functools.reduce",
+    }
+)
+
+_CALLABLE_DESCRIPTOR_BINDING_TARGETS: Mapping[type, str] = types.MappingProxyType(
+    {
+        property: "builtins.property.__get__",
+        types.ClassMethodDescriptorType: "types.ClassMethodDescriptorType.__get__",
+        types.FunctionType: "types.FunctionType.__get__",
+        types.MethodDescriptorType: "types.MethodDescriptorType.__get__",
+        types.WrapperDescriptorType: "types.WrapperDescriptorType.__get__",
+    }
+)
+
+# These helpers construct, bind, or relabel callable wrappers whose later
+# invocation can return an unauthorized callable outside instantiate's result
+# mediation.
+CALLABLE_WRAPPER_TARGETS = frozenset(
+    {
+        "abc.abstractmethod",
+        "builtins.classmethod",
+        "builtins.property",
+        "builtins.staticmethod",
+        "contextlib.AsyncContextDecorator.__call__",
+        "contextlib.ContextDecorator.__call__",
+        "contextlib.asynccontextmanager",
+        "contextlib.contextmanager",
+        "functools.cache",
+        "functools.cached_property",
+        "functools.lru_cache",
+        "functools.partialmethod",
+        "functools.partialmethod.__get__",
+        "functools.singledispatch",
+        "functools.singledispatchmethod",
+        "functools.singledispatchmethod.__get__",
+        "functools.update_wrapper",
+        "functools.wraps",
+        "types.FunctionType",
+        "types.MethodType",
+        "types.coroutine",
+        "unittest.mock.AsyncMock",
+        "unittest.mock.MagicMock",
+        "unittest.mock.Mock",
+        "unittest.mock.PropertyMock",
+        "unittest.mock.create_autospec",
+        "unittest.mock.mock_open",
+    }
+) | frozenset(_CALLABLE_DESCRIPTOR_BINDING_TARGETS.values())
+
+_NON_CALLABLE_MOCK_TARGETS = frozenset(
+    {
+        "unittest.mock.NonCallableMagicMock",
+        "unittest.mock.NonCallableMock",
+    }
+)
+_NON_CALLABLE_MOCK_SAFE_PARAMETERS = frozenset({"name", "spec", "spec_set"})
+
+# These targets allow config data to select or supply executable behavior.
+# They are refused both on the legacy path and by a real execution whitelist.
+# UNSAFE_DISABLE_EXECUTION_CHECKS remains the explicit opt-out from all checks.
+UNCONTROLLED_EXECUTION_TARGETS = frozenset(
+    {
+        "_sitebuiltins._Helper",
+        "builtins.__build_class__",
+        "builtins.__import__",
+        "builtins.compile",
+        "builtins.eval",
+        "builtins.exec",
+        "builtins.frame.clear",
+        "builtins.getset_descriptor.__get__",
+        "builtins.help",
+        "builtins.locals",
+        "builtins.member_descriptor.__get__",
+        "builtins.type.__new__",
+        # vars() exposes the caller's locals, while vars(obj) exposes an object
+        # namespace selected by config. Block both forms intentionally rather
+        # than maintain an argument-sensitive exception for vars(obj).
+        "builtins.vars",
+        "inspect",
+        # Generic dispatch primitives delegate the effective callable, selected
+        # member, or operation to config data instead of naming it as _target_.
+        # Include public and canonical C-module spellings.
+        "operator.attrgetter",
+        "operator.call",
+        "operator.contains",
+        "operator.delitem",
+        "operator.getitem",
+        "operator.itemgetter",
+        "operator.methodcaller",
+        "operator.setitem",
+        "_operator.attrgetter",
+        "_operator.call",
+        "_operator.contains",
+        "_operator.delitem",
+        "_operator.getitem",
+        "_operator.itemgetter",
+        "_operator.methodcaller",
+        "_operator.setitem",
+        "ctypes.CDLL",
+        "ctypes.LibraryLoader.LoadLibrary",
+        "ctypes.OleDLL",
+        "ctypes.PyDLL",
+        "ctypes.WinDLL",
+        "ctypes.cdll.LoadLibrary",
+        "ctypes.oledll.LoadLibrary",
+        "ctypes.pydll.LoadLibrary",
+        "ctypes.windll.LoadLibrary",
+        "dataclasses.make_dataclass",
+        "importlib.import_module",
+        "importlib.machinery.ExtensionFileLoader.create_module",
+        "importlib.machinery.ExtensionFileLoader.exec_module",
+        "importlib.machinery.ExtensionFileLoader.load_module",
+        "importlib.machinery.SourceFileLoader.exec_module",
+        "importlib.machinery.SourceFileLoader.load_module",
+        "importlib.machinery.SourcelessFileLoader.exec_module",
+        "importlib.machinery.SourcelessFileLoader.load_module",
+        "_frozen_importlib_external.ExtensionFileLoader.create_module",
+        "_frozen_importlib_external.ExtensionFileLoader.exec_module",
+        "_frozen_importlib_external.FileLoader.load_module",
+        "_frozen_importlib_external._LoaderBasics.exec_module",
+        "os.popen",
+        "os.posix_spawn",
+        "os.posix_spawnp",
+        "os.putenv",
+        "os.startfile",
+        "os.system",
+        "os.unsetenv",
+        "pty.spawn",
+        "runpy.run_module",
+        "runpy.run_path",
+        "subprocess.Popen",
+        "subprocess.call",
+        "subprocess.check_call",
+        "subprocess.check_output",
+        "subprocess.getoutput",
+        "subprocess.getstatusoutput",
+        "subprocess.run",
+        "sys.exc_info",
+        "sys.exception",
+        "sys._current_exceptions",
+        "sys._current_frames",
+        "sys._getframe",
+        # Available only in CPython trace-refs builds; enumerates live objects.
+        "sys.getobjects",
+        # Formatting field syntax performs attribute and item traversal using
+        # config-controlled field names. Block the traversal entry points while
+        # leaving ordinary formatting in trusted Python untouched.
+        "builtins.str.format",
+        "builtins.str.format_map",
+        "logging.Formatter",
+        "logging.StrFormatStyle",
+        "string.Formatter._vformat",
+        "string.Formatter.format",
+        "string.Formatter.get_field",
+        "string.Formatter.vformat",
+        "_asyncio.Task.get_stack",
+        "asyncio.base_tasks._task_get_stack",
+        "asyncio.tasks.Task.get_stack",
+        "traceback.clear_frames",
+        "traceback._walk_tb_with_full_positions",
+        "traceback.walk_stack",
+        "traceback.walk_tb",
+        # Unsafe deserialization sinks. Include friendly and canonical C spellings
+        # so resolved identities such as pickle.loads -> _pickle.loads are caught.
+        "pickle.load",
+        "pickle.loads",
+        "pickle.Unpickler",
+        "pickle._load",
+        "pickle._loads",
+        "pickle._Unpickler",
+        "_pickle.load",
+        "_pickle.loads",
+        "_pickle.Unpickler",
+        "marshal.load",
+        "marshal.loads",
+        "tracemalloc.Snapshot.load",
+        "dill.load",
+        "dill.loads",
+        "cloudpickle.load",
+        "cloudpickle.loads",
+        # Exec/eval wrappers that run config-supplied strings or code objects.
+        "timeit.timeit",
+        "timeit.repeat",
+        "timeit.main",
+        "timeit.Timer.timeit",
+        "timeit.Timer.repeat",
+        "timeit.Timer.autorange",
+        "cProfile.run",
+        "cProfile.runctx",
+        "cProfile.Profile.run",
+        "cProfile.Profile.runctx",
+        "profile.run",
+        "profile.runctx",
+        "profile.Profile.run",
+        "profile.Profile.runctx",
+        "code.interact",
+        "code.InteractiveInterpreter.runsource",
+        "code.InteractiveInterpreter.runcode",
+        "code.InteractiveConsole.push",
+        # Annotation evaluators: these execute string annotations as expressions.
+        # Include compatibility and canonical spellings across Python versions.
+        "typing.ForwardRef._evaluate",
+        "typing._eval_type",
+        "typing.evaluate_forward_ref",
+        "typing.get_type_hints",
+        "types.new_class",
+        "unittest.mock.patch",
+        "unittest.mock.patch.dict",
+        "unittest.mock.patch.multiple",
+        "unittest.mock.patch.object",
+        "annotationlib.ForwardRef._evaluate",
+        "annotationlib.ForwardRef.evaluate",
+        "annotationlib.get_annotations",
+        "optparse.Values.read_file",
+        "optparse.Values.read_module",
+    }
+    | CALLBACK_DISPATCH_TARGETS
+    | CALLABLE_WRAPPER_TARGETS
+)
+
+# These package families contain version-specific execution, import, debugger,
+# or unsafe loading surfaces. Prefixes make coverage version-resilient; narrow
+# inert constructors with plausible instantiate() use are excepted below.
+UNCONTROLLED_EXECUTION_TARGET_PREFIXES = (
+    # Reflection helpers expose live Python objects and code metadata. Block
+    # the whole family because individual accessors cannot be mediated safely.
+    "gc.",
+    "inspect.",
+    "os.exec",
+    "os.spawn",
+    # Whole logging.config namespace: dictConfig/fileConfig and every
+    # BaseConfigurator/DictConfigurator method resolve and call config-named
+    # factories (arbitrary code) on the legacy/no-whitelist path. Block the
+    # family with one prefix instead of enumerating methods. Stopgap only; the
+    # permanent control for logging config is the execution whitelist (GHSA-c3wx).
+    # Hydra's own logging calls logging.config.dictConfig directly (not via
+    # instantiate), so this does not affect it.
+    "logging.config.",
+    # doctest executes example code from docstrings/files (run_docstring_examples,
+    # testmod, testfile, DocTestRunner.run, ...). Block the family by default;
+    # inert constructors used to assemble tests are excepted below.
+    "doctest.",
+    # Whole-module deserialization/tracing machinery. shelve.* shelf classes
+    # unpickle values on access; trace.* delegates to CoverageResults which
+    # unpickles a counts file. The inert Trace constructor is excepted below.
+    "shelve.",
+    "trace.",
+    # pydoc imports/executes modules and files (importfile runs a file,
+    # safeimport imports by name). Inert documentation formatters are excepted
+    # below.
+    "pydoc.",
+    # Debugger machinery: pdb/bdb run/eval user strings (pdb.run/runeval,
+    # Pdb._getval/_getval_except/default, Bdb.run/runeval/runctx). Whole
+    # families; no legitimate instantiate() use.
+    "pdb.",
+    "bdb.",
+)
+
+# Exact legitimate constructors within otherwise denied module families. Exact
+# entries in UNCONTROLLED_EXECUTION_TARGETS still take precedence over exceptions.
+# An exception permits only the named target, not its methods or descendants.
+UNCONTROLLED_EXECUTION_TARGET_PREFIX_EXCEPTIONS = frozenset(
+    {
+        "doctest.DocTest",
+        "doctest.DocTestParser",
+        "doctest.Example",
+        "pydoc.HTMLDoc",
+        "pydoc.TextDoc",
+        "trace.Trace",
+    }
+)
+
+# These additional callables cannot be safely authorized by the target-name
+# whitelist, but retain temporary legacy compatibility while users migrate.
+# Uncontrolled-execution targets above are independently non-whitelistable and
+# blocked on the legacy path.
+LEGACY_COMPATIBLE_NON_WHITELISTABLE_TARGETS = frozenset(
+    {
+        "builtins.delattr",
+        "builtins.getattr",
+        "builtins.hasattr",
+        "builtins.object.__getattribute__",
+        "builtins.setattr",
+        "builtins.type.__getattribute__",
+        "lerna._internal.instantiate._instantiate2.instantiate",
+        # Hydra may be installed alongside Lerna; its instantiate is an
+        # equivalent uncontrolled dispatch surface.
+        "hydra._internal.instantiate._instantiate2.instantiate",
+    }
+)
+
+# These targets resolve another object from a config-controlled dotpath. The
+# selected path is itself an authorization boundary, independent of whether the
+# helper is called immediately or returned through Hydra-native partial support.
+DISCOVERY_TARGETS = frozenset(
+    {
+        # Underlying resolver used by the public helpers. Gate it independently so
+        # a broad lerna.* whitelist cannot authorize an arbitrary import path.
+        "lerna._internal.utils._locate",
+        "lerna.utils.get_class",
+        "lerna.utils.get_method",
+        # get_static_method is currently an alias of get_method; list it explicitly
+        # so gating does not depend on that aliasing implementation detail.
+        "lerna.utils.get_static_method",
+        "lerna.utils.get_object",
+        # Hydra's equivalents, gated too: Hydra may be installed alongside Lerna.
+        "hydra._internal.utils._locate",
+        "hydra._internal._locate._locate",
+        "hydra.utils.get_class",
+        "hydra.utils.get_method",
+        "hydra.utils.get_static_method",
+        "hydra.utils.get_object",
+    }
+)
+
+_PROTECTED_FUNCTION_ATTRIBUTES = frozenset(
+    {
+        "__annotations__",
+        "__annotate__",
+        "__builtins__",
+        "__closure__",
+        "__code__",
+        "__defaults__",
+        "__dict__",
+        "__globals__",
+        "__kwdefaults__",
+    }
+)
+
+
+class _UnsafeDisableExecutionChecks:
+    def __repr__(self) -> str:
+        return "UNSAFE_DISABLE_EXECUTION_CHECKS"
+
+    def __reduce__(self) -> Any:
+        return (_get_unsafe_disable_execution_checks, ())
+
+
+def _get_unsafe_disable_execution_checks() -> "_UnsafeDisableExecutionChecks":
+    return UNSAFE_DISABLE_EXECUTION_CHECKS
+
+
+UNSAFE_DISABLE_EXECUTION_CHECKS = _UnsafeDisableExecutionChecks()
+NormalizedExecutionWhitelist = tuple[str, ...] | _UnsafeDisableExecutionChecks | None
+_EXECUTION_WHITELIST_CONTEXT: ContextVar[NormalizedExecutionWhitelist] = ContextVar("lerna_execution_whitelist", default=None)
+
+
+class _ExecutionPolicySnapshot(NamedTuple):
+    default_blacklisted_modules: frozenset[str]
+    callable_descriptor_binding_targets: tuple[tuple[type, str], ...]
+    non_callable_mock_targets: frozenset[str]
+    non_callable_mock_safe_parameters: frozenset[str]
+    uncontrolled_execution_targets: frozenset[str]
+    uncontrolled_execution_target_prefixes: tuple[str, ...]
+    uncontrolled_execution_target_prefix_exceptions: frozenset[str]
+    legacy_compatible_non_whitelistable_targets: frozenset[str]
+    discovery_targets: frozenset[str]
+    protected_function_attributes: frozenset[str]
+    protected_objects: tuple[Any, ...]
+
+
+_EXECUTION_POLICY_CONTEXT: ContextVar[_ExecutionPolicySnapshot | None] = ContextVar("lerna_execution_policy", default=None)
+_TRUSTED_INTERNAL_TARGET_CONTEXT: ContextVar[str | None] = ContextVar("lerna_trusted_internal_target", default=None)
+
+
+def _checked_frozenset(name: str, value: Any) -> frozenset[str]:
+    if type(value) is not frozenset or any(type(item) is not str for item in value):
+        raise InstantiationException(f"Hydra execution policy integrity check failed for {name}")
+    return value
+
+
+def _capture_execution_policy() -> _ExecutionPolicySnapshot:
+    if type(UNCONTROLLED_EXECUTION_TARGET_PREFIXES) is not tuple or any(type(item) is not str for item in UNCONTROLLED_EXECUTION_TARGET_PREFIXES):
+        raise InstantiationException("Hydra execution policy integrity check failed for UNCONTROLLED_EXECUTION_TARGET_PREFIXES")
+    if type(_CALLABLE_DESCRIPTOR_BINDING_TARGETS) is not types.MappingProxyType:
+        raise InstantiationException("Hydra execution policy integrity check failed for _CALLABLE_DESCRIPTOR_BINDING_TARGETS")
+    descriptor_items = tuple(_CALLABLE_DESCRIPTOR_BINDING_TARGETS.items())
+    if any(not isinstance(key, type) or type(value) is not str for key, value in descriptor_items):
+        raise InstantiationException("Hydra execution policy integrity check failed for _CALLABLE_DESCRIPTOR_BINDING_TARGETS")
+
+    protected_objects = (
+        DEFAULT_BLACKLISTED_MODULES,
+        CALLBACK_DISPATCH_TARGETS,
+        _CALLABLE_DESCRIPTOR_BINDING_TARGETS,
+        CALLABLE_WRAPPER_TARGETS,
+        _NON_CALLABLE_MOCK_TARGETS,
+        _NON_CALLABLE_MOCK_SAFE_PARAMETERS,
+        UNCONTROLLED_EXECUTION_TARGETS,
+        UNCONTROLLED_EXECUTION_TARGET_PREFIXES,
+        UNCONTROLLED_EXECUTION_TARGET_PREFIX_EXCEPTIONS,
+        LEGACY_COMPATIBLE_NON_WHITELISTABLE_TARGETS,
+        DISCOVERY_TARGETS,
+        _PROTECTED_FUNCTION_ATTRIBUTES,
+        _EXECUTION_WHITELIST_CONTEXT,
+        _EXECUTION_POLICY_CONTEXT,
+        _TRUSTED_INTERNAL_TARGET_CONTEXT,
+    )
+    return _ExecutionPolicySnapshot(
+        default_blacklisted_modules=_checked_frozenset("DEFAULT_BLACKLISTED_MODULES", DEFAULT_BLACKLISTED_MODULES),
+        callable_descriptor_binding_targets=descriptor_items,
+        non_callable_mock_targets=_checked_frozenset("_NON_CALLABLE_MOCK_TARGETS", _NON_CALLABLE_MOCK_TARGETS),
+        non_callable_mock_safe_parameters=_checked_frozenset("_NON_CALLABLE_MOCK_SAFE_PARAMETERS", _NON_CALLABLE_MOCK_SAFE_PARAMETERS),
+        uncontrolled_execution_targets=_checked_frozenset("UNCONTROLLED_EXECUTION_TARGETS", UNCONTROLLED_EXECUTION_TARGETS),
+        uncontrolled_execution_target_prefixes=UNCONTROLLED_EXECUTION_TARGET_PREFIXES,
+        uncontrolled_execution_target_prefix_exceptions=_checked_frozenset(
+            "UNCONTROLLED_EXECUTION_TARGET_PREFIX_EXCEPTIONS",
+            UNCONTROLLED_EXECUTION_TARGET_PREFIX_EXCEPTIONS,
+        ),
+        legacy_compatible_non_whitelistable_targets=_checked_frozenset(
+            "LEGACY_COMPATIBLE_NON_WHITELISTABLE_TARGETS",
+            LEGACY_COMPATIBLE_NON_WHITELISTABLE_TARGETS,
+        ),
+        discovery_targets=_checked_frozenset("DISCOVERY_TARGETS", DISCOVERY_TARGETS),
+        protected_function_attributes=_checked_frozenset("_PROTECTED_FUNCTION_ATTRIBUTES", _PROTECTED_FUNCTION_ATTRIBUTES),
+        protected_objects=protected_objects,
+    )
+
+
+def _execution_policy_digest(policy: _ExecutionPolicySnapshot) -> str:
+    payload = {
+        "schema": "lerna-execution-policy-v1",
+        "default_blacklisted_modules": sorted(policy.default_blacklisted_modules),
+        "callable_descriptor_binding_targets": sorted(
+            (f"{key.__module__}.{key.__qualname__}", value) for key, value in policy.callable_descriptor_binding_targets
+        ),
+        "non_callable_mock_targets": sorted(policy.non_callable_mock_targets),
+        "non_callable_mock_safe_parameters": sorted(policy.non_callable_mock_safe_parameters),
+        "uncontrolled_execution_targets": sorted(policy.uncontrolled_execution_targets),
+        "uncontrolled_execution_target_prefixes": list(policy.uncontrolled_execution_target_prefixes),
+        "uncontrolled_execution_target_prefix_exceptions": sorted(policy.uncontrolled_execution_target_prefix_exceptions),
+        "legacy_compatible_non_whitelistable_targets": sorted(policy.legacy_compatible_non_whitelistable_targets),
+        "discovery_targets": sorted(policy.discovery_targets),
+        "protected_function_attributes": sorted(policy.protected_function_attributes),
+    }
+    canonical = json.dumps(payload, ensure_ascii=True, separators=(",", ":"), sort_keys=True).encode()
+    return hashlib.sha256(canonical).hexdigest()
+
+
+def _validated_execution_policy(expected_digest: str) -> _ExecutionPolicySnapshot:
+    policy = _capture_execution_policy()
+    if _execution_policy_digest(policy) != expected_digest:
+        raise InstantiationException("Hydra execution policy integrity check failed; refusing to resolve config-selected targets")
+    return policy
+
+
+@contextmanager
+def _execution_policy_context(
+    policy: _ExecutionPolicySnapshot | None,
+) -> Iterator[None]:
+    if policy is None:
+        yield
+        return
+    token = _EXECUTION_POLICY_CONTEXT.set(policy)
+    try:
+        yield
+    finally:
+        _EXECUTION_POLICY_CONTEXT.reset(token)
+
+
+def _current_execution_policy() -> _ExecutionPolicySnapshot:
+    policy = _EXECUTION_POLICY_CONTEXT.get()
+    return _capture_execution_policy() if policy is None else policy
+
+
+def _get_active_execution_policy() -> _ExecutionPolicySnapshot | None:
+    return _EXECUTION_POLICY_CONTEXT.get()
+
+
+@contextmanager
+def _trusted_internal_target(target: str) -> Iterator[None]:
+    token = _TRUSTED_INTERNAL_TARGET_CONTEXT.set(target)
+    try:
+        yield
+    finally:
+        _TRUSTED_INTERNAL_TARGET_CONTEXT.reset(token)
+
+
+def _is_hydra_module_name(name: Any) -> bool:
+    if type(name) is not str:
+        return False
+    return any(name == root or name.startswith(f"{root}.") for root in ("lerna", "hydra"))
+
+
+def _is_hydra_internal_path(path: str) -> bool:
+    return any(path == root or path.startswith(f"{root}.") for root in ("lerna._internal", "hydra._internal"))
+
+
+def _reject_protected_reference(
+    reference: str,
+    full_key: str,
+    execution_whitelist: NormalizedExecutionWhitelist,
+) -> None:
+    if execution_whitelist is UNSAFE_DISABLE_EXECUTION_CHECKS:
+        return
+    if reference == _TRUSTED_INTERNAL_TARGET_CONTEXT.get():
+        return
+    policy = _current_execution_policy()
+    protected_runtime_reference = (
+        # Before Python 3.13, frame locals are plain dictionaries and cannot be
+        # identified as frame state after a longer dotpath has traversed them.
+        "f_locals" in reference.split(".")
+        or any(reference == prefix or reference.startswith(f"{prefix}.") for prefix in ("sys.last_exc", "sys.last_traceback", "sys.last_value"))
+    )
+    if (
+        not _is_hydra_internal_path(reference)
+        and not protected_runtime_reference
+        and not any(component in policy.protected_function_attributes for component in reference.split("."))
+    ):
+        return
+    raise InstantiationException(
+        _with_full_key(
+            dedent(
+                f"""\
+                Reference '{reference}' cannot be selected by declarative
+                configuration because it exposes implementation state. Access it
+                from trusted Python code instead."""
+            ),
+            full_key,
+        )
+    )
+
+
+def _is_loaded_module_namespace(value: Any) -> bool:
+    if type(value) is not dict:
+        return False
+    return any(isinstance(module, types.ModuleType) and vars(module) is value for module in tuple(sys.modules.values()))
+
+
+def _is_frame_locals_proxy(value: Any) -> bool:
+    value_type = type(value)
+    return value_type.__module__ == "builtins" and value_type.__name__ == "FrameLocalsProxy"
+
+
+def _is_protected_implementation_object(value: Any, policy: _ExecutionPolicySnapshot) -> bool:
+    if value is sys.modules or isinstance(value, _ExecutionPolicySnapshot):
+        return True
+    if type(value) in {types.CodeType, types.FrameType, types.TracebackType}:
+        return True
+    if _is_frame_locals_proxy(value):
+        return True
+    if any(value is protected for protected in policy.protected_objects):
+        return True
+    if _is_loaded_module_namespace(value):
+        return True
+    if isinstance(value, types.ModuleType):
+        return _is_hydra_internal_path(value.__name__)
+    if type(value) is types.FunctionType:
+        return _is_hydra_internal_path(value.__module__)
+    if type(value) is types.MethodType:
+        return _is_hydra_internal_path(getattr(value.__func__, "__module__", ""))
+    if isinstance(value, type):
+        return _is_hydra_internal_path(value.__module__)
+    return value is not None and _is_hydra_internal_path(type(value).__module__)
+
+
+def _unwrap_method_wrapper_call(target: Any) -> Any:
+    while type(target) is types.MethodWrapperType and target.__name__ == "__call__":
+        target = target.__self__
+    return target
+
+
+def _get_bound_receiver(target: Any) -> Any:
+    target = _unwrap_method_wrapper_call(target)
+    if type(target) in {
+        types.BuiltinMethodType,
+        types.MethodType,
+        types.MethodWrapperType,
+    }:
+        return target.__self__
+    return None
+
+
+def _reject_protected_callable_capability(
+    target: Any,
+    args: tuple[Any, ...],
+    resolved_from: str,
+    full_key: str,
+    execution_whitelist: NormalizedExecutionWhitelist,
+) -> None:
+    if execution_whitelist is UNSAFE_DISABLE_EXECUTION_CHECKS:
+        return
+    receiver = _get_bound_receiver(target)
+    unwrapped = _unwrap_method_wrapper_call(target)
+    if (
+        receiver is None
+        and args
+        and type(unwrapped)
+        in {
+            types.MethodDescriptorType,
+            types.WrapperDescriptorType,
+        }
+    ):
+        receiver = args[0]
+    if not _is_protected_implementation_object(receiver, _current_execution_policy()):
+        return
+    raise InstantiationException(
+        _with_full_key(
+            dedent(
+                f"""\
+                Target '{resolved_from}' operates on protected Hydra implementation
+                state. Access it from trusted Python code instead."""
+            ),
+            full_key,
+        )
+    )
+
+
+def _reject_code_metadata_access(
+    target: Callable[..., Any],
+    args: tuple[Any, ...],
+    full_key: str,
+    execution_whitelist: NormalizedExecutionWhitelist,
+) -> None:
+    if execution_whitelist is UNSAFE_DISABLE_EXECUTION_CHECKS:
+        return
+
+    target_name = _get_resolved_target_name_for_check(target)
+    bound_receiver = _get_bound_receiver(target)
+    receiver: Any = None
+    attribute: Any = None
+
+    if target_name == "builtins.getattr":
+        if len(args) >= 2:
+            receiver, attribute = args[:2]
+    elif target_name == "builtins.object.__getstate__" or (
+        getattr(target, "__name__", None) == "__getstate__" and type(target) in {types.BuiltinMethodType, types.MethodDescriptorType}
+    ):
+        receiver = bound_receiver if bound_receiver is not None else args[0] if args else None
+        attribute = "__dict__"
+    elif (
+        target_name
+        in {
+            "builtins.object.__getattribute__",
+            "builtins.type.__getattribute__",
+        }
+        or getattr(target, "__name__", None) == "__getattribute__"
+    ):
+        if bound_receiver is not None:
+            receiver = bound_receiver
+            attribute = args[0] if args else None
+        elif len(args) >= 2:
+            receiver, attribute = args[:2]
+    else:
+        return
+
+    policy = _current_execution_policy()
+    accesses_code_metadata = (
+        type(receiver) is types.FunctionType or isinstance(receiver, (type, types.ModuleType))
+    ) and attribute in policy.protected_function_attributes
+    accesses_frame_locals = type(receiver) is types.FrameType and attribute == "f_locals"
+    if not accesses_code_metadata and not accesses_frame_locals:
+        return
+
+    raise InstantiationException(
+        _with_full_key(
+            dedent(
+                """\
+                Declarative configuration cannot access Python function, class,
+                module, or frame implementation metadata. Access it from trusted
+                Python code instead."""
+            ),
+            full_key,
+        )
+    )
+
+
+def _reject_protected_result(
+    result: Any,
+    resolved_from: str,
+    full_key: str,
+    execution_whitelist: NormalizedExecutionWhitelist,
+) -> None:
+    if execution_whitelist is UNSAFE_DISABLE_EXECUTION_CHECKS:
+        return
+    if type(result) is _DeferredTarget:
+        return
+    trusted_target = _TRUSTED_INTERNAL_TARGET_CONTEXT.get()
+    if trusted_target is not None and any(f"{cls.__module__}.{cls.__qualname__}" == trusted_target for cls in type(result).__mro__):
+        return
+    policy = _current_execution_policy()
+    protected = _is_protected_implementation_object(result, policy)
+    if callable(result):
+        protected = protected or _is_protected_implementation_object(_get_bound_receiver(result), policy)
+    if isinstance(result, Context):
+        protected = protected or any(_is_protected_implementation_object(value, policy) for item in result.items() for value in item)
+    if protected:
+        raise InstantiationException(
+            _with_full_key(
+                dedent(
+                    f"""\
+                    Target '{resolved_from}' cannot return Hydra implementation
+                    state, live Python frames or tracebacks, frame locals, code
+                    objects, or loaded module state to declarative configuration.
+                    Access it from trusted Python code instead."""
+                ),
+                full_key,
+            )
+        )
+
+
+def _reject_code_or_policy_mutation(
+    target: Callable[..., Any],
+    args: tuple[Any, ...],
+    full_key: str,
+    execution_whitelist: NormalizedExecutionWhitelist,
+) -> None:
+    if execution_whitelist is UNSAFE_DISABLE_EXECUTION_CHECKS:
+        return
+    target_name = _get_resolved_target_name_for_check(target)
+    bound_receiver = _get_bound_receiver(target)
+    attribute_mutators = {
+        "builtins.delattr",
+        "builtins.object.__delattr__",
+        "builtins.object.__setattr__",
+        "builtins.setattr",
+        "builtins.type.__delattr__",
+        "builtins.type.__setattr__",
+    }
+    mapping_mutators = {
+        "builtins.dict.__delitem__",
+        "builtins.dict.__ior__",
+        "builtins.dict.__setitem__",
+        "builtins.dict.clear",
+        "builtins.dict.pop",
+        "builtins.dict.popitem",
+        "builtins.dict.setdefault",
+        "builtins.dict.update",
+        "operator.delitem",
+        "operator.ior",
+        "operator.setitem",
+        "_operator.delitem",
+        "_operator.ior",
+        "_operator.setitem",
+    }
+    receiver: Any = None
+    if target_name in {"builtins.delattr", "builtins.setattr"}:
+        receiver = args[0] if target is setattr or target is delattr else bound_receiver if bound_receiver is not None else args[0] if args else None
+    elif target_name in attribute_mutators or target_name in mapping_mutators or getattr(target, "__name__", None) in {"__delattr__", "__setattr__"}:
+        receiver = bound_receiver if bound_receiver is not None else args[0] if args else None
+
+    descriptor_types = (types.GetSetDescriptorType, types.MemberDescriptorType)
+    if getattr(target, "__name__", None) in {"__delete__", "__set__"}:
+        descriptor = _get_bound_receiver(target)
+        if isinstance(descriptor, descriptor_types):
+            receiver = args[0] if args else None
+        elif args and isinstance(args[0], descriptor_types):
+            receiver = args[1] if len(args) > 1 else None
+
+    policy = _current_execution_policy()
+    if (
+        type(receiver) is not types.FunctionType
+        and not isinstance(receiver, type)
+        and not isinstance(receiver, types.ModuleType)
+        and type(receiver) is not types.CellType
+        and not _is_protected_implementation_object(receiver, policy)
+    ):
+        return
+    raise InstantiationException(
+        _with_full_key(
+            dedent(
+                """\
+                Declarative configuration cannot modify Python functions, classes,
+                modules, or Hydra implementation state. Perform this mutation from
+                trusted Python code instead."""
+            ),
+            full_key,
+        )
+    )
+
+
+def _reject_process_environment_mutation(
+    target: Callable[..., Any],
+    args: tuple[Any, ...],
+    kwargs: dict[str, Any],
+    full_key: str,
+    execution_whitelist: NormalizedExecutionWhitelist,
+) -> None:
+    if execution_whitelist is UNSAFE_DISABLE_EXECUTION_CHECKS:
+        return
+
+    target_name = _get_os_alias_target(_get_resolved_target_name_for_check(target))
+    if target_name in {"os.putenv", "os.unsetenv"}:
+        mutates_environment = True
+    else:
+        method_name = getattr(target, "__name__", None)
+        if target_name in {"builtins.delattr", "builtins.setattr"}:
+            bound_receiver = _get_bound_receiver(target)
+            receiver = (
+                args[0] if target is setattr or target is delattr else bound_receiver if bound_receiver is not None else args[0] if args else None
+            )
+        elif target_name in {
+            "builtins.object.__delattr__",
+            "builtins.object.__setattr__",
+            "builtins.type.__delattr__",
+            "builtins.type.__setattr__",
+        }:
+            bound_receiver = _get_bound_receiver(target)
+            receiver = bound_receiver if bound_receiver is not None else args[0] if args else None
+        else:
+            receiver = _get_bound_receiver(target)
+            if receiver is None and args:
+                receiver = args[0]
+            if receiver is None:
+                receiver = kwargs.get("self")
+        environments = (os.environ, getattr(os, "environb", None))
+        environment_state = tuple(
+            state for environ in environments if environ is not None for state in (environ, getattr(environ, "_data", None), vars(environ))
+        )
+        mutates_environment = method_name in {
+            "__delattr__",
+            "__delitem__",
+            "__init__",
+            "__ior__",
+            "__setattr__",
+            "__setitem__",
+            "clear",
+            "delattr",
+            "pop",
+            "popitem",
+            "setattr",
+            "setdefault",
+            "update",
+        } and (isinstance(receiver, type(os.environ)) or any(receiver is state for state in environment_state))
+
+    if mutates_environment:
+        raise InstantiationException(
+            _with_full_key(
+                dedent(
+                    f"""\
+                    Target '{target_name}' cannot modify the process environment from
+                    declarative configuration. Perform this mutation from trusted Python
+                    code instead."""
+                ),
+                full_key,
+            )
+        )
+
+
+def _get_os_alias_target(target: str) -> str:
+    for module, public_module in (
+        ("posix", "os"),
+        ("nt", "os"),
+        ("posixpath", "os.path"),
+        ("ntpath", "os.path"),
+    ):
+        module_prefix = f"{module}."
+        if target.startswith(module_prefix):
+            return f"{public_module}.{target[len(module_prefix) :]}"
+    return target
+
+
+def _get_policy_alias_target(target: str) -> str:
+    """Return the canonical security identity for a configured target name."""
+    for prefix, canonical_target in (
+        ("abc.abstractclassmethod", "builtins.classmethod"),
+        ("abc.abstractproperty", "builtins.property"),
+        ("abc.abstractstaticmethod", "builtins.staticmethod"),
+        ("builtins.property", "builtins.property"),
+        ("collections.UserString.format", "builtins.str.format"),
+        ("collections.UserString.format_map", "builtins.str.format_map"),
+        ("enum.DynamicClassAttribute", "builtins.property"),
+        ("enum.property", "builtins.property"),
+        ("functools.cached_property", "functools.cached_property"),
+        ("logging.Formatter", "logging.Formatter"),
+        ("types.DynamicClassAttribute", "builtins.property"),
+    ):
+        if target == prefix or target.startswith(f"{prefix}."):
+            return canonical_target
+    return target
+
+
+def _is_blacklisted_target(target: str) -> bool:
+    policy = _current_execution_policy()
+    canonical_target = _get_os_alias_target(target)
+    if canonical_target in policy.default_blacklisted_modules or canonical_target in policy.uncontrolled_execution_targets:
+        return True
+    if canonical_target in policy.uncontrolled_execution_target_prefix_exceptions:
+        return False
+    return canonical_target.startswith(policy.uncontrolled_execution_target_prefixes)
+
+
+def _is_non_whitelistable_target(target: str) -> bool:
+    policy = _current_execution_policy()
+    canonical_target = _get_os_alias_target(target)
+    if canonical_target in policy.uncontrolled_execution_targets or canonical_target in policy.legacy_compatible_non_whitelistable_targets:
+        return True
+    if canonical_target in policy.uncontrolled_execution_target_prefix_exceptions:
+        return False
+    return canonical_target.startswith(policy.uncontrolled_execution_target_prefixes)
+
+
+def _is_uncontrolled_execution_target(target: str) -> bool:
+    policy = _current_execution_policy()
+    canonical_target = _get_os_alias_target(target)
+    if canonical_target in policy.uncontrolled_execution_targets:
+        return True
+    if canonical_target in policy.uncontrolled_execution_target_prefix_exceptions:
+        return False
+    return canonical_target.startswith(policy.uncontrolled_execution_target_prefixes)
+
+
+def _validate_execution_whitelist_pattern(pattern: Any) -> str:
+    if not isinstance(pattern, str):
+        raise InstantiationException(f"Invalid _execution_whitelist_ entry '{pattern}': expected a string")
+    if pattern == "":
+        raise InstantiationException("Invalid _execution_whitelist_ entry: empty string")
+    if "*" not in pattern:
+        return pattern
+    if pattern == "*" or not pattern.endswith(".*") or pattern.count("*") > 1:
+        raise InstantiationException(
+            dedent(f"""\
+                Invalid _execution_whitelist_ entry '{pattern}'. Only trailing '.*'
+                package wildcards are supported. The wildcard '*' is not allowed
+                as an execution whitelist pattern. To preserve legacy all-target
+                behavior, pass UNSAFE_DISABLE_EXECUTION_CHECKS explicitly.""")
+        )
+    prefix = pattern[:-2]
+    if prefix == "" or prefix.endswith("."):
+        raise InstantiationException(f"Invalid _execution_whitelist_ entry '{pattern}': missing package prefix")
+    return pattern
+
+
+def _normalize_execution_whitelist(
+    execution_whitelist: Any,
+) -> NormalizedExecutionWhitelist:
+    if execution_whitelist is None:
+        return None
+    if execution_whitelist is UNSAFE_DISABLE_EXECUTION_CHECKS:
+        return UNSAFE_DISABLE_EXECUTION_CHECKS
+    if isinstance(execution_whitelist, _ExecutionWhitelistPolicy):
+        return execution_whitelist.whitelist
+    if isinstance(execution_whitelist, str):
+        return (_validate_execution_whitelist_pattern(execution_whitelist),)
+    try:
+        return tuple(_validate_execution_whitelist_pattern(pattern) for pattern in execution_whitelist)
+    except TypeError as e:
+        raise InstantiationException(
+            "Invalid _execution_whitelist_: expected a string, a sequence of strings, or UNSAFE_DISABLE_EXECUTION_CHECKS"
+        ) from e
+
+
+def _combine_execution_whitelists(base: NormalizedExecutionWhitelist, extra: NormalizedExecutionWhitelist) -> NormalizedExecutionWhitelist:
+    if base is UNSAFE_DISABLE_EXECUTION_CHECKS or extra is UNSAFE_DISABLE_EXECUTION_CHECKS:
+        return UNSAFE_DISABLE_EXECUTION_CHECKS
+    if base is None:
+        return extra
+    if extra is None:
+        return base
+    return tuple(dict.fromkeys(cast(tuple[str, ...], base) + cast(tuple[str, ...], extra)))
+
+
+class _ExecutionWhitelistPolicy:
+    def __init__(self, whitelist: NormalizedExecutionWhitelist, reset: bool = False) -> None:
+        self.whitelist = whitelist
+        self.reset = reset
+        self._tokens: ContextVar[tuple[Any, ...]] = ContextVar("lerna_execution_whitelist_tokens", default=())
+
+    def resolve(self, inherited: NormalizedExecutionWhitelist) -> NormalizedExecutionWhitelist:
+        if self.reset:
+            return self.whitelist
+        return _combine_execution_whitelists(inherited, self.whitelist)
+
+    def __enter__(self) -> "_ExecutionWhitelistPolicy":  # noqa: PYI034
+        token = _EXECUTION_WHITELIST_CONTEXT.set(self.resolve(_EXECUTION_WHITELIST_CONTEXT.get()))
+        self._tokens.set((*self._tokens.get(), token))
+        return self
+
+    def __exit__(self, *args: object) -> None:
+        tokens = self._tokens.get()
+        _EXECUTION_WHITELIST_CONTEXT.reset(tokens[-1])
+        self._tokens.set(tokens[:-1])
+
+
+ExecutionWhitelist = str | Sequence[str] | _UnsafeDisableExecutionChecks | _ExecutionWhitelistPolicy | None
+
+
+def execution_whitelist(execution_whitelist: ExecutionWhitelist, reset: bool = False) -> Any:
+    """
+    Create an execution whitelist object for config-selected Python targets.
+
+    The returned object can be used as a context manager for instantiate() calls
+    and Python logging configured by Hydra in the current context, or passed to
+    instantiate() as _execution_whitelist_.
+
+    :param execution_whitelist: A target string, list of target strings, or
+        UNSAFE_DISABLE_EXECUTION_CHECKS. A trailing .* allows targets under a package
+        prefix.
+    :param reset: If True, ignore any outer execution_whitelist() context.
+        If False, add these targets to the current context.
+    """
+    return _ExecutionWhitelistPolicy(
+        whitelist=_normalize_execution_whitelist(execution_whitelist),
+        reset=reset,
+    )
+
+
+def _resolve_execution_whitelist(
+    execution_whitelist: ExecutionWhitelist,
+) -> NormalizedExecutionWhitelist:
+    inherited = _EXECUTION_WHITELIST_CONTEXT.get()
+    if isinstance(execution_whitelist, _ExecutionWhitelistPolicy):
+        return execution_whitelist.resolve(inherited)
+    return _combine_execution_whitelists(inherited, _normalize_execution_whitelist(execution_whitelist))
+
+
+def _get_active_execution_whitelist() -> NormalizedExecutionWhitelist:
+    """Return the normalized execution whitelist active in this context."""
+    return _EXECUTION_WHITELIST_CONTEXT.get()
+
+
+def _is_execution_whitelisted(target: str, execution_whitelist: tuple[str, ...]) -> bool:
+    for pattern in execution_whitelist:
+        if pattern.endswith(".*"):
+            prefix = pattern[:-2]
+            if target.startswith(f"{prefix}."):
+                return True
+        elif target == pattern:
+            return True
+    return False
+
+
+def _with_full_key(message: str, full_key: str) -> str:
+    return f"{message}\nfull_key: {full_key}" if full_key else message
+
+
+def _get_target_name_for_check(target: str | type | Callable[..., Any]) -> str:
+    if isinstance(target, str):
+        return target
+    module = getattr(target, "__module__", None)
+    qualname = getattr(target, "__qualname__", None)
+    if module is not None and qualname is not None:
+        return f"{module}.{qualname}"
+    target_type = type(target)
+    return f"{target_type.__module__}.{target_type.__qualname__}"
+
+
+def _get_resolved_target_name_for_check(target: Any) -> str:
+    """Return the security identity of a resolved target or discovery result.
+
+    Callable wrappers, constructors, and descriptors must be authorized as the
+    operation they expose, not as generic callable containers. Unwrap recursively
+    because wrapper forms can wrap one another.
+    """
+    if isinstance(target, types.ModuleType):
+        return target.__name__
+
+    seen: set[int] = set()
+    while id(target) not in seen:
+        seen.add(id(target))
+        if getattr(target, "__name__", None) == "__call__":
+            owner = getattr(target, "__self__", None)
+            if owner is not None and callable(owner):
+                target = owner
+                continue
+        if isinstance(target, functools.partial):
+            target = target.func
+            continue
+        break
+    if target is object.__getattribute__:
+        return "builtins.object.__getattribute__"
+    if target is type.__getattribute__:
+        return "builtins.type.__getattribute__"
+    descriptor_owner = getattr(target, "__objclass__", None)
+    if getattr(target, "__name__", None) == "__get__":
+        descriptor_binding_target = (
+            dict(_current_execution_policy().callable_descriptor_binding_targets).get(descriptor_owner)
+            if isinstance(descriptor_owner, type)
+            else None
+        )
+        if descriptor_binding_target is not None:
+            return descriptor_binding_target
+    if descriptor_owner is operator.attrgetter:
+        return "operator.attrgetter"
+    if descriptor_owner is operator.itemgetter:
+        return "operator.itemgetter"
+    if descriptor_owner is operator.methodcaller:
+        return "operator.methodcaller"
+    if descriptor_owner is type and getattr(target, "__name__", None) == "__call__":
+        return "builtins.type.__call__"
+    if descriptor_owner is types.FunctionType:
+        return "types.FunctionType"
+    if descriptor_owner is types.MethodType:
+        return "types.MethodType"
+    if descriptor_owner is classmethod:
+        return "builtins.classmethod"
+    if descriptor_owner is staticmethod:
+        return "builtins.staticmethod"
+    if target is functools.partial.__new__:
+        return "functools.partial"
+    if target is type.__new__:
+        return "builtins.type.__new__"
+    if target is classmethod or target is classmethod.__new__:
+        return "builtins.classmethod"
+    if target is staticmethod or target is staticmethod.__new__:
+        return "builtins.staticmethod"
+    if target is types.FunctionType or target is types.FunctionType.__new__:
+        return "types.FunctionType"
+    if target is types.MethodType or target is types.MethodType.__new__:
+        return "types.MethodType"
+    if target is map.__new__:
+        return "builtins.map"
+    if target is itertools.accumulate.__new__:
+        return "itertools.accumulate"
+    if target is itertools.groupby.__new__:
+        return "itertools.groupby"
+    if target is itertools.starmap.__new__:
+        return "itertools.starmap"
+    if target is operator.attrgetter.__new__:
+        return "operator.attrgetter"
+    if target is operator.itemgetter.__new__:
+        return "operator.itemgetter"
+    if target is operator.methodcaller.__new__:
+        return "operator.methodcaller"
+    descriptor_name = getattr(target, "__name__", None)
+    owner_module = getattr(descriptor_owner, "__module__", None)
+    owner_qualname = getattr(descriptor_owner, "__qualname__", None)
+    if descriptor_name is not None and owner_module is not None and owner_qualname is not None:
+        return f"{owner_module}.{owner_qualname}.{descriptor_name}"
+    return _get_target_name_for_check(target)
+
+
+def _resolved_from_note(target_name: str, resolved_from: str) -> str:
+    return "" if resolved_from == target_name else f" (resolved from '{resolved_from}')"
+
+
+_EXECUTION_WHITELIST_DOC_URL = "https://hydra.cc/docs/advanced/execution_whitelist/"
+
+
+def _logging_target_help(full_key: str) -> str:
+    if full_key != "hydra.logging":
+        return ""
+    return f"\nSee {_EXECUTION_WHITELIST_DOC_URL}"
+
+
+def _blacklisted_target_message(target_name: str, resolved_from: str, full_key: str) -> str:
+    resolved_note = _resolved_from_note(target_name, resolved_from)
+    if _get_os_alias_target(target_name) in {"os.putenv", "os.unsetenv"}:
+        message = dedent(
+            f"""\
+            Target '{target_name}'{resolved_note} is blacklisted because it modifies
+            the process environment from declarative configuration."""
+        )
+    elif target_name in {
+        "operator.attrgetter",
+        "operator.call",
+        "operator.contains",
+        "operator.delitem",
+        "operator.getitem",
+        "operator.itemgetter",
+        "operator.methodcaller",
+        "operator.setitem",
+        "_operator.attrgetter",
+        "_operator.call",
+        "_operator.contains",
+        "_operator.delitem",
+        "_operator.getitem",
+        "_operator.itemgetter",
+        "_operator.methodcaller",
+        "_operator.setitem",
+    }:
+        message = dedent(
+            f"""\
+            Target '{target_name}'{resolved_note} is blacklisted because it performs
+            generic selection or dispatch using config data.
+            Set '_target_' to the intended callable instead. Pass
+            UNSAFE_DISABLE_EXECUTION_CHECKS only to explicitly disable target safety checks."""
+        )
+    elif _is_uncontrolled_execution_target(target_name):
+        message = dedent(
+            f"""\
+            Target '{target_name}'{resolved_note} is blacklisted because it allows
+            config data to control executable behavior or belongs to an
+            execution-capable target family. It cannot be authorized with an execution
+            whitelist. Pass UNSAFE_DISABLE_EXECUTION_CHECKS only to explicitly disable
+            target safety checks."""
+        )
+    else:
+        message = dedent(
+            f"""\
+            Target '{target_name}'{resolved_note} is blacklisted and cannot be instantiated from config
+            to prevent security vulnerabilities.
+            Pass _execution_whitelist_ from trusted code to allow expected targets."""
+        )
+    return message + _logging_target_help(full_key)
+
+
+def _not_whitelisted_message(target_name: str, resolved_from: str, full_key: str) -> str:
+    resolved_note = _resolved_from_note(target_name, resolved_from)
+    if full_key == "hydra.logging":
+        return dedent(
+            f"""\
+            Logging target '{target_name}'{resolved_note} is not in the Hydra execution whitelist.
+            Add it to execution_whitelist= on @lerna.main(), or use
+            lerna.utils.execution_whitelist() around logging setup from trusted Python
+            code.
+            See {_EXECUTION_WHITELIST_DOC_URL}"""
+        )
+    return dedent(
+        f"""\
+        Target '{target_name}'{resolved_note} is not in the Hydra execution whitelist.
+        Pass _execution_whitelist_ from trusted code to allow expected targets."""
+    )
+
+
+def _non_whitelistable_target_message(target_name: str, resolved_from: str, full_key: str) -> str:
+    resolved_note = _resolved_from_note(target_name, resolved_from)
+    if _get_os_alias_target(target_name) in {"os.putenv", "os.unsetenv"}:
+        message = dedent(
+            f"""\
+            Target '{target_name}'{resolved_note} cannot be authorized by the Hydra
+            execution whitelist because it modifies the process environment from
+            declarative configuration. Perform this mutation from trusted Python code
+            instead."""
+        )
+    elif target_name in {
+        "builtins.delattr",
+        "builtins.getattr",
+        "builtins.hasattr",
+        "builtins.object.__getattribute__",
+        "builtins.setattr",
+        "builtins.type.__getattribute__",
+    }:
+        message = dedent(
+            f"""\
+            Target '{target_name}'{resolved_note} cannot be authorized by the Hydra
+            execution whitelist because attribute operations can execute descriptor code before
+            the operation can be authorized. Access or mutate the attribute from trusted
+            Python code instead."""
+        )
+    elif target_name in (
+        "lerna._internal.instantiate._instantiate2.instantiate",
+        "hydra._internal.instantiate._instantiate2.instantiate",
+    ):
+        message = dedent(
+            f"""\
+            Target '{target_name}'{resolved_note} cannot be authorized by the Hydra
+            execution whitelist because reentrant instantiate calls do not safely inherit
+            the effective whitelist. Call instantiate() from trusted Python code instead."""
+        )
+    elif target_name in {
+        "operator.attrgetter",
+        "operator.call",
+        "operator.contains",
+        "operator.delitem",
+        "operator.getitem",
+        "operator.itemgetter",
+        "operator.methodcaller",
+        "operator.setitem",
+        "_operator.attrgetter",
+        "_operator.call",
+        "_operator.contains",
+        "_operator.delitem",
+        "_operator.getitem",
+        "_operator.itemgetter",
+        "_operator.methodcaller",
+        "_operator.setitem",
+    }:
+        message = dedent(
+            f"""\
+            Target '{target_name}'{resolved_note} cannot be authorized by the Hydra
+            execution whitelist because it performs generic selection or dispatch using
+            config data.
+            Set '_target_' to the intended callable instead."""
+        )
+    elif _is_uncontrolled_execution_target(target_name):
+        message = dedent(
+            f"""\
+            Target '{target_name}'{resolved_note} cannot be authorized by the
+            Hydra execution whitelist because it allows config data to control
+            executable behavior or belongs to an execution-capable target family.
+            Call a narrow trusted wrapper from config instead."""
+        )
+    else:
+        message = dedent(
+            f"""\
+            Target '{target_name}'{resolved_note} cannot be authorized by the Hydra
+            execution whitelist because it delegates the effective operation to config data.
+            Set '_target_' to the intended callable instead."""
+        )
+    return message + _logging_target_help(full_key)
+
+
+def _reject_non_whitelistable_target(
+    target_name: str,
+    resolved_from: str,
+    full_key: str,
+    execution_whitelist: NormalizedExecutionWhitelist,
+) -> None:
+    if execution_whitelist is not None and execution_whitelist is not UNSAFE_DISABLE_EXECUTION_CHECKS and _is_non_whitelistable_target(target_name):
+        raise InstantiationException(
+            _with_full_key(
+                _non_whitelistable_target_message(target_name, resolved_from, full_key),
+                full_key,
+            )
+        )
+
+
+def _is_exactly_whitelisted(target: str, execution_whitelist: tuple[str, ...]) -> bool:
+    """True if target matches a non-wildcard (exact) whitelist entry."""
+    return any(not pattern.endswith(".*") and target == pattern for pattern in execution_whitelist)
+
+
+def _requires_resolved_authorization(target_name: str, execution_whitelist: NormalizedExecutionWhitelist) -> bool:
+    """Whether the resolved identity must be re-authorized after _locate().
+
+    The resolved-identity recheck is what closes aliasing bypasses, but it must
+    not punish a deliberate exact whitelist entry for a re-exported target
+    (e.g. 'json.JSONDecoder' whose canonical name is 'json.decoder.JSONDecoder').
+    An exact whitelist match on the config string is authoritative; only a
+    wildcard match still needs the recheck. The blacklist path always rechecks.
+    """
+    if execution_whitelist is UNSAFE_DISABLE_EXECUTION_CHECKS:
+        return False
+    if execution_whitelist is None:
+        return True
+    if target_name.endswith(".__call__"):
+        return True
+    return not _is_exactly_whitelisted(target_name, cast(tuple[str, ...], execution_whitelist))
+
+
+def _authorize_target_name(
+    target_name: str,
+    resolved_from: str,
+    full_key: str,
+    execution_whitelist: NormalizedExecutionWhitelist,
+) -> None:
+    """Authorize a single target name against the active policy.
+
+    Called on the literal pre-resolution string and on resolved callable
+    identities. Checking the resolved identity is what closes module-attribute
+    aliasing bypasses (e.g. ``logging.os.system`` resolving to the blacklisted
+    ``os.system``), since a dotted string can name a callable that lives in a
+    different module than the string's prefix suggests.
+    """
+    target_name = _get_policy_alias_target(target_name)
+    if execution_whitelist is UNSAFE_DISABLE_EXECUTION_CHECKS:
+        return
+    _reject_non_whitelistable_target(target_name, resolved_from, full_key, execution_whitelist)
+    if execution_whitelist is None:
+        if _is_blacklisted_target(target_name):
+            raise InstantiationException(
+                _with_full_key(
+                    _blacklisted_target_message(target_name, resolved_from, full_key),
+                    full_key,
+                )
+            )
+    elif not _is_execution_whitelisted(target_name, cast(tuple[str, ...], execution_whitelist)):
+        raise InstantiationException(
+            _with_full_key(
+                _not_whitelisted_message(target_name, resolved_from, full_key),
+                full_key,
+            )
+        )
+
+
+def _authorize_discovery_path(
+    target: Callable[..., Any],
+    args: tuple[Any, ...],
+    kwargs: dict[str, Any],
+    full_key: str,
+    execution_whitelist: NormalizedExecutionWhitelist,
+) -> str | None:
+    """Authorize the dotpath consumed by a Hydra discovery helper."""
+    target_name = _get_resolved_target_name_for_check(target)
+    if target_name not in _current_execution_policy().discovery_targets:
+        return None
+
+    path = args[0] if args else kwargs.get("path")
+    if not isinstance(path, str):
+        return None
+    _reject_protected_reference(path, full_key, execution_whitelist)
+    _authorize_target_name(path, path, full_key, execution_whitelist)
+    return path
+
+
+def _authorize_discovery_result(
+    path: str,
+    result: Any,
+    full_key: str,
+    execution_whitelist: NormalizedExecutionWhitelist,
+) -> None:
+    """Recheck a discovered callable or module by its canonical security identity."""
+    if callable(result):
+        target, args, kwargs = _get_effective_target_invocation(result, (), {})
+        _reject_process_environment_mutation(target, args, kwargs, full_key, execution_whitelist)
+    _authorize_resolved_target_identity(result, path, full_key, execution_whitelist)
+    _reject_protected_result(result, path, full_key, execution_whitelist)
+
+
+def _authorize_resolved_target_identity(
+    target: Any,
+    resolved_from: str,
+    full_key: str,
+    execution_whitelist: NormalizedExecutionWhitelist,
+) -> str:
+    """Authorize the canonical identity of an object resolved from a dotpath."""
+    resolved_name = _get_policy_alias_target(_get_os_alias_target(_get_resolved_target_name_for_check(target)))
+    _reject_non_whitelistable_target(resolved_name, resolved_from, full_key, execution_whitelist)
+    _reject_protected_reference(resolved_name, full_key, execution_whitelist)
+    if resolved_name != resolved_from and _requires_resolved_authorization(resolved_from, execution_whitelist):
+        _authorize_target_name(resolved_name, resolved_from, full_key, execution_whitelist)
+    return resolved_name
+
+
+def _authorize_callable_result(
+    result: Callable[..., Any],
+    resolved_from: str,
+    full_key: str,
+    execution_whitelist: NormalizedExecutionWhitelist,
+) -> None:
+    """Authorize a callable selected as another target's runtime result."""
+    resolved_name = _get_os_alias_target(_get_resolved_target_name_for_check(result))
+    _authorize_target_name(resolved_name, resolved_from, full_key, execution_whitelist)
+
+
+def _get_effective_target_invocation(
+    target: Callable[..., Any],
+    args: tuple[Any, ...],
+    kwargs: dict[str, Any],
+) -> tuple[Callable[..., Any], tuple[Any, ...], dict[str, Any]]:
+    """Return the callable and arguments an indirect invocation will use."""
+    args = tuple(args)
+    seen: set[int] = set()
+    while id(target) not in seen:
+        seen.add(id(target))
+        if isinstance(target, functools.partial):
+            partial_args = target.args
+            placeholder = getattr(functools, "Placeholder", None)
+            if placeholder is not None and any(arg is placeholder for arg in partial_args):
+                placeholder_count = sum(arg is placeholder for arg in partial_args)
+                if len(args) < placeholder_count:
+                    # The partial call will fail before invoking its target.
+                    return target, args, kwargs
+                supplied_args = iter(args)
+                partial_args = tuple(next(supplied_args) if arg is placeholder else arg for arg in partial_args)
+                args = partial_args + tuple(supplied_args)
+            else:
+                args = partial_args + args
+            kwargs = {**(target.keywords or {}), **kwargs}
+            target = target.func
+            continue
+
+        if getattr(target, "__name__", None) == "__call__":
+            receiver = getattr(target, "__self__", None)
+            if receiver is not None and callable(receiver):
+                target = receiver
+                continue
+            if type(target) is types.WrapperDescriptorType and args and callable(args[0]):
+                target = cast(Callable[..., Any], args[0])
+                args = args[1:]
+                continue
+        break
+    return target, args, kwargs
+
+
+def _authorize_target_invocation(
+    target: Callable[..., Any],
+    args: tuple[Any, ...],
+    kwargs: dict[str, Any],
+    full_key: str,
+    execution_whitelist: NormalizedExecutionWhitelist,
+    *,
+    allow_incomplete_partial: bool = False,
+) -> tuple[Callable[..., Any], tuple[Any, ...], dict[str, Any]]:
+    """Reject argument-sensitive construction surfaces before invoking them."""
+    original_target = target
+    target, args, kwargs = _get_effective_target_invocation(target, args, kwargs)
+    if execution_whitelist is UNSAFE_DISABLE_EXECUTION_CHECKS:
+        return target, args, kwargs
+
+    resolved_from = _get_resolved_target_name_for_check(original_target)
+    if _get_resolved_target_name_for_check(target) != resolved_from:
+        _authorize_callable_result(target, resolved_from, full_key, execution_whitelist)
+        _reject_protected_result(target, resolved_from, full_key, execution_whitelist)
+
+    target_name = _get_resolved_target_name_for_check(target)
+    _reject_protected_callable_capability(target, args, target_name, full_key, execution_whitelist)
+    _reject_code_metadata_access(target, args, full_key, execution_whitelist)
+    _reject_code_or_policy_mutation(target, args, full_key, execution_whitelist)
+    _reject_process_environment_mutation(target, args, kwargs, full_key, execution_whitelist)
+    if target_name == "builtins.iter" and len(args) == 2:
+        msg = dedent(
+            """\
+            Target 'builtins.iter' cannot use its two-argument callback form from
+            config because callback execution is deferred beyond instantiate's
+            target authorization. Use one-argument iter(iterable), or perform the
+            callback iteration in trusted Python code. Pass UNSAFE_DISABLE_EXECUTION_CHECKS
+            only to explicitly disable target safety checks."""
+        )
+        raise InstantiationException(_with_full_key(msg, full_key))
+
+    policy = _current_execution_policy()
+    if target_name in policy.non_callable_mock_targets:
+        unsafe_parameters = sorted(set(kwargs).difference(policy.non_callable_mock_safe_parameters))
+        if len(args) > 1 or unsafe_parameters:
+            unsafe_details = list(unsafe_parameters)
+            if len(args) > 1:
+                unsafe_details.append(f"{len(args)} positional arguments")
+            joined = ", ".join(unsafe_details)
+            msg = dedent(
+                f"""\
+                Target '{target_name}' cannot configure callable attributes,
+                children, or wrappers from config (unsafe parameters: {joined}).
+                Only one positional spec and the name, spec, and spec_set keyword
+                parameters are allowed. Pass UNSAFE_DISABLE_EXECUTION_CHECKS only to
+                explicitly disable target safety checks."""
+            )
+            raise InstantiationException(_with_full_key(msg, full_key))
+
+    if getattr(target, "__name__", None) in {"__call__", "__new__"}:
+        module = getattr(target, "__module__", None)
+        qualname = getattr(target, "__qualname__", "")
+        owner_qualname, separator, _ = qualname.rpartition(".")
+        if module is not None and separator and "<locals>" not in owner_qualname:
+            try:
+                owner = _locate(f"{module}.{owner_qualname}")
+            except Exception:  # noqa: BLE001
+                owner = None
+            if isinstance(owner, type) and issubclass(owner, type):
+                msg = dedent(
+                    f"""\
+                    Target '{target_name}' cannot be used for dynamic class construction
+                    from config. Metaclass constructor methods cannot be authorized with
+                    an execution whitelist. Pass UNSAFE_DISABLE_EXECUTION_CHECKS only to explicitly
+                    disable target safety checks."""
+                )
+                raise InstantiationException(_with_full_key(msg, full_key))
+
+    if not isinstance(target, type) or not issubclass(target, type):
+        return target, args, kwargs
+    if allow_incomplete_partial and len(args) <= 1 and not kwargs:
+        return target, args, kwargs
+    if len(args) == 1 and not kwargs:
+        return target, args, kwargs
+    msg = dedent(
+        f"""\
+        Target '{target_name}' cannot be used for dynamic class construction from
+        config. Only one-argument type(obj) introspection is allowed. Pass
+        UNSAFE_DISABLE_EXECUTION_CHECKS only to explicitly disable target safety checks."""
+    )
+    raise InstantiationException(_with_full_key(msg, full_key))
+
+
+class _DeferredTarget(functools.partial):  # type: ignore[type-arg]
+    """Authorize arguments and callable results when a Hydra partial is invoked."""
+
+    _hydra_resolved_from: str
+    _hydra_full_key: str
+    _hydra_execution_whitelist: NormalizedExecutionWhitelist
+    _hydra_execution_policy: _ExecutionPolicySnapshot | None = None
+    _hydra_call_context: Callable[["_DeferredTarget", tuple[Any, ...], dict[str, Any]], Any] | None = None
+
+    def __copy__(self) -> "_DeferredTarget":
+        copied = type(self)(
+            cast(Callable[..., Any], self.func),
+            *self.args,
+            **(self.keywords or {}),
+        )
+        copied.__dict__.update(self.__dict__)
+        return copied
+
+    def __deepcopy__(self, memo: dict[int, Any]) -> "_DeferredTarget":
+        copied = type(self)(cast(Callable[..., Any], self.func))
+        memo[id(self)] = copied
+        attributes = dict(self.__dict__)
+        execution_policy = attributes.pop("_hydra_execution_policy", None)
+        copied_attributes = copy.deepcopy(attributes, memo)
+        copied_attributes["_hydra_execution_policy"] = execution_policy
+        setstate = cast(Callable[[Any], None], copied.__setstate__)
+        setstate(
+            (
+                copy.deepcopy(self.func, memo),
+                copy.deepcopy(self.args, memo),
+                copy.deepcopy(self.keywords, memo),
+                copied_attributes,
+            )
+        )
+        return copied
+
+    def __reduce__(self) -> str | tuple[Any, ...]:
+        raise TypeError("Hydra _partial_ factories cannot be pickled before invocation")
+
+    def __reduce_ex__(self, _protocol: SupportsIndex, /) -> str | tuple[Any, ...]:
+        return self.__reduce__()
+
+    def __call__(self, *args: Any, **kwargs: Any) -> Any:
+        with _execution_policy_context(self._hydra_execution_policy):
+            return self._call_with_execution_policy(*args, **kwargs)
+
+    def _call_with_execution_policy(self, *args: Any, **kwargs: Any) -> Any:
+        context = self._hydra_call_context(self, args, kwargs) if self._hydra_call_context is not None else nullcontext()
+        with context:
+            effective_target, effective_args, effective_kwargs = _authorize_target_invocation(
+                self,
+                args,
+                kwargs,
+                self._hydra_full_key,
+                self._hydra_execution_whitelist,
+            )
+            discovery_path = _authorize_discovery_path(
+                effective_target,
+                effective_args,
+                effective_kwargs,
+                self._hydra_full_key,
+                self._hydra_execution_whitelist,
+            )
+            result = super().__call__(*args, **kwargs)
+            return _mediate_target_result(
+                result,
+                discovery_path or self._hydra_resolved_from,
+                self._hydra_full_key,
+                self._hydra_execution_whitelist,
+                discovery_path=discovery_path,
+                call_context=self._hydra_call_context,
+            )
+
+
+def _mediate_target_result(
+    result: Any,
+    resolved_from: str,
+    full_key: str,
+    execution_whitelist: NormalizedExecutionWhitelist,
+    *,
+    discovery_path: str | None = None,
+    call_context: Callable[[_DeferredTarget, tuple[Any, ...], dict[str, Any]], Any] | None = None,
+) -> Any:
+    """Authorize callable results and keep deferred partial results mediated."""
+    guard_returned_partial = call_context is not None and type(result) is functools.partial
+    if execution_whitelist is UNSAFE_DISABLE_EXECUTION_CHECKS and not guard_returned_partial:
+        return result
+
+    if isinstance(result, functools.partial) and type(result) is not _DeferredTarget:
+        if type(result) is not functools.partial:
+            msg = dedent(
+                """\
+                Callable targets cannot return partial subclasses because overrides
+                can hide their invocation behavior. Return an exact functools.partial
+                or use Hydra's '_partial_: true' support instead."""
+            )
+            raise InstantiationException(_with_full_key(msg, full_key))
+        deferred = _DeferredTarget(
+            result.func,
+            *result.args,
+            **(result.keywords or {}),
+        )
+        deferred.__dict__.update(result.__dict__)
+        deferred._hydra_resolved_from = resolved_from
+        deferred._hydra_full_key = full_key
+        deferred._hydra_execution_whitelist = execution_whitelist
+        deferred._hydra_execution_policy = _get_active_execution_policy()
+        deferred._hydra_call_context = call_context
+        result = deferred
+
+    _reject_protected_result(result, resolved_from, full_key, execution_whitelist)
+
+    if callable(result):
+        target, args, kwargs = _get_effective_target_invocation(result, (), {})
+        _reject_code_metadata_access(target, args, full_key, execution_whitelist)
+        _reject_code_or_policy_mutation(target, args, full_key, execution_whitelist)
+        _reject_process_environment_mutation(target, args, kwargs, full_key, execution_whitelist)
+
+    if discovery_path is not None and (callable(result) or isinstance(result, types.ModuleType)):
+        _authorize_discovery_result(discovery_path, result, full_key, execution_whitelist)
+    elif callable(result):
+        _authorize_callable_result(result, resolved_from, full_key, execution_whitelist)
+    return result

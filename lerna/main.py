@@ -12,6 +12,7 @@ from omegaconf import DictConfig, open_dict, read_write
 
 from . import version
 from ._internal.deprecation_warning import deprecation_warning
+from ._internal.execution_policy import ExecutionWhitelist, execution_whitelist as execution_whitelist_context
 from ._internal.utils import _run_hydra, get_args_parser
 from .core.hydra_config import HydraConfig
 from .core.utils import _flush_loggers, configure_log
@@ -47,6 +48,7 @@ def main(
     config_name: str | None = None,
     version_base: str | None = _UNSPECIFIED_,
     overrides: list[str] | None = None,
+    execution_whitelist: ExecutionWhitelist = None,
 ) -> Callable[[TaskFunction], Any]:
     """
     :param config_path: The config path, a directory where Hydra will search for
@@ -59,6 +61,8 @@ def main(
     :param overrides: Default overrides to apply. CLI overrides take precedence over these.
                       This is useful for setting defaults that can still be overridden from CLI.
                       (Lerna extension - fixes Hydra issue #2459)
+    :param execution_whitelist: Trusted targets allowed for calls to instantiate()
+                            and for Python logging configured by Lerna.
     """
 
     version.setbase(version_base)
@@ -83,32 +87,33 @@ def main(
     def main_decorator(task_function: TaskFunction) -> Callable[[], None]:
         @functools.wraps(task_function)
         def decorated_main(cfg_passthrough: DictConfig | None = None) -> Any:
-            if cfg_passthrough is not None:
-                return task_function(cfg_passthrough)
-            else:
-                args_parser = get_args_parser()
-                args = args_parser.parse_intermixed_args()
-
-                # Merge decorator overrides with CLI overrides (CLI takes precedence)
-                # This implements Hydra issue #2459
-                if overrides:
-                    # Decorator overrides come first, CLI overrides can override them
-                    args.overrides = list(overrides) + args.overrides
-
-                if args.experimental_rerun is not None:
-                    cfg = _get_rerun_conf(args.experimental_rerun, args.overrides)
-                    task_function(cfg)
-                    _flush_loggers()
+            with execution_whitelist_context(execution_whitelist):
+                if cfg_passthrough is not None:
+                    return task_function(cfg_passthrough)
                 else:
-                    # no return value from run_hydra() as it may sometime actually run the task_function
-                    # multiple times (--multirun)
-                    _run_hydra(
-                        args=args,
-                        args_parser=args_parser,
-                        task_function=task_function,
-                        config_path=config_path,
-                        config_name=config_name,
-                    )
+                    args_parser = get_args_parser()
+                    args = args_parser.parse_intermixed_args()
+
+                    # Merge decorator overrides with CLI overrides (CLI takes precedence)
+                    # This implements Hydra issue #2459
+                    if overrides:
+                        # Decorator overrides come first, CLI overrides can override them
+                        args.overrides = list(overrides) + args.overrides
+
+                    if args.experimental_rerun is not None:
+                        cfg = _get_rerun_conf(args.experimental_rerun, args.overrides)
+                        task_function(cfg)
+                        _flush_loggers()
+                    else:
+                        # no return value from run_hydra() as it may sometime actually run the task_function
+                        # multiple times (--multirun)
+                        _run_hydra(
+                            args=args,
+                            args_parser=args_parser,
+                            task_function=task_function,
+                            config_path=config_path,
+                            config_name=config_name,
+                        )
 
         return decorated_main
 

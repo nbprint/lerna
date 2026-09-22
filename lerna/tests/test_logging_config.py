@@ -27,4 +27,5 @@ def test_logging_rejects_unsafe_factory() -> None:
     while cause.__cause__ is not None:
         cause = cause.__cause__
     assert isinstance(cause, InstantiationException)
-    assert "os.system" in str(cause)
+    assert "posix.system" in str(cause)
+    assert "blacklisted" in str(cause)

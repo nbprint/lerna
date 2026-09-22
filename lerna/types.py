@@ -22,6 +22,7 @@ if TYPE_CHECKING:
 class HydraContext:
     config_loader: "ConfigLoader"
     callbacks: "Callbacks"
+    execution_whitelist: Any = None
 
 
 @dataclass

@@ -31,7 +31,7 @@ classifiers = [
 ]
 
 dependencies = [
-    "omegaconf>=2.2.3,<2.4",
+    "omegaconf>=2.2.3,<3",
     "packaging",
 ]
 
@@ -191,6 +191,8 @@ filterwarnings = [
     "ignore:.*Future Hydra versions will no longer change working directory.*:UserWarning",
     "ignore:[\\s\\S]*validated against ConfigStore schema[\\s\\S]*:UserWarning",
     "ignore:[\\s\\S]*behavior is deprecated in Hydra[\\s\\S]*:UserWarning",
+    "ignore:[\\s\\S]*_execution_whitelist_[\\s\\S]*:UserWarning",
+    "ignore:[\\s\\S]*without an execution whitelist[\\s\\S]*:UserWarning",
 ]
 
 [tool.ruff]
