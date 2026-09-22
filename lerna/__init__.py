@@ -9,8 +9,16 @@ from lerna.errors import MissingConfigException
 from lerna.main import main
 from lerna.types import TaskFunction
 
-from .compose import compose
+from .compose import compose, compose_with_provenance
 from .initialize import initialize, initialize_config_dir, initialize_config_module
+from .provenance import (
+    CompositionOperation,
+    CompositionResult,
+    CompositionSource,
+    NodeProvenance,
+    RemovedItem,
+    SelectedDefault,
+)
 
 CallbackManager = _rust.CallbackManager
 JobReturn = _rust.JobReturn
@@ -30,18 +38,25 @@ SweeperManager = _rust.SweeperManager
 
 __all__ = [
     "CallbackManager",
+    "CompositionOperation",
+    "CompositionResult",
+    "CompositionSource",
     "ConfigResult",
     "ConfigSourceManager",
     "JobReturn",
     "LauncherManager",
     "MissingConfigException",
+    "NodeProvenance",
+    "RemovedItem",
     "RustBasicLauncher",
     "RustBasicSweeper",
     "RustFileConfigSource",
+    "SelectedDefault",
     "SweeperManager",
     "TaskFunction",
     "__version__",
     "compose",
+    "compose_with_provenance",
     "initialize",
     "initialize_config_dir",
     "initialize_config_module",

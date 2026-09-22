@@ -587,6 +587,11 @@ fn override_value_to_py(py: Python<'_>, value: &RustOverrideValue) -> PyResult<P
             } else {
                 dict.set_item("index", py.None())?;
             }
+            if let Some(idx) = ext.end_index {
+                dict.set_item("end_index", idx)?;
+            } else {
+                dict.set_item("end_index", py.None())?;
+            }
             Ok(dict.unbind().into_any())
         }
     }

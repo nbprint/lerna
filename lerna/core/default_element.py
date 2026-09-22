@@ -610,7 +610,7 @@ See http://hydra.cc/docs/1.1/upgrades/1.0_to_1.1/defaults_list_interpolation for
 
 @dataclass
 class PatchDefault(InputDefault):
-    operations: list[str] = field(default_factory=list)
+    operations: list[str | DictConfig] = field(default_factory=list)
     package_scope: str | None = None
 
     def is_self(self) -> bool:

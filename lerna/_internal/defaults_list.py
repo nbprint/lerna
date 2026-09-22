@@ -7,7 +7,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from textwrap import dedent
 
-from omegaconf import DictConfig, OmegaConf
+from omegaconf import DictConfig, ListConfig, OmegaConf
 
 from lerna import MissingConfigException, version
 from lerna._internal.config_repository import IConfigRepository
@@ -23,7 +23,7 @@ from lerna.core.default_element import (
 )
 from lerna.core.object_type import ObjectType
 from lerna.core.override_parser.overrides_parser import OverridesParser
-from lerna.core.override_parser.types import Override
+from lerna.core.override_parser.types import ListOperationType, Override, OverrideType, ValueType
 from lerna.errors import ConfigCompositionException
 
 from .deprecation_warning import deprecation_warning
@@ -142,15 +142,20 @@ class Overrides:
 
     def add_patch_operations(
         self,
-        operations: list[str],
+        operations: list[str | DictConfig],
         parent_package: str,
         containing_config_path: str,
         package_scope: str | None = None,
     ) -> None:
         # If _patch_@pkg is used, scope bare keys to pkg instead of parent_package
         effective_package = package_scope if package_scope is not None else parent_package
-        parsed = self._override_parser.parse_overrides(overrides=operations)
-        for override in parsed:
+        for operation in operations:
+            if isinstance(operation, str):
+                parsed = self._override_parser.parse_overrides(overrides=[operation])
+                override = parsed[0]
+            else:
+                override = self._structured_patch_override(operation, containing_config_path)
+
             if override.is_sweep_override():
                 raise ConfigCompositionException(
                     f"In '{containing_config_path}': _patch_ does not support sweep overrides ('{override.input_line}')."
@@ -161,7 +166,132 @@ class Overrides:
                 raise ConfigCompositionException(f"In '{containing_config_path}': _patch_ override '{override.input_line}' resolved to an empty key.")
 
             override.key_or_group = resolved_key
+            override.source_config_path = containing_config_path
+            override.source_package = effective_package
             self.patch_overrides.append(override)
+
+    @staticmethod
+    def _structured_patch_override(operation: DictConfig, containing_config_path: str) -> Override:
+        def fail(op: object, path: object, detail: str) -> None:
+            raise ConfigCompositionException(
+                f"In '{containing_config_path}': invalid structured _patch_ operation '{op}' for key '{path}': {detail}."
+            )
+
+        op = operation.get("op")
+        path = operation.get("path")
+        if not isinstance(op, str):
+            fail(op, path, "'op' must be a string")
+        if not isinstance(path, str) or not path:
+            fail(op, path, "'path' must be a non-empty string")
+
+        scalar_specs = {
+            "change": OverrideType.CHANGE,
+            "add": OverrideType.ADD,
+            "force_add": OverrideType.FORCE_ADD,
+        }
+        list_specs = {
+            "append": ListOperationType.APPEND,
+            "prepend": ListOperationType.PREPEND,
+            "remove_value": ListOperationType.REMOVE_VALUE,
+            "append_unique": ListOperationType.APPEND_UNIQUE,
+            "remove_all": ListOperationType.REMOVE_ALL,
+        }
+
+        def value_of(field: str) -> object:
+            node = operation._get_node(field)
+            if isinstance(node, (DictConfig, ListConfig)):
+                return OmegaConf.to_container(node, resolve=False)
+            return copy.deepcopy(node._value()) if node is not None else None
+
+        if op in scalar_specs:
+            allowed = {"op", "path", "value"}
+            if "value" not in operation:
+                fail(op, path, "missing required field 'value'")
+            override = Override(scalar_specs[op], path, ValueType.ELEMENT, value_of("value"))
+        elif op == "delete":
+            allowed = {"op", "path", "value"}
+            has_value = "value" in operation
+            override = Override(OverrideType.DEL, path, ValueType.ELEMENT if has_value else None, value_of("value") if has_value else None)
+        elif op in list_specs:
+            allowed = {"op", "path", "values"}
+            values = value_of("values")
+            if not isinstance(values, list):
+                fail(op, path, "'values' must be an ordered list")
+            override = Override(OverrideType.EXTEND_LIST, path, ValueType.ELEMENT, values, list_operation=list_specs[op])
+        elif op == "insert":
+            allowed = {"op", "path", "index", "values"}
+            index = value_of("index")
+            values = value_of("values")
+            if not isinstance(index, int) or isinstance(index, bool):
+                fail(op, path, "'index' must be an integer")
+            if not isinstance(values, list):
+                fail(op, path, "'values' must be an ordered list")
+            override = Override(
+                OverrideType.EXTEND_LIST,
+                path,
+                ValueType.ELEMENT,
+                values,
+                list_operation=ListOperationType.INSERT,
+                list_index=index,
+            )
+        elif op in ("pop", "remove_at"):
+            allowed = {"op", "path", "index"}
+            index = value_of("index")
+            if not isinstance(index, int) or isinstance(index, bool):
+                fail(op, path, "'index' must be an integer")
+            override = Override(
+                OverrideType.EXTEND_LIST,
+                path,
+                ValueType.ELEMENT,
+                [],
+                list_operation=ListOperationType.REMOVE_AT,
+                list_index=index,
+            )
+        elif op == "remove":
+            allowed = {"op", "path", "value"}
+            if "value" not in operation:
+                fail(op, path, "missing required field 'value'")
+            override = Override(
+                OverrideType.EXTEND_LIST,
+                path,
+                ValueType.ELEMENT,
+                [value_of("value")],
+                list_operation=ListOperationType.REMOVE_VALUE,
+            )
+        elif op in ("clear", "list_clear"):
+            allowed = {"op", "path"}
+            override = Override(OverrideType.EXTEND_LIST, path, ValueType.ELEMENT, [], list_operation=ListOperationType.CLEAR)
+        elif op in ("extend", "extend_from"):
+            allowed = {"op", "path", "value"}
+            source = value_of("value")
+            if not isinstance(source, str) or not source.startswith("${") or not source.endswith("}"):
+                fail(op, path, "'value' must be one interpolation")
+            override = Override(OverrideType.EXTEND_LIST, path, ValueType.ELEMENT, [source], list_operation=ListOperationType.EXTEND_FROM)
+        elif op == "delete_slice":
+            allowed = {"op", "path", "start", "stop"}
+            start = value_of("start")
+            stop = value_of("stop")
+            if not isinstance(start, int) or isinstance(start, bool):
+                fail(op, path, "'start' must be an integer")
+            if "stop" in operation and (not isinstance(stop, int) or isinstance(stop, bool)):
+                fail(op, path, "'stop' must be an integer")
+            override = Override(
+                OverrideType.EXTEND_LIST,
+                path,
+                ValueType.ELEMENT,
+                [],
+                list_operation=ListOperationType.DELETE_SLICE,
+                list_index=start,
+                list_end_index=stop,
+            )
+        else:
+            fail(op, path, "unknown operation name")
+
+        extra = set(operation.keys()) - allowed
+        if extra:
+            fail(op, path, f"unexpected fields: {', '.join(sorted(extra))}")
+        override.input_line = f"{op}({path})"
+        return override
 
     def add_override(self, parent_config_path: str, default: GroupDefault) -> None:
         assert default.override

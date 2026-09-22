@@ -13,8 +13,10 @@ from packaging.version import InvalidVersion
 from pytest import fixture, mark, param, raises, warns
 
 from lerna import (
+    CompositionResult,
     __version__,
     compose,
+    compose_with_provenance,
     initialize,
     initialize_config_dir,
     initialize_config_module,
@@ -161,6 +163,91 @@ def test_top_level_config_is_list() -> None:
         match="primary config 'top_level_list/file1' must be a DictConfig, got ListConfig",
     ):
         compose("top_level_list/file1", overrides=[])
+
+
+@mark.usefixtures("hydra_restore_singletons")
+class TestComposeWithProvenance:
+    @fixture
+    def config_dir(self, tmp_path):
+        conf_dir = tmp_path / "conf"
+        gateway_dir = conf_dir / "gateway"
+        gateway_dir.mkdir(parents=True)
+        (gateway_dir / "base.yaml").write_text("modules: [core, legacy]\nlabel: ${name}\n")
+        (gateway_dir / "alternate.yaml").write_text("modules: [alternate]\n")
+        (conf_dir / "config.yaml").write_text(
+            """
+defaults:
+  - gateway: base
+  - _self_
+  - _patch_@gateway:
+    - modules=append(metrics)
+    - modules=remove_value(legacy)
+
+name: app
+"""
+        )
+        return conf_dir
+
+    def test_public_result_preserves_unresolved_config_and_returns_resolved_copy(self, config_dir):
+        with initialize_config_dir(config_dir=str(config_dir), version_base=None):
+            result = compose_with_provenance(config_name="config")
+
+        assert isinstance(result, CompositionResult)
+        assert OmegaConf.to_container(result.config, resolve=False)["gateway"]["label"] == "${name}"
+        resolved = result.resolved_copy()
+        assert resolved.gateway.label == "app"
+        resolved.gateway.label = "changed"
+        assert OmegaConf.to_container(result.config, resolve=False)["gateway"]["label"] == "${name}"
+
+    def test_selected_defaults_options_and_node_provenance(self, config_dir):
+        with initialize_config_dir(config_dir=str(config_dir), version_base=None):
+            result = compose_with_provenance(config_name="config")
+
+        gateway = next(default for default in result.selected_defaults if default.config_path == "gateway/base")
+        assert gateway.option == "base"
+        assert gateway.package == "gateway"
+        assert gateway.provider == "main"
+        assert gateway.source.identifier.endswith("/gateway/base.yaml")
+        assert result.available_options["gateway"] == ("alternate", "base")
+
+        core = result.provenance("gateway.modules[0]")
+        metrics = result.provenance("gateway.modules[1]")
+        assert core is not None and core.source_key == "modules[0]"
+        assert metrics is not None and metrics.operation == 0
+
+    def test_patch_history_retains_removed_item_and_cli_is_separate(self, config_dir):
+        with initialize_config_dir(config_dir=str(config_dir), version_base=None):
+            result = compose_with_provenance(config_name="config", overrides=["gateway.modules=append(cli)"])
+
+        assert [operation.name for operation in result.patch_operations] == ["append", "remove_value"]
+        assert result.patch_operations[0].source_config == "config"
+        assert result.patch_operations[1].removed_items[0].value == "legacy"
+        assert result.patch_operations[1].removed_items[0].provenance.source_key == "modules[1]"
+        assert [operation.name for operation in result.cli_overrides] == ["append"]
+        assert result.provenance("gateway.modules[2]").origin == "cli"
+
+    def test_canonical_operation_names_and_slice_history(self, config_dir):
+        with initialize_config_dir(config_dir=str(config_dir), version_base=None):
+            result = compose_with_provenance(
+                config_name="config",
+                overrides=["gateway.modules=pop(0)", "gateway.modules=delete_slice(0,1)"],
+            )
+
+        assert [operation.name for operation in result.patch_operations] == ["append", "remove_value"]
+        assert [operation.name for operation in result.cli_overrides] == ["pop", "delete_slice"]
+        assert [item.value for item in result.cli_overrides[1].removed_items] == ["metrics"]
+
+
+@mark.usefixtures("initialize_hydra_no_path", "hydra_restore_singletons")
+def test_compose_with_provenance_structured_source() -> None:
+    ConfigStore.instance().store(name="provenance_config", node={"value": 10}, provider="example-provider")
+
+    result = compose_with_provenance(config_name="provenance_config")
+
+    selected = next(default for default in result.selected_defaults if default.config_path == "provenance_config")
+    assert selected.provider == "example-provider"
+    assert selected.source.identifier == "structured://provenance_config.yaml"
+    assert result.provenance("value").source_identifier == selected.source.identifier
 
 
 @mark.usefixtures("hydra_restore_singletons")

@@ -994,3 +994,227 @@ root_marker: true
                 assert cfg.root_marker is True
         finally:
             GlobalHydra.instance().clear()
+
+    def test_extend_from_root_patch_and_cli_precedence(self, tmp_path):
+        from lerna import compose, initialize_config_dir
+        from lerna.core.global_hydra import GlobalHydra
+
+        conf_dir = tmp_path / "conf"
+        conf_dir.mkdir()
+        (conf_dir / "config.yaml").write_text(
+            """
+defaults:
+  - _self_
+  - _patch_@gateway:
+    - modules=extend_from(${gateway_frequency.modules})
+
+gateway_frequency:
+  modules: [trigger, market_data]
+gateway:
+  modules: [universe]
+"""
+        )
+
+        GlobalHydra.instance().clear()
+        try:
+            with initialize_config_dir(config_dir=str(conf_dir), version_base=None):
+                cfg = compose(config_name="config", overrides=["gateway.modules=append(cli)"])
+            assert cfg.gateway.modules == ["universe", "trigger", "market_data", "cli"]
+        finally:
+            GlobalHydra.instance().clear()
+
+    def test_extend_from_nested_packaged_patch(self, tmp_path):
+        from lerna import compose, initialize_config_dir
+        from lerna.core.global_hydra import GlobalHydra
+
+        conf_dir = tmp_path / "conf"
+        package_dir = conf_dir / "gateway"
+        package_dir.mkdir(parents=True)
+        (package_dir / "configured.yaml").write_text(
+            OmegaConf.to_yaml(
+                {
+                    "defaults": ["_self_", {"_patch_": ["modules=extend_from(${frequency_modules})"]}],
+                    "modules": ["universe"],
+                }
+            )
+        )
+        (conf_dir / "config.yaml").write_text(
+            """
+defaults:
+  - gateway/configured@gateway
+  - _self_
+
+frequency_modules: [trigger, market_data]
+"""
+        )
+
+        GlobalHydra.instance().clear()
+        try:
+            with initialize_config_dir(config_dir=str(conf_dir), version_base=None):
+                cfg = compose(config_name="config")
+            assert cfg.gateway.modules == ["universe", "trigger", "market_data"]
+        finally:
+            GlobalHydra.instance().clear()
+
+    def test_extend_from_mandatory_missing_source(self, tmp_path):
+        from lerna import compose, initialize_config_dir
+        from lerna.core.global_hydra import GlobalHydra
+
+        conf_dir = tmp_path / "conf"
+        conf_dir.mkdir()
+        (conf_dir / "config.yaml").write_text(
+            """
+defaults:
+  - _self_
+  - _patch_:
+    - items=extend_from(${missing_items})
+
+items: []
+missing_items: ???
+"""
+        )
+
+        GlobalHydra.instance().clear()
+        try:
+            with (
+                initialize_config_dir(config_dir=str(conf_dir), version_base=None),
+                pytest.raises(Exception, match="destination 'items'.*source 'missing_items'.*mandatory missing"),
+            ):
+                compose(config_name="config")
+        finally:
+            GlobalHydra.instance().clear()
+
+
+class TestStructuredPatchDirective:
+    @pytest.fixture(autouse=True)
+    def cleanup(self):
+        from lerna.core.global_hydra import GlobalHydra
+
+        GlobalHydra.instance().clear()
+        yield
+        GlobalHydra.instance().clear()
+
+    @pytest.fixture
+    def config_dir(self, tmp_path):
+        conf_dir = tmp_path / "conf"
+        package_dir = conf_dir / "gateway"
+        package_dir.mkdir(parents=True)
+        (package_dir / "base.yaml").write_text(
+            """
+modules: [core]
+settings: {enabled: false, retries: 0, label: original}
+mode: original
+obsolete: true
+"""
+        )
+        (conf_dir / "config.yaml").write_text(
+            OmegaConf.to_yaml(
+                {
+                    "defaults": [
+                        "gateway/base@gateway",
+                        "_self_",
+                        {
+                            "_patch_@gateway": [
+                                {"op": "append", "path": "modules", "values": ["rest", ["outputs", "metrics"]]},
+                                "modules=prepend(auth)",
+                                {
+                                    "op": "change",
+                                    "path": "settings",
+                                    "value": {"enabled": True, "retries": 3, "label": None},
+                                },
+                                {"op": "delete", "path": "obsolete"},
+                                {"op": "change", "path": "_here_.mode", "value": "here"},
+                                {"op": "change", "path": "_global_.root_mode", "value": "global"},
+                            ]
+                        },
+                    ],
+                    "root": True,
+                    "root_mode": "original",
+                }
+            )
+        )
+        return conf_dir
+
+    def test_structured_and_string_operations_execute_in_order(self, config_dir):
+        from lerna import compose, initialize_config_dir
+
+        with initialize_config_dir(config_dir=str(config_dir), version_base=None):
+            cfg = compose(config_name="config")
+
+        assert cfg.gateway.modules == ["auth", "core", "rest", ["outputs", "metrics"]]
+        assert cfg.gateway.settings == {"enabled": True, "retries": 3, "label": None}
+        assert cfg.gateway.mode == "here"
+        assert cfg.root_mode == "global"
+        assert "obsolete" not in cfg.gateway
+
+    def test_all_structured_operation_shapes(self, tmp_path):
+        from lerna import compose, initialize_config_dir
+
+        conf_dir = tmp_path / "conf"
+        conf_dir.mkdir()
+        config = {
+            "defaults": [
+                "_self_",
+                {
+                    "_patch_": [
+                        {"op": "add", "path": "added", "value": {"enabled": True}},
+                        {"op": "force_add", "path": "marker", "value": "new"},
+                        {"op": "prepend", "path": "values", "values": ["start"]},
+                        {"op": "insert", "path": "values", "index": 2, "values": ["middle"]},
+                        {"op": "pop", "path": "values", "index": 1},
+                        {"op": "remove", "path": "values", "value": "a"},
+                        {"op": "append_unique", "path": "values", "values": ["b", "unique"]},
+                        {"op": "remove_all", "path": "values", "values": ["middle"]},
+                        {"op": "extend", "path": "values", "value": "${source}"},
+                        {"op": "delete_slice", "path": "values", "start": 1, "stop": 2},
+                        {"op": "delete_slice", "path": "slice_tail", "start": 1},
+                        {"op": "clear", "path": "cleared"},
+                        {"op": "remove_at", "path": "legacy", "index": 0},
+                        {"op": "remove_value", "path": "legacy", "values": ["b"]},
+                        {"op": "extend_from", "path": "legacy", "value": "${source}"},
+                        {"op": "list_clear", "path": "legacy_cleared"},
+                        {"op": "delete", "path": "conditional", "value": "old"},
+                    ]
+                },
+            ],
+            "values": ["a", "b", "a"],
+            "source": ["x", ["y", "z"]],
+            "slice_tail": ["a", "b", "c"],
+            "cleared": [1, 2],
+            "legacy": ["a", "b"],
+            "legacy_cleared": [1, 2],
+            "marker": "old",
+            "conditional": "old",
+        }
+        (conf_dir / "config.yaml").write_text(OmegaConf.to_yaml(config))
+
+        with initialize_config_dir(config_dir=str(conf_dir), version_base=None):
+            cfg = compose(config_name="config")
+
+        assert cfg.added == {"enabled": True}
+        assert cfg.marker == "new"
+        assert cfg["values"] == ["start", "unique", "x", ["y", "z"]]
+        assert cfg.slice_tail == ["a"]
+        assert cfg.cleared == []
+        assert cfg.legacy == ["x", ["y", "z"]]
+        assert cfg.legacy_cleared == []
+        assert "conditional" not in cfg
+
+    @pytest.mark.parametrize(
+        ("operation", "message"),
+        [
+            ({"op": "unknown", "path": "items"}, "config.*unknown.*items"),
+            ({"op": "append", "path": "items", "values": "wrong"}, "config.*append.*items.*values"),
+            ({"op": "change", "path": "items"}, "config.*change.*items.*value"),
+        ],
+    )
+    def test_invalid_structured_operation_identifies_source_and_key(self, tmp_path, operation, message):
+        from lerna import compose, initialize_config_dir
+
+        conf_dir = tmp_path / "conf"
+        conf_dir.mkdir()
+        patch = OmegaConf.to_yaml({"defaults": ["_self_", {"_patch_": [operation]}], "items": []})
+        (conf_dir / "config.yaml").write_text(patch)
+
+        with initialize_config_dir(config_dir=str(conf_dir), version_base=None), pytest.raises(Exception, match=message):
+            compose(config_name="config")
