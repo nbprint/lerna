@@ -13,6 +13,7 @@ except ImportError:
 from pytest import mark, param, raises, warns
 
 from lerna import version
+from lerna._internal.grammar import grammar_functions
 from lerna._internal.grammar.functions import Functions
 from lerna._internal.grammar.utils import escape_special_characters
 from lerna.core.override_parser.overrides_parser import (
@@ -1415,6 +1416,32 @@ def test_tag_sweep(value: str, expected: str) -> None:
 def test_sort(value: str, expected: str) -> None:
     ret = parse_rule(value, "function")
     assert ret == expected
+
+
+@mark.parametrize(
+    "start, stop, step",
+    [
+        param(0, 5, 2, id="int:non_landing"),
+        param(4, -1, -2, id="int:non_landing:neg_step"),
+        param(7, 0, -3, id="int:non_landing:neg_step2"),
+        param(1, 10, 1, id="int:landing"),
+        param(0, 1, 1, id="int:single_element"),
+        param(0, 0, 1, id="int:empty"),
+        param(1, 0, 1, id="int:empty_positive_step"),
+        param(0, 2, 0.5, id="float:landing"),
+        param(0, 1.3, 0.5, id="float:non_landing"),
+        param(1.3, 0, -0.5, id="float:non_landing:neg_step"),
+        param(0, 1, 0.1, id="float:decimal_step"),
+        param(0, 1, 0.2, id="float:decimal_step2"),
+        param(0, 0.3, 0.1, id="float:short_decimal_step"),
+        param(1, 0, -0.1, id="float:negative_decimal_step"),
+    ],
+)
+def test_sort_range_materializes_to_sorted_values(start: float, stop: float, step: float) -> None:
+    original = list(grammar_functions.range(start, stop, step).range())
+    for reverse in (False, True):
+        sweep = grammar_functions.sort(grammar_functions.range(start, stop, step), reverse=reverse)
+        assert list(sweep.range()) == sorted(original, reverse=reverse)
 
 
 @mark.parametrize(
