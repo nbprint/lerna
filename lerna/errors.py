@@ -37,3 +37,7 @@ class MissingConfigException(IOError, ConfigCompositionException):
 
 
 class HydraDeprecationError(HydraException): ...
+
+
+class Hydra15MigrationWarning(UserWarning):
+    """Warn about changes required before upgrading to Hydra 1.5."""

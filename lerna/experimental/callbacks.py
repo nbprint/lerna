@@ -8,25 +8,23 @@ from typing import Any
 
 from omegaconf import DictConfig, OmegaConf, flag_override
 
+from lerna._internal.deprecation_warning import deprecation_warning
 from lerna.core.global_hydra import GlobalHydra
-from lerna.core.utils import JobReturn, JobStatus
+from lerna.core.utils import JobReturn
+from lerna.errors import Hydra15MigrationWarning
 from lerna.experimental.callback import Callback
 from lerna.types import RunMode
 
 
 class LogJobReturnCallback(Callback):
-    """Log the job's return value or error upon job end"""
+    """Deprecated no-op compatibility stub; removed in Hydra 1.5."""
 
     def __init__(self) -> None:
-        self.log = logging.getLogger(f"{__name__}.{self.__class__.__name__}")
-
-    def on_job_end(self, config: DictConfig, job_return: JobReturn, **kwargs: Any) -> None:
-        if job_return.status == JobStatus.COMPLETED:
-            self.log.info(f"Succeeded with return value: {job_return.return_value}")
-        elif job_return.status == JobStatus.FAILED:
-            self.log.error("", exc_info=job_return._return_value)
-        else:
-            self.log.error("Status unknown. This should never happen.")
+        deprecation_warning(
+            "LogJobReturnCallback no longer has any effect and will be removed in Hydra 1.5. Task exceptions are logged to per-job logs without it.",
+            stacklevel=2,
+            category=Hydra15MigrationWarning,
+        )
 
 
 class PickleJobInfoCallback(Callback):

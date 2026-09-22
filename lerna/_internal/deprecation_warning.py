@@ -5,9 +5,9 @@ import warnings
 from lerna.errors import HydraDeprecationError
 
 
-def deprecation_warning(message: str, stacklevel: int = 1) -> None:
+def deprecation_warning(message: str, stacklevel: int = 1, category: type[Warning] = UserWarning) -> None:
     warnings_as_errors = os.environ.get("HYDRA_DEPRECATION_WARNINGS_AS_ERRORS")
     if warnings_as_errors:
         raise HydraDeprecationError(message)
     else:
-        warnings.warn(message, stacklevel=stacklevel + 1)
+        warnings.warn(message, category=category, stacklevel=stacklevel + 1)
