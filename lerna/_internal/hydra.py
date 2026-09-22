@@ -625,12 +625,24 @@ class Hydra:
             log = logging.getLogger(__name__)
             self._print_debug_info(config_name, overrides, run_mode)
         if run_callback:
-            callbacks = Callbacks(cfg, check_cache=False)
-            callbacks.on_compose_config(
-                config=cfg,
-                config_name=config_name,
-                overrides=overrides,
-            )
+            # Install the composed config so compose callbacks can resolve
+            # ${hydra:...} interpolations in their own arguments, then restore
+            # whatever was in place before composing.
+            orig_hydra_cfg = HydraConfig.instance().cfg
+            # set_config() marks cfg.hydra read-only in place, but the composed
+            # config is still the caller's to modify, so restore the flag.
+            was_readonly = OmegaConf.is_readonly(cfg.hydra)
+            HydraConfig.instance().set_config(cfg)
+            try:
+                callbacks = Callbacks(cfg, check_cache=False)
+                callbacks.on_compose_config(
+                    config=cfg,
+                    config_name=config_name,
+                    overrides=overrides,
+                )
+            finally:
+                HydraConfig.instance().cfg = orig_hydra_cfg
+                OmegaConf.set_readonly(cfg.hydra, was_readonly)
         return cfg
 
     def _print_plugins_info(

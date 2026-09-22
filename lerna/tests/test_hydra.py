@@ -1900,6 +1900,13 @@ class ControllerProbe(Callback):
         RESOLVED["controller_cwd"] = HydraConfig.get().runtime.cwd
 
 
+class ComposeProbe(Callback):
+    """Resolves ${hydra:...} in its own constructor arguments at compose time."""
+
+    def __init__(self, compose_cwd: str) -> None:
+        RESOLVED["compose_cwd"] = compose_cwd
+
+
 def test_multirun_controller_resolution_and_restore(
     hydra_restore_singletons: Any,
     hydra_sweep_runner: TSweepRunner,
@@ -1960,4 +1967,32 @@ def test_multirun_restores_hydra_config_when_sweep_raises(
     ):
         pass
 
+    assert not HydraConfig.initialized()
+
+
+def test_compose_callback_resolves_hydra_interpolations(
+    hydra_restore_singletons: Any,
+    hydra_sweep_runner: TSweepRunner,
+    tmpdir: Path,
+) -> None:
+    """A compose callback can resolve ${hydra:...} in its constructor arguments."""
+    RESOLVED.clear()
+    assert not HydraConfig.initialized()
+
+    with hydra_sweep_runner(
+        calling_file="lerna/tests/test_apps/simple_app/my_app.py",
+        calling_module=None,
+        config_path=None,
+        config_name=None,
+        task_function=lambda cfg: None,
+        overrides=[
+            "+x=1",
+            "+hydra.callbacks.probe._target_=lerna.tests.test_hydra.ComposeProbe",
+            "+hydra.callbacks.probe.compose_cwd=${hydra:runtime.cwd}",
+        ],
+        temp_dir=tmpdir,
+    ):
+        pass
+
+    assert RESOLVED.get("compose_cwd") == os.getcwd()
     assert not HydraConfig.initialized()

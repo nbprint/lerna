@@ -71,6 +71,7 @@ def compose_with_provenance(
     """Compose a config and return unresolved values with composition provenance."""
     from lerna._internal.callbacks import Callbacks
     from lerna._internal.config_loader_impl import ConfigLoaderImpl
+    from lerna.core.hydra_config import HydraConfig
 
     if overrides is None:
         overrides = []
@@ -89,7 +90,14 @@ def compose_with_provenance(
         from_shell=False,
         validate_sweep_overrides=True,
     )
-    Callbacks(cfg, check_cache=False).on_compose_config(config=cfg, config_name=config_name, overrides=overrides)
+    orig_hydra_cfg = HydraConfig.instance().cfg
+    was_readonly = OmegaConf.is_readonly(cfg.hydra)
+    HydraConfig.instance().set_config(cfg)
+    try:
+        Callbacks(cfg, check_cache=False).on_compose_config(config=cfg, config_name=config_name, overrides=overrides)
+    finally:
+        HydraConfig.instance().cfg = orig_hydra_cfg
+        OmegaConf.set_readonly(cfg.hydra, was_readonly)
 
     if not return_hydra_config and "hydra" in cfg:
         with open_dict(cfg):
