@@ -32,7 +32,6 @@ classifiers = [
 
 dependencies = [
     "omegaconf>=2.2.3,<3",
-    "packaging",
 ]
 
 [project.optional-dependencies]
@@ -46,6 +45,7 @@ develop = [
     "hatchling",
     "mdformat",
     "mdformat-tables>=1",
+    "packaging",
     "pytest",
     "pytest-cov",
     "ruff",

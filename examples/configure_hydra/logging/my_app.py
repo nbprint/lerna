@@ -8,7 +8,7 @@ import lerna
 log = logging.getLogger(__name__)
 
 
-@lerna.main(version_base=None, config_path="conf", config_name="config")
+@lerna.main(config_path="conf", config_name="config")
 def my_app(_cfg: DictConfig) -> None:
     log.info("Info level message")
 

@@ -16,7 +16,7 @@ cs = ConfigStore.instance()
 cs.store(name="config", node=MySQLConfig)
 
 
-@lerna.main(version_base=None, config_name="config")
+@lerna.main(config_name="config")
 def my_app(cfg: MySQLConfig) -> None:
     # pork should be port!
     if cfg.pork == 80:  # type: ignore

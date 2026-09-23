@@ -11,7 +11,7 @@ from typing import Any
 from omegaconf import DictConfig, OmegaConf
 from pytest import mark, param, raises
 
-from lerna import MissingConfigException, version
+from lerna import MissingConfigException
 from lerna.core.hydra_config import HydraConfig
 from lerna.core.plugins import Plugins
 from lerna.experimental.callback import Callback
@@ -1485,49 +1485,8 @@ def test_hydra_main_without_config_path(tmpdir: Path) -> None:
         f'hydra.run.dir="{normalize_path_for_override(tmpdir)}"',
         "hydra.job.chdir=True",
     ]
-    _, err = run_python_script(cmd, allow_warnings=True)
-
-    expected = dedent(
-        f"""
-        .*my_app.py:7: UserWarning:
-        The version_base parameter is not specified.
-        Please specify a compatibility version level, or None.
-        Will assume defaults for version {version.__compat_version__}
-          @lerna.main().*
-        .*my_app.py:7: UserWarning:
-        config_path is not specified in @hydra.main().
-        See https://hydra.cc/docs/1.2/upgrades/1.0_to_1.1/changes_to_hydra_main_config_path for more information.
-          @lerna.main().*
-        """
-    )
-    assert_regex_match(
-        from_line=expected,
-        to_line=err,
-        from_name="Expected error",
-        to_name="Actual error",
-    )
-
-
-def test_job_chdir_not_specified(tmpdir: Path) -> None:
-    cmd = [
-        "lerna/tests/test_apps/app_with_no_chdir_override/my_app.py",
-        f'hydra.run.dir="{normalize_path_for_override(tmpdir)}"',
-    ]
-    _out, err = run_python_script(cmd, allow_warnings=True)
-
-    expected = dedent(
-        """
-        .*UserWarning: Future Hydra versions will no longer change working directory at job runtime by default.
-        See https://hydra.cc/docs/1.2/upgrades/1.1_to_1.2/changes_to_job_working_dir/ for more information..*
-        .*
-        """
-    )
-    assert_regex_match(
-        from_line=expected,
-        to_line=err,
-        from_name="Expected error",
-        to_name="Actual error",
-    )
+    _, err = run_python_script(cmd)
+    assert err == ""
 
 
 def test_app_with_unicode_config(tmpdir: Path) -> None:

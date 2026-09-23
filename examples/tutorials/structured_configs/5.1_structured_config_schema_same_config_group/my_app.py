@@ -43,7 +43,7 @@ cs.store(group="db", name="base_mysql", node=MySQLConfig)
 cs.store(group="db", name="base_postgresql", node=PostGreSQLConfig)
 
 
-@lerna.main(version_base=None, config_path="conf", config_name="config")
+@lerna.main(config_path="conf", config_name="config")
 def my_app(cfg: Config) -> None:
     print(OmegaConf.to_yaml(cfg))
 

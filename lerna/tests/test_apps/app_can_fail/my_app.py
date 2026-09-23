@@ -4,7 +4,7 @@ from omegaconf import DictConfig
 import lerna
 
 
-@lerna.main(version_base=None)
+@lerna.main()
 def my_app(cfg: DictConfig) -> None:
     val = 1 / cfg.divisor
     print(f"val={val}")

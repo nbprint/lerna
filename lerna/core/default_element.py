@@ -8,8 +8,6 @@ from typing import Optional, Union
 from omegaconf import AnyNode, DictConfig, OmegaConf
 from omegaconf.errors import InterpolationResolutionError
 
-from lerna import version
-from lerna._internal.deprecation_warning import deprecation_warning
 from lerna.errors import ConfigCompositionException
 
 
@@ -147,21 +145,6 @@ class InputDefault:
         if package_header is None:
             return
 
-        if not version.base_at_least("1.2"):
-            if "_group_" in package_header or "_name_" in package_header:
-                path = self.get_config_path()
-                url = "https://hydra.cc/docs/1.2/upgrades/1.0_to_1.1/changes_to_package_header"
-                deprecation_warning(
-                    message=dedent(
-                        f"""\
-                        In '{path}': Usage of deprecated keyword in package header '# @package {package_header}'.
-                        See {url} for more information"""
-                    ),
-                )
-
-            if package_header == "_group_":
-                return
-
         # package header is always interpreted as absolute.
         # if it does not have a _global_ prefix, add it.
         if package_header != "_global_" and not package_header.startswith("_global_."):
@@ -170,8 +153,6 @@ class InputDefault:
             else:
                 package_header = f"_global_.{package_header}"
 
-        if not version.base_at_least("1.2"):
-            package_header = package_header.replace("_group_", self.get_default_package())
         self.__dict__["package_header"] = package_header
 
     def get_package_header(self) -> str | None:
@@ -197,10 +178,6 @@ class InputDefault:
 
         if package is None:
             package = self._relative_group_path().replace("/", ".")
-
-        # name computation should be deferred to after the final config group choice is done
-        if isinstance(name, str) and not version.base_at_least("1.2") and "_name_" in package:
-            package = package.replace("_name_", name)
 
         if parent_package == "":
             ret = package
@@ -581,12 +558,7 @@ class GroupDefault(InputDefault):
 Defaults list element '{self.get_override_key()}={name}' is using a deprecated interpolation form.
 See http://hydra.cc/docs/1.1/upgrades/1.0_to_1.1/defaults_list_interpolation for migration information."""
                 )
-                if not version.base_at_least("1.2"):
-                    deprecation_warning(
-                        message=msg,
-                    )
-                else:
-                    raise ConfigCompositionException(msg)
+                raise ConfigCompositionException(msg)
 
             self.value = self._resolve_interpolation_impl(known_choices, name)
 

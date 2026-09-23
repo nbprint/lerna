@@ -23,7 +23,6 @@ database_lib.register_configs()
 
 
 @lerna.main(
-    version_base=None,
     config_path="conf",
     config_name="config",
 )

@@ -5,7 +5,7 @@ import lerna
 from lerna.core.hydra_config import HydraConfig
 
 
-@lerna.main(version_base=None)
+@lerna.main()
 def my_app(_: DictConfig) -> None:
     print(HydraConfig.instance().get().runtime.output_dir)
 

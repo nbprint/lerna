@@ -5,7 +5,7 @@ from pytest import raises
 import lerna
 
 
-@lerna.main(version_base=None, config_path=".", config_name="config")
+@lerna.main(config_path=".", config_name="config")
 def my_app(cfg: DictConfig) -> None:
     assert cfg.node.loompa == 10  # attribute style access
     assert cfg["node"]["loompa"] == 10  # dictionary style access

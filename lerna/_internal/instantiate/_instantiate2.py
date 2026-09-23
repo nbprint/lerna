@@ -48,7 +48,7 @@ from lerna._internal.execution_policy import (
 )
 from lerna._internal.utils import _locate
 from lerna.errors import InstantiationException
-from lerna.types import ConvertMode, TargetConf
+from lerna.types import ConvertMode
 
 # OmegaConf 2.4 adds tuple configurations (TupleConfig) along with is_sequence()
 # and is_tuple(). Lerna supports OmegaConf 2.2/2.3 as well, where sequences are
@@ -464,19 +464,6 @@ def instantiate(
 
     if config is None:
         return None
-
-    # TargetConf edge case
-    if isinstance(config, TargetConf) and config._target_ == "???":
-        # Specific check to give a good warning about failure to annotate _target_ as a string.
-        raise InstantiationException(
-            dedent(
-                f"""\
-                Config has missing value for key `_target_`, cannot instantiate.
-                Config type: {type(config).__name__}
-                Check that the `_target_` key in your dataclass is properly annotated and overridden.
-                A common problem is forgetting to annotate _target_ as a string : '_target_: str = ...'"""
-            )
-        )
 
     execution_whitelist = _resolve_execution_whitelist(_execution_whitelist_)
     policy = (

@@ -4,7 +4,7 @@ from omegaconf import DictConfig, OmegaConf
 import lerna
 
 
-@lerna.main(version_base=None, config_path=".")
+@lerna.main(config_path=".")
 def my_app(cfg: DictConfig) -> None:
     print(OmegaConf.to_yaml(cfg))
 

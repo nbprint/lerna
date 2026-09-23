@@ -10,9 +10,8 @@ try:
     from _pytest.python_api import RaisesContext
 except ImportError:
     from _pytest.raises import RaisesExc as RaisesContext  # type: ignore
-from pytest import mark, param, raises, warns
+from pytest import mark, param, raises
 
-from lerna import version
 from lerna._internal.grammar import grammar_functions
 from lerna._internal.grammar.functions import Functions
 from lerna._internal.grammar.utils import escape_special_characters
@@ -1040,27 +1039,16 @@ def test_list_extend_override(
     assert ret == expected
 
 
-def test_deprecated_name_package(hydra_restore_singletons: Any) -> None:
-    msg = (
-        "In override key@_name_=value: _name_ keyword is deprecated in packages, "
-        "see https://hydra.cc/docs/1.2/upgrades/1.0_to_1.1/changes_to_package_header"
+def test_name_package_is_not_special(hydra_restore_singletons: Any) -> None:
+    assert parse_rule("key@_name_=value", "override") == Override(
+        type=OverrideType.CHANGE,
+        key_or_group="key",
+        value_type=ValueType.ELEMENT,
+        _value="value",
+        package="_name_",
+        input_line="key@_name_=value",
+        config_loader=None,
     )
-
-    version.setbase("1.1")
-
-    with warns(
-        UserWarning,
-        match=re.escape(msg),
-    ):
-        assert parse_rule("key@_name_=value", "override") == Override(
-            type=OverrideType.CHANGE,
-            key_or_group="key",
-            value_type=ValueType.ELEMENT,
-            _value="value",
-            package="_name_",
-            input_line="key@_name_=value",
-            config_loader=None,
-        )
 
 
 @mark.parametrize(

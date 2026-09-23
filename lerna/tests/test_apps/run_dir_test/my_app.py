@@ -9,7 +9,7 @@ from lerna.core.hydra_config import HydraConfig
 from lerna.utils import get_original_cwd
 
 
-@lerna.main(version_base=None)
+@lerna.main()
 def my_app(_: DictConfig) -> None:
     run_dir = str(Path.cwd().relative_to(get_original_cwd()))
     time.sleep(2)

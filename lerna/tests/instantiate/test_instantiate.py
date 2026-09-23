@@ -9,10 +9,9 @@ from textwrap import dedent
 from typing import Any
 
 from omegaconf import MISSING, AnyNode, DictConfig, ListConfig, MissingMandatoryValue, OmegaConf
-from pytest import fixture, mark, param, raises, warns
+from pytest import fixture, mark, param, raises
 
 import lerna
-from lerna import version
 from lerna.errors import InstantiationException
 from lerna.test_utils.test_utils import assert_multiline_regex_search
 from lerna.tests.instantiate import (
@@ -22,7 +21,6 @@ from lerna.tests.instantiate import (
     AnotherClass,
     ArgsClass,
     ASubclass,
-    BadAdamConf,
     BClass,
     CenterCrop,
     CenterCropConf,
@@ -55,7 +53,7 @@ from lerna.tests.instantiate import (
     partial_equal,
     recisinstance,
 )
-from lerna.types import ConvertMode, TargetConf
+from lerna.types import ConvertMode
 
 
 @fixture(
@@ -733,41 +731,6 @@ def test_instantiate_adam_conf_with_convert(instantiate_func: Any) -> None:
     assert res.eps == expected.eps
     assert res.weight_decay == expected.weight_decay
     assert res.amsgrad == expected.amsgrad
-
-
-def test_targetconf_deprecated(hydra_restore_singletons: Any) -> None:
-    version.setbase("1.1")
-    with warns(
-        expected_warning=UserWarning,
-        match=re.escape("TargetConf is deprecated since Hydra 1.1 and will be removed in Hydra 1.2."),
-    ):
-        TargetConf()
-
-
-def test_targetconf_disabled(hydra_restore_singletons: Any) -> None:
-    version.setbase("1.2")
-    with raises(
-        TypeError,
-        match=re.escape("TargetConf is unsupported since Hydra 1.2"),
-    ):
-        TargetConf()
-
-
-def test_instantiate_bad_adam_conf(instantiate_func: Any, recwarn: Any) -> None:
-    msg = re.escape(
-        dedent(
-            """\
-            Config has missing value for key `_target_`, cannot instantiate.
-            Config type: BadAdamConf
-            Check that the `_target_` key in your dataclass is properly annotated and overridden.
-            A common problem is forgetting to annotate _target_ as a string : '_target_: str = ...'"""
-        )
-    )
-    with raises(
-        InstantiationException,
-        match=msg,
-    ):
-        instantiate_func(BadAdamConf())
 
 
 def test_instantiate_with_missing_module(instantiate_func: Any) -> None:

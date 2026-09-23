@@ -18,8 +18,6 @@ from typing import Any, cast
 
 from omegaconf import DictConfig, OmegaConf, open_dict, read_write
 
-from lerna import version
-from lerna._internal.deprecation_warning import deprecation_warning
 from lerna.core.hydra_config import HydraConfig
 from lerna.core.singleton import Singleton
 from lerna.types import HydraContext, TaskFunction
@@ -199,20 +197,8 @@ def _run_job(
 
         _chdir = hydra_cfg.hydra.job.chdir
 
-        if _chdir is None and version.base_at_least("1.2"):
-            _chdir = False
-
         if _chdir is None:
-            url = "https://hydra.cc/docs/1.2/upgrades/1.1_to_1.2/changes_to_job_working_dir/"
-            deprecation_warning(
-                message=dedent(
-                    f"""\
-                    Future Hydra versions will no longer change working directory at job runtime by default.
-                    See {url} for more information."""
-                ),
-                stacklevel=2,
-            )
-            _chdir = True
+            _chdir = False
 
         if _chdir:
             os.chdir(output_dir)

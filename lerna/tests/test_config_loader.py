@@ -7,7 +7,6 @@ from typing import Any
 from omegaconf import MISSING, OmegaConf, ValidationError, open_dict
 from pytest import mark, param, raises, warns
 
-from lerna import version
 from lerna._internal.config_loader_impl import ConfigLoaderImpl
 from lerna._internal.utils import create_config_search_path
 from lerna.core.config_store import ConfigStore, ConfigStoreWithProvider
@@ -167,7 +166,6 @@ class TestConfigLoader:
 
     def test_load_yml_file(self, path: str, hydra_restore_singletons: Any) -> None:
         config_loader = ConfigLoaderImpl(config_search_path=create_config_search_path(path))
-        version.setbase("1.2")
         with raises(
             ConfigLoadError,
             match=re.escape("Unsupported config file extension '.yml'. Hydra config files must use the '.yaml' extension."),
@@ -177,22 +175,6 @@ class TestConfigLoader:
                 overrides=[],
                 run_mode=RunMode.RUN,
             )
-
-        version.setbase("1.1")
-        with warns(
-            UserWarning,
-            match=("Support for .yml files is deprecated. Use .yaml extension for Hydra config files"),
-        ):
-            cfg = config_loader.load_configuration(
-                config_name="config.yml",
-                overrides=[],
-                run_mode=RunMode.RUN,
-            )
-
-        with open_dict(cfg):
-            del cfg["hydra"]
-
-        assert cfg == {"yml_file_here": True}
 
 
 @mark.parametrize("controller", ["launcher", "sweeper"])

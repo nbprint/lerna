@@ -2,30 +2,31 @@
 
 # Source of truth for Hydra's version
 
+import re
 from textwrap import dedent
 from typing import Any
-
-from packaging.version import Version
 
 from . import __version__
 from ._internal.deprecation_warning import deprecation_warning
 from .core.singleton import Singleton
-from .errors import HydraException
+from .errors import Hydra15MigrationWarning, HydraException
 
 _UNSPECIFIED_: Any = object()
 
-__compat_version__: Version = Version("1.1")
+_MIN_SUPPORTED_VERSION_BASE = "1.3"
+
+_VERSION_PATTERN = re.compile(r"(?P<major>[0-9]+)\.(?P<minor>[0-9]+)(?:\.[0-9]+(?:rc[0-9]+|\.dev[0-9]+)?)?")
 
 
 class VersionBase(metaclass=Singleton):
     def __init__(self) -> None:
-        self.version_base: Version | None = _UNSPECIFIED_
+        self.version_base = _get_version(__version__)
 
-    def setbase(self, version: "Version") -> None:
-        assert isinstance(version, Version), f"Unexpected Version type : {type(version)}"
+    def setbase(self, version: str) -> None:
+        assert isinstance(version, str), f"Unexpected Version type : {type(version)}"
         self.version_base = version
 
-    def getbase(self) -> Version | None:
+    def getbase(self) -> str:
         return self.version_base
 
     @staticmethod
@@ -38,45 +39,44 @@ class VersionBase(metaclass=Singleton):
         Singleton._instances[VersionBase] = instance  # type: ignore
 
 
-def _get_version(ver: str) -> Version:
-    # Only consider major.minor as packaging will compare "1.2.0.dev2" < "1.2"
-    pver = Version(ver)
-    return Version(f"{pver.major}.{pver.minor}")
+def _parse_version(ver: str) -> tuple[int, int]:
+    if not isinstance(ver, str):
+        raise TypeError(f"Expected version string, got {type(ver).__name__}")
+
+    match = _VERSION_PATTERN.fullmatch(ver)
+    if match is None:
+        raise ValueError(f"Invalid version: {ver!r}")
+
+    return int(match.group("major")), int(match.group("minor"))
 
 
-def base_at_least(ver: str) -> bool:
-    _version_base = VersionBase.instance().getbase()
-    if type(_version_base) is type(_UNSPECIFIED_):
-        VersionBase.instance().setbase(__compat_version__)
-        _version_base = __compat_version__
-    assert isinstance(_version_base, Version)
-    return _version_base >= _get_version(ver)
+def _get_version(ver: str) -> str:
+    major, minor = _parse_version(ver)
+    return f"{major}.{minor}"
 
 
-def getbase() -> Version | None:
+def getbase() -> str:
     return VersionBase.instance().getbase()
 
 
 def setbase(ver: Any) -> None:
     """
-    Set the `version_base` parameter, which is used to support backward compatibility
-    with older versions of Hydra.
+    Record the deprecated `version_base` parameter for runtime reporting.
     """
-    if type(ver) is type(_UNSPECIFIED_):
-        deprecation_warning(
-            message=dedent(
-                f"""
-            The version_base parameter is not specified.
-            Please specify a compatibility version level, or None.
-            Will assume defaults for version {__compat_version__}"""
-            ),
-            stacklevel=3,
-        )
-        _version_base = __compat_version__
-    elif ver is None:
+    if ver is _UNSPECIFIED_:
         _version_base = _get_version(__version__)
     else:
-        _version_base = _get_version(ver)
-        if _version_base < __compat_version__:
-            raise HydraException(f'version_base must be >= "{__compat_version__}"')
+        if ver is None:
+            _version_base = _get_version(__version__)
+        else:
+            _version_base = _get_version(ver)
+            if _parse_version(_version_base) < _parse_version(_MIN_SUPPORTED_VERSION_BASE):
+                raise HydraException(f"version_base={ver!r} is not supported in Hydra 1.4; omit version_base to use the current behavior")
+        deprecation_warning(
+            message=dedent("""\
+            The version_base parameter is deprecated and will be removed in Hydra 1.5.
+            Omit the version_base parameter to use the current Hydra defaults."""),
+            stacklevel=3,
+            category=Hydra15MigrationWarning,
+        )
     VersionBase.instance().setbase(_version_base)

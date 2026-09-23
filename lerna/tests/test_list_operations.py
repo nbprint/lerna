@@ -201,73 +201,73 @@ empty: []
         return str(conf_dir)
 
     def test_append_single(self, config_dir):
-        with initialize_config_dir(version_base=None, config_dir=config_dir):
+        with initialize_config_dir(config_dir=config_dir):
             cfg = compose(config_name="config", overrides=["tags=append(four)"])
             assert list(cfg["tags"]) == ["one", "two", "three", "four"]
 
     def test_append_multiple(self, config_dir):
-        with initialize_config_dir(version_base=None, config_dir=config_dir):
+        with initialize_config_dir(config_dir=config_dir):
             cfg = compose(config_name="config", overrides=["tags=append(four,five)"])
             assert list(cfg["tags"]) == ["one", "two", "three", "four", "five"]
 
     def test_prepend_single(self, config_dir):
-        with initialize_config_dir(version_base=None, config_dir=config_dir):
+        with initialize_config_dir(config_dir=config_dir):
             cfg = compose(config_name="config", overrides=["tags=prepend(zero)"])
             assert list(cfg["tags"]) == ["zero", "one", "two", "three"]
 
     def test_prepend_multiple(self, config_dir):
-        with initialize_config_dir(version_base=None, config_dir=config_dir):
+        with initialize_config_dir(config_dir=config_dir):
             cfg = compose(config_name="config", overrides=["tags=prepend(zero,half)"])
             assert list(cfg["tags"]) == ["zero", "half", "one", "two", "three"]
 
     def test_insert_at_beginning(self, config_dir):
-        with initialize_config_dir(version_base=None, config_dir=config_dir):
+        with initialize_config_dir(config_dir=config_dir):
             cfg = compose(config_name="config", overrides=["tags=insert(0,zero)"])
             assert list(cfg["tags"]) == ["zero", "one", "two", "three"]
 
     def test_insert_in_middle(self, config_dir):
-        with initialize_config_dir(version_base=None, config_dir=config_dir):
+        with initialize_config_dir(config_dir=config_dir):
             cfg = compose(config_name="config", overrides=["tags=insert(1,one-half)"])
             assert list(cfg["tags"]) == ["one", "one-half", "two", "three"]
 
     def test_insert_at_end(self, config_dir):
-        with initialize_config_dir(version_base=None, config_dir=config_dir):
+        with initialize_config_dir(config_dir=config_dir):
             cfg = compose(config_name="config", overrides=["tags=insert(3,four)"])
             assert list(cfg["tags"]) == ["one", "two", "three", "four"]
 
     def test_remove_at_first(self, config_dir):
-        with initialize_config_dir(version_base=None, config_dir=config_dir):
+        with initialize_config_dir(config_dir=config_dir):
             cfg = compose(config_name="config", overrides=["tags=remove_at(0)"])
             assert list(cfg["tags"]) == ["two", "three"]
 
     def test_remove_at_middle(self, config_dir):
-        with initialize_config_dir(version_base=None, config_dir=config_dir):
+        with initialize_config_dir(config_dir=config_dir):
             cfg = compose(config_name="config", overrides=["tags=remove_at(1)"])
             assert list(cfg["tags"]) == ["one", "three"]
 
     def test_remove_at_last(self, config_dir):
-        with initialize_config_dir(version_base=None, config_dir=config_dir):
+        with initialize_config_dir(config_dir=config_dir):
             cfg = compose(config_name="config", overrides=["tags=remove_at(2)"])
             assert list(cfg["tags"]) == ["one", "two"]
 
     def test_remove_at_negative_index(self, config_dir):
-        with initialize_config_dir(version_base=None, config_dir=config_dir):
+        with initialize_config_dir(config_dir=config_dir):
             cfg = compose(config_name="config", overrides=["tags=remove_at(-1)"])
             assert list(cfg["tags"]) == ["one", "two"]
 
     def test_remove_value(self, config_dir):
-        with initialize_config_dir(version_base=None, config_dir=config_dir):
+        with initialize_config_dir(config_dir=config_dir):
             cfg = compose(config_name="config", overrides=["tags=remove_value(two)"])
             assert list(cfg["tags"]) == ["one", "three"]
 
     def test_list_clear(self, config_dir):
-        with initialize_config_dir(version_base=None, config_dir=config_dir):
+        with initialize_config_dir(config_dir=config_dir):
             cfg = compose(config_name="config", overrides=["tags=list_clear()"])
             assert list(cfg["tags"]) == []
 
     def test_multiple_operations_sequential(self, config_dir):
         """Test that multiple list operations work sequentially."""
-        with initialize_config_dir(version_base=None, config_dir=config_dir):
+        with initialize_config_dir(config_dir=config_dir):
             cfg = compose(
                 config_name="config",
                 overrides=[
@@ -290,17 +290,17 @@ db:
     - replica1
 """
         )
-        with initialize_config_dir(version_base=None, config_dir=str(conf_dir)):
+        with initialize_config_dir(config_dir=str(conf_dir)):
             cfg = compose(config_name="config", overrides=["db.hosts=append(replica2)"])
             assert list(cfg["db"]["hosts"]) == ["localhost", "replica1", "replica2"]
 
     def test_append_unique_preserves_existing_duplicates(self, config_dir):
-        with initialize_config_dir(version_base=None, config_dir=config_dir):
+        with initialize_config_dir(config_dir=config_dir):
             cfg = compose(config_name="config", overrides=["duplicates=append_unique(rest,metrics,metrics)"])
             assert list(cfg.duplicates) == ["rest", "outputs", "rest", "metrics"]
 
     def test_append_unique_compares_resolved_structures(self, config_dir):
-        with initialize_config_dir(version_base=None, config_dir=config_dir):
+        with initialize_config_dir(config_dir=config_dir):
             cfg = compose(
                 config_name="config",
                 overrides=[
@@ -313,12 +313,12 @@ db:
             assert OmegaConf.to_container(cfg["items"], resolve=False)[3] == {"name": "${candidate.name}"}
 
     def test_remove_all_removes_every_resolved_match(self, config_dir):
-        with initialize_config_dir(version_base=None, config_dir=config_dir):
+        with initialize_config_dir(config_dir=config_dir):
             cfg = compose(config_name="config", overrides=["duplicates=remove_all(rest,missing)"])
             assert list(cfg.duplicates) == ["outputs"]
 
     def test_extend_from_splices_only_source_list(self, config_dir):
-        with initialize_config_dir(version_base=None, config_dir=config_dir):
+        with initialize_config_dir(config_dir=config_dir):
             cfg = compose(config_name="config", overrides=["tags=extend_from(${source.values})"])
             assert OmegaConf.to_container(cfg.tags, resolve=True) == [
                 "one",
@@ -331,12 +331,12 @@ db:
             assert OmegaConf.to_container(cfg.tags, resolve=False)[-1] == {"name": "${source.label}"}
 
     def test_extend_from_empty_and_self_sources(self, config_dir):
-        with initialize_config_dir(version_base=None, config_dir=config_dir):
+        with initialize_config_dir(config_dir=config_dir):
             empty = compose(config_name="config", overrides=["tags=extend_from(${empty})"])
             assert list(empty.tags) == ["one", "two", "three"]
 
         GlobalHydra.instance().clear()
-        with initialize_config_dir(version_base=None, config_dir=config_dir):
+        with initialize_config_dir(config_dir=config_dir):
             same = compose(config_name="config", overrides=["tags=extend_from(${tags})"])
             assert list(same.tags) == ["one", "two", "three", "one", "two", "three"]
 
@@ -354,7 +354,7 @@ db:
         ],
     )
     def test_python_style_operations(self, config_dir, override, expected):
-        with initialize_config_dir(version_base=None, config_dir=config_dir):
+        with initialize_config_dir(config_dir=config_dir):
             cfg = compose(config_name="config", overrides=[override])
             assert OmegaConf.to_container(cfg.tags, resolve=True) == expected
 
@@ -374,7 +374,7 @@ db:
         ],
     )
     def test_append_unique_sequential_behavior(self, config_dir, overrides, expected):
-        with initialize_config_dir(version_base=None, config_dir=config_dir):
+        with initialize_config_dir(config_dir=config_dir):
             cfg = compose(config_name="config", overrides=overrides)
             assert list(cfg.tags) == expected
 
@@ -394,7 +394,7 @@ db:
         ],
     )
     def test_remove_all_sequential_behavior(self, config_dir, overrides, expected):
-        with initialize_config_dir(version_base=None, config_dir=config_dir):
+        with initialize_config_dir(config_dir=config_dir):
             cfg = compose(config_name="config", overrides=overrides)
             assert list(cfg.tags) == expected
 
@@ -425,12 +425,12 @@ name: not_a_list
 
     def test_append_to_non_list_fails(self, config_dir):
         """Cannot append to a non-list value."""
-        with initialize_config_dir(version_base=None, config_dir=config_dir), pytest.raises(Exception, match="not a list"):
+        with initialize_config_dir(config_dir=config_dir), pytest.raises(Exception, match="not a list"):
             compose(config_name="config", overrides=["name=append(new)"])
 
     def test_remove_at_out_of_bounds(self, config_dir):
         """Remove at out-of-bounds index should fail."""
-        with initialize_config_dir(version_base=None, config_dir=config_dir), pytest.raises(Exception, match="Cannot remove item"):
+        with initialize_config_dir(config_dir=config_dir), pytest.raises(Exception, match="Cannot remove item"):
             compose(config_name="config", overrides=["tags=remove_at(10)"])
 
     @pytest.mark.parametrize(
@@ -442,5 +442,5 @@ name: not_a_list
         ],
     )
     def test_extend_from_reports_source_and_destination(self, config_dir, override, message):
-        with initialize_config_dir(version_base=None, config_dir=config_dir), pytest.raises(Exception, match=message):
+        with initialize_config_dir(config_dir=config_dir), pytest.raises(Exception, match=message):
             compose(config_name="config", overrides=[override])

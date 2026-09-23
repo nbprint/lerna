@@ -7,7 +7,7 @@ import lerna
 from lerna.utils import get_original_cwd, to_absolute_path
 
 
-@lerna.main(version_base=None)
+@lerna.main()
 def my_app(_cfg: DictConfig) -> None:
     print(f"Current working directory : {os.getcwd()}")
     print(f"Orig working directory    : {get_original_cwd()}")
