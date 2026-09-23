@@ -5,7 +5,7 @@ import lerna
 from lerna.core.hydra_config import HydraConfig
 
 
-@lerna.main(version_base=None, config_path="conf", config_name="config")
+@lerna.main(config_path="conf", config_name="config")
 def my_app(_: DictConfig) -> None:
     print(HydraConfig.get().mode)
 

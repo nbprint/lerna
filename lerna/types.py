@@ -4,12 +4,6 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import TYPE_CHECKING, Any
 
-from omegaconf import MISSING
-
-from lerna import version
-
-from ._internal.deprecation_warning import deprecation_warning
-
 TaskFunction = Callable[[Any], Any]
 
 
@@ -22,25 +16,7 @@ if TYPE_CHECKING:
 class HydraContext:
     config_loader: "ConfigLoader"
     callbacks: "Callbacks"
-
-
-@dataclass
-class TargetConf:
-    """
-    This class is going away in Hydra 1.2.
-    You should no longer extend it or annotate with it.
-    instantiate will work correctly if you pass in a DictConfig object or any dataclass that has the
-    _target_ attribute.
-    """
-
-    _target_: str = MISSING
-
-    def __post_init__(self) -> None:
-        if version.base_at_least("1.2"):
-            raise TypeError("TargetConf is unsupported since Hydra 1.2")
-        else:
-            msg = "\nTargetConf is deprecated since Hydra 1.1 and will be removed in Hydra 1.2."
-            deprecation_warning(message=msg)
+    execution_whitelist: Any = None
 
 
 class RunMode(Enum):

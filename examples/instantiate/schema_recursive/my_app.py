@@ -6,7 +6,7 @@ from omegaconf import MISSING
 
 import lerna
 from lerna.core.config_store import ConfigStore
-from lerna.utils import instantiate
+from lerna.utils import execution_whitelist, instantiate
 
 
 class Tree:
@@ -46,10 +46,11 @@ def pretty_print(tree: Tree, name: str = "root", depth: int = 0) -> None:
         pretty_print(tree.right, name="right", depth=depth + 1)
 
 
-@lerna.main(version_base=None, config_path=".", config_name="config")
+@lerna.main(config_path=".", config_name="config")
 def my_app(cfg: Config) -> None:
-    tree: Tree = instantiate(cfg.tree)
-    pretty_print(tree)
+    with execution_whitelist("my_app.*"):
+        tree: Tree = instantiate(cfg.tree)
+        pretty_print(tree)
 
 
 if __name__ == "__main__":

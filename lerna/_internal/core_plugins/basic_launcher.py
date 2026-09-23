@@ -52,7 +52,11 @@ class BasicLauncher(Launcher):
         assert self.config is not None
         assert self.task_function is not None
 
-        configure_log(self.config.hydra.hydra_logging, self.config.hydra.verbose)
+        configure_log(
+            self.config.hydra.hydra_logging,
+            self.config.hydra.verbose,
+            execution_whitelist=self.hydra_context.execution_whitelist,
+        )
         sweep_dir = self.config.hydra.sweep.dir
         Path(str(sweep_dir)).mkdir(parents=True, exist_ok=True)
         log.info(f"Launching {len(job_overrides)} jobs locally")
@@ -73,5 +77,9 @@ class BasicLauncher(Launcher):
                 job_subdir_key="hydra.sweep.subdir",
             )
             runs.append(ret)
-            configure_log(self.config.hydra.hydra_logging, self.config.hydra.verbose)
+            configure_log(
+                self.config.hydra.hydra_logging,
+                self.config.hydra.verbose,
+                execution_whitelist=self.hydra_context.execution_whitelist,
+            )
         return runs

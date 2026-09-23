@@ -5,7 +5,7 @@ import lerna
 from lerna._internal.deprecation_warning import deprecation_warning
 
 
-@lerna.main(version_base=None)
+@lerna.main()
 def my_app(cfg: DictConfig) -> None:
     deprecation_warning("Feature FooBar is deprecated")
 

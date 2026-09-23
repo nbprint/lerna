@@ -6,7 +6,7 @@ from omegaconf import MISSING
 
 import lerna
 from lerna.core.config_store import ConfigStore
-from lerna.utils import instantiate
+from lerna.utils import execution_whitelist, instantiate
 
 
 class DBConnection:
@@ -69,10 +69,11 @@ cs.store(group="db", name="mysql", node=MySQLConfig)
 cs.store(group="db", name="postgresql", node=PostGreSQLConfig)
 
 
-@lerna.main(version_base=None, config_name="config")
+@lerna.main(config_name="config")
 def my_app(cfg: Config) -> None:
-    connection = instantiate(cfg.db)
-    connection.connect()
+    with execution_whitelist("my_app.*"):
+        connection = instantiate(cfg.db)
+        connection.connect()
 
 
 if __name__ == "__main__":

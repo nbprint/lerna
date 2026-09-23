@@ -9,7 +9,7 @@ import lerna
 log = logging.getLogger(__name__)
 
 
-@lerna.main(version_base=None)
+@lerna.main()
 def my_app(_: DictConfig) -> None:
     assert os.getenv("FOO") == "bar"
 

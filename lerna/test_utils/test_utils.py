@@ -236,8 +236,9 @@ def verify_dir_outputs(job_return: JobReturn, overrides: list[str] | None = None
     assert job_return.task_name is not None
     assert job_return.hydra_cfg is not None
 
-    assert os.path.exists(os.path.join(job_return.working_dir, job_return.task_name + ".log"))
-    hydra_dir = os.path.join(job_return.working_dir, job_return.hydra_cfg.hydra.output_subdir)
+    output_dir = job_return.hydra_cfg.hydra.runtime.output_dir
+    assert os.path.exists(os.path.join(output_dir, job_return.task_name + ".log"))
+    hydra_dir = os.path.join(output_dir, job_return.hydra_cfg.hydra.output_subdir)
     assert os.path.exists(os.path.join(hydra_dir, "config.yaml"))
     assert os.path.exists(os.path.join(hydra_dir, "overrides.yaml"))
     assert OmegaConf.load(os.path.join(hydra_dir, "overrides.yaml")) == OmegaConf.create(overrides or [])
@@ -284,7 +285,7 @@ from lerna.core.hydra_config import HydraConfig
 
 $PROLOG
 
-@lerna.main(version_base=None, config_path='.', config_name='config')
+@lerna.main(config_path='.', config_name='config')
 def experiment(cfg):
     with open("$OUTPUT_FILE", "w") as f:
 $PRINTS

@@ -4,19 +4,22 @@ import os
 import pickle
 import subprocess
 import sys
+import warnings
 from pathlib import Path
 from textwrap import dedent
 from typing import Any
 
-from omegaconf import open_dict, read_write
-from pytest import mark, param
+from omegaconf import OmegaConf, open_dict, read_write
+from pytest import mark, param, warns
 
+from lerna._internal.callbacks import Callbacks
 from lerna.core.utils import JobReturn, JobStatus
+from lerna.errors import Hydra15MigrationWarning
+from lerna.experimental.callbacks import LogJobReturnCallback
 from lerna.test_utils.test_utils import (
     assert_regex_match,
     chdir_hydra_root,
     normalize_path_for_override,
-    run_process,
     run_python_script,
 )
 
@@ -223,31 +226,29 @@ def test_experimental_save_job_info_callback(tmpdir: Path, multirun: bool) -> No
     assert job_return_on_job_end.status == JobStatus.COMPLETED
 
 
-@mark.parametrize("multirun", [True, False])
-def test_save_job_return_callback(tmpdir: Path, multirun: bool) -> None:
-    app_path = "lerna/tests/test_apps/app_with_log_jobreturn_callback/my_app.py"
-    cmd = [
-        sys.executable,
-        app_path,
-        f'hydra.run.dir="{normalize_path_for_override(tmpdir)}"',
-        "hydra.sweep.dir=" + normalize_path_for_override(tmpdir),
-        "hydra.job.chdir=True",
-    ]
-    if multirun:
-        extra = ["+x=0,1", "-m"]
-        cmd.extend(extra)
-    log_msg = "omegaconf.errors.ConfigAttributeError: Key 'divisor' is not in struct\n"
-    run_process(cmd=cmd, print_error=False, raise_exception=False)
+@mark.parametrize("status", [JobStatus.COMPLETED, JobStatus.FAILED])
+def test_log_job_return_callback_is_deprecated_noop(status: JobStatus, caplog: Any) -> None:
+    with warns(Hydra15MigrationWarning, match="no longer has any effect") as record:
+        callback = LogJobReturnCallback()
+    assert "Task exceptions" in str(record[0].message)
 
-    if multirun:
-        log_paths = [tmpdir / "0" / "my_app.log", tmpdir / "1" / "my_app.log"]
-    else:
-        log_paths = [tmpdir / "my_app.log"]
+    callback.on_job_end(
+        config=OmegaConf.create({}),
+        job_return=JobReturn(status=status, _return_value=ValueError("job failed")),
+    )
+    assert not caplog.records
 
-    for p in log_paths:
-        with open(p) as file:
-            logs = file.readlines()
-            assert log_msg in logs
+
+def test_log_job_return_callback_config_warns_only_once() -> None:
+    config = OmegaConf.create({"hydra": {"callbacks": {"log_job_return": {"_target_": "lerna.experimental.callbacks.LogJobReturnCallback"}}}})
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        callbacks = Callbacks(config)
+
+    assert len(caught) == 1
+    assert issubclass(caught[0].category, Hydra15MigrationWarning)
+    assert "no longer has any effect" in str(caught[0].message)
+    assert isinstance(callbacks.callbacks[0], LogJobReturnCallback)
 
 
 @mark.parametrize(

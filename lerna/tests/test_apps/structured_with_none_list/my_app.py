@@ -17,7 +17,7 @@ cs = ConfigStore.instance()
 cs.store(name="config", node=Config)
 
 
-@lerna.main(version_base=None, config_name="config")
+@lerna.main(config_name="config")
 def main(cfg: DictConfig) -> None:
     print(cfg)
 

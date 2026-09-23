@@ -9,7 +9,7 @@ import lerna
 log = logging.getLogger(__name__)
 
 
-@lerna.main(version_base=None, config_path="conf", config_name="config")
+@lerna.main(config_path="conf", config_name="config")
 def experiment(cfg: DictConfig) -> None:
     print(OmegaConf.to_yaml(cfg))
 

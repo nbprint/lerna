@@ -1,11 +1,9 @@
 # Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved
 import copy
 import os
-from textwrap import dedent
 from typing import Any
 
 from lerna import version
-from lerna._internal.deprecation_warning import deprecation_warning
 from lerna._internal.hydra import Hydra
 from lerna._internal.utils import (
     create_config_search_path,
@@ -31,7 +29,7 @@ def restore_gh_from_backup(_gh_backup: Any) -> Any:
         Singleton._instances[GlobalHydra] = _gh_backup
 
 
-_UNSPECIFIED_: Any = object()
+_UNSPECIFIED_: Any = version._UNSPECIFIED_
 
 
 class initialize:
@@ -52,7 +50,7 @@ class initialize:
 
     def __init__(
         self,
-        config_path: str | None = _UNSPECIFIED_,
+        config_path: str | None = None,
         job_name: str | None = None,
         caller_stack_depth: int = 1,
         version_base: str | None = _UNSPECIFIED_,
@@ -60,23 +58,6 @@ class initialize:
         self._gh_backup = get_gh_backup()
 
         version.setbase(version_base)
-
-        if config_path is _UNSPECIFIED_:
-            if version.base_at_least("1.2"):
-                config_path = None
-            elif version_base is _UNSPECIFIED_:
-                url = "https://hydra.cc/docs/1.2/upgrades/1.0_to_1.1/changes_to_hydra_main_config_path"
-                deprecation_warning(
-                    message=dedent(
-                        f"""\
-                    config_path is not specified in hydra.initialize().
-                    See {url} for more information."""
-                    ),
-                    stacklevel=2,
-                )
-                config_path = "."
-            else:
-                config_path = "."
 
         if config_path is not None and os.path.isabs(config_path):
             raise HydraException("config_path in initialize() must be relative")

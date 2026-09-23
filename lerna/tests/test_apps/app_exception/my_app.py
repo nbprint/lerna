@@ -4,7 +4,7 @@ from omegaconf import DictConfig
 import lerna
 
 
-@lerna.main(version_base=None)
+@lerna.main()
 def my_app(_: DictConfig) -> None:
     1 / 0
 

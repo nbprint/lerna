@@ -9,11 +9,12 @@ from omegaconf import DictConfig
 
 import lerna
 from lerna.core.hydra_config import HydraConfig
+from lerna.utils import execution_whitelist
 
 log = logging.getLogger(__name__)
 
 
-@lerna.main(version_base=None, config_path=".", config_name="config")
+@lerna.main(config_path=".", config_name="config")
 def my_app(cfg: DictConfig) -> str:
     def pickle_cfg(path: Path, obj: Any) -> Any:
         with open(str(path), "wb") as file:
@@ -29,4 +30,5 @@ def my_app(cfg: DictConfig) -> str:
 
 
 if __name__ == "__main__":
-    my_app()
+    with execution_whitelist("lerna.experimental.callbacks.*"):
+        my_app()

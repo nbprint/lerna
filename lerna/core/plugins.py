@@ -14,6 +14,7 @@ from typing import Any
 
 from omegaconf import DictConfig
 
+from lerna._internal.execution_policy import _trusted_internal_target
 from lerna._internal.sources_registry import SourcesRegistry
 from lerna.core.singleton import Singleton
 from lerna.plugins.completion_plugin import CompletionPlugin
@@ -61,19 +62,47 @@ class Plugins(metaclass=Singleton):
         top_level.append(core_plugins)
 
         # Support both lerna_plugins and hydra_plugins for backward compatibility
+        namespace_modules = []
         for plugin_namespace in ["lerna_plugins", "hydra_plugins"]:
             try:
                 plugins_module = importlib.import_module(plugin_namespace)
-                top_level.append(plugins_module)
             except ImportError:
                 # If no plugins are installed the plugins package does not exist.
-                pass
+                continue
+            top_level.append(plugins_module)
+            namespace_modules.append(plugins_module)
 
         self.plugin_type_to_subclass_list = defaultdict(list)
         self.class_name_to_class = {}
 
         scanned_plugins, self.stats = self._scan_all_plugins(modules=top_level)
         scanned_plugins.extend(_scan_entrypoint_search_path_plugins())
+
+        # Upstream's group for plugin classes of any type. Lerna's own
+        # "lerna.plugins" / "hydra.lernaplugins" groups carry search path
+        # entries in a different format and are scanned separately above.
+        plugin_entry_points = list(entry_points(group="hydra.plugins"))
+        for entry_point in plugin_entry_points:
+            load_start = timer()
+            try:
+                clazz = entry_point.load()
+            except Exception as e:  # noqa: BLE001
+                warnings.warn(f"Error loading Lerna plugin entry point '{entry_point.name}': {e}", UserWarning, stacklevel=2)
+                continue
+            finally:
+                load_time = timer() - load_start
+                self.stats.total_time += load_time
+                self.stats.total_modules_import_time += load_time
+                key = f"entry point: {entry_point.name}"
+                self.stats.modules_import_time[key] = self.stats.modules_import_time.get(key, 0) + load_time
+            if not _is_concrete_plugin_type(clazz):
+                warnings.warn(f"Lerna plugin entry point '{entry_point.name}' is not a concrete plugin class", UserWarning, stacklevel=2)
+                continue
+            scanned_plugins.append(clazz)
+
+        for plugins_module in namespace_modules:
+            _warn_unenumerable_editable_namespace(plugins_module.__path__, plugin_entry_points)
+
         for clazz in scanned_plugins:
             self._register(clazz)
 
@@ -103,25 +132,22 @@ class Plugins(metaclass=Singleton):
             if classname is None:
                 raise ImportError("class not configured")
 
-            if not self.is_in_toplevel_plugins_module(classname):
-                # All plugins must be defined inside the approved top level modules.
-                # For plugins outside of lerna-core, the approved module is lerna_plugins or hydra_plugins.
-                raise RuntimeError(f"Invalid plugin '{classname}': not in lerna_plugins or hydra_plugins package")
-
             if classname not in self.class_name_to_class:
                 raise RuntimeError(f"Unknown plugin class : '{classname}'")
             clazz = self.class_name_to_class[classname]
-            plugin = instantiate(config=config, _target_=clazz)
+            with _trusted_internal_target(classname):
+                plugin = instantiate(
+                    config=config,
+                    _target_=clazz,
+                    _execution_whitelist_=classname,
+                    _recursive_=False,
+                )
             assert isinstance(plugin, Plugin)
 
         except ImportError as e:
             raise ImportError(f"Could not instantiate plugin {classname} : {e!s}\n\n\tIS THE PLUGIN INSTALLED?\n\n")
 
         return plugin
-
-    @staticmethod
-    def is_in_toplevel_plugins_module(clazz: str) -> bool:
-        return clazz.startswith(("lerna_plugins.", "hydra_plugins.", "lerna._internal.core_plugins.", "lerna._internal.core_plugins."))
 
     def instantiate_sweeper(
         self,
@@ -242,6 +268,27 @@ class Plugins(metaclass=Singleton):
             raise ValueError(  # noqa: TRY004
                 f"Plugins is now a Singleton. usage: Plugins.instance().{inspect.stack()[1][3]}(...)"
             )
+
+
+def _warn_unenumerable_editable_namespace(path: Any, plugin_entry_points: Any) -> None:
+    covered = {
+        re.sub(r"[-_.]+", "_", entry_point.dist.name).lower() for entry_point in plugin_entry_points if getattr(entry_point, "dist", None) is not None
+    }
+    for item in path:
+        if not (item.startswith("__editable__.") and item.endswith(".finder.__path_hook__")):
+            continue
+        if any(pkgutil.iter_modules([item])):
+            continue
+        if any(item.startswith(f"__editable__.{name}-") for name in covered):
+            continue
+        warnings.warn(
+            "Lerna could not discover plugins in an editable plugins namespace install. "
+            "Legacy plugins can use 'pip install -e . --config-settings editable_mode=strict'; "
+            "plugin authors should migrate to entry points.",
+            UserWarning,
+            stacklevel=2,
+        )
+        return
 
 
 def _is_concrete_plugin_type(obj: Any) -> bool:

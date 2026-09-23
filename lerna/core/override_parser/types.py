@@ -7,14 +7,11 @@ from copy import copy
 from dataclasses import dataclass, field
 from enum import Enum
 from random import shuffle
-from textwrap import dedent
 from typing import Any, cast
 
 from omegaconf import OmegaConf
 from omegaconf._utils import is_structured_config
 
-from lerna import version
-from lerna._internal.deprecation_warning import deprecation_warning
 from lerna._internal.grammar.utils import _ESC_QUOTED_STR, escape_special_characters
 from lerna.core.config_loader import ConfigLoader
 from lerna.core.object_type import ObjectType
@@ -98,14 +95,15 @@ class ChoiceSweep(Sweep):
 
 @dataclass
 class FloatRange:
-    start: decimal.Decimal | float
-    stop: decimal.Decimal | float
-    step: decimal.Decimal | float
+    start: decimal.Decimal | float | int
+    stop: decimal.Decimal | float | int
+    step: decimal.Decimal | float | int
+    _idx: int = field(default=0, init=False, repr=False, compare=False)
 
     def __post_init__(self) -> None:
-        self.start = decimal.Decimal(self.start)
-        self.stop = decimal.Decimal(self.stop)
-        self.step = decimal.Decimal(self.step)
+        self.start = decimal.Decimal(str(self.start))
+        self.stop = decimal.Decimal(str(self.stop))
+        self.step = decimal.Decimal(str(self.step))
 
     def __iter__(self) -> Any:
         return self
@@ -114,18 +112,17 @@ class FloatRange:
         assert isinstance(self.start, decimal.Decimal)
         assert isinstance(self.stop, decimal.Decimal)
         assert isinstance(self.step, decimal.Decimal)
+        current = self.start + self.step * self._idx
         if self.step > 0:
-            if self.start < self.stop:
-                ret = float(self.start)
-                self.start += self.step
-                return ret
+            if current < self.stop:
+                self._idx += 1
+                return float(current)
             else:
                 raise StopIteration
         elif self.step < 0:
-            if self.start > self.stop:
-                ret = float(self.start)
-                self.start += self.step
-                return ret
+            if current > self.stop:
+                self._idx += 1
+                return float(current)
             else:
                 raise StopIteration
         else:
@@ -138,9 +135,9 @@ class RangeSweep(Sweep):
     Discrete range of numbers
     """
 
-    start: int | float | None = None
-    stop: int | float | None = None
-    step: int | float = 1
+    start: int | float | decimal.Decimal | None = None
+    stop: int | float | decimal.Decimal | None = None
+    step: int | float | decimal.Decimal = 1
 
     shuffle: bool = False
 
@@ -525,12 +522,4 @@ class Override:
         return Override._get_value_element_as_str(self._value, space_after_sep=space_after_sep)
 
     def validate(self) -> None:
-        if not version.base_at_least("1.2") and self.package is not None and "_name_" in self.package:
-            url = "https://hydra.cc/docs/1.2/upgrades/1.0_to_1.1/changes_to_package_header"
-            deprecation_warning(
-                message=dedent(
-                    f"""\
-                        In override {self.input_line}: _name_ keyword is deprecated in packages, see {url}
-                        """
-                ),
-            )
+        return

@@ -9,6 +9,10 @@ from typing import Any
 
 import lerna._internal.instantiate._instantiate2
 import lerna.types
+from lerna._internal.execution_policy import (
+    UNSAFE_DISABLE_EXECUTION_CHECKS as UNSAFE_DISABLE_EXECUTION_CHECKS,  # noqa: PLC0414
+    execution_whitelist as execution_whitelist,  # noqa: PLC0414
+)
 from lerna._internal.utils import _locate
 from lerna.core.hydra_config import HydraConfig
 

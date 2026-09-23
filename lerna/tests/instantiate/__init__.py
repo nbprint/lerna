@@ -8,7 +8,6 @@ from typing import Any, NoReturn
 from omegaconf import MISSING, DictConfig, ListConfig
 
 from lerna.tests.instantiate.module_shadowed_by_function import a_function
-from lerna.types import TargetConf
 from lerna.utils import instantiate
 
 module_shadowed_by_function = a_function
@@ -206,12 +205,6 @@ class AdamConf:
     eps: float = 1e-08
     weight_decay: int = 0
     amsgrad: bool = False
-
-
-@dataclass
-class BadAdamConf(TargetConf):
-    # Missing str annotation
-    _target_ = "lerna.tests.instantiate.Adam"
 
 
 @dataclass

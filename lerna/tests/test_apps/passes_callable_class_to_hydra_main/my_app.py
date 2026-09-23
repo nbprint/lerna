@@ -15,7 +15,7 @@ class MyCallable:
 
 
 my_callable = MyCallable()
-my_app = lerna.main(version_base=None)(my_callable)
+my_app = lerna.main()(my_callable)
 
 if __name__ == "__main__":
     my_app()

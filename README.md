@@ -321,7 +321,7 @@ defaults:
 ```python
 from lerna import compose_with_provenance, initialize_config_dir
 
-with initialize_config_dir(config_dir="conf", version_base=None):
+with initialize_config_dir(config_dir="conf"):
   result = compose_with_provenance("config", overrides=["gateway.modules=append(metrics)"])
 
 print(result.config)                         # unresolved DictConfig

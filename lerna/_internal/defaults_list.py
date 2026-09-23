@@ -9,7 +9,7 @@ from textwrap import dedent
 
 from omegaconf import DictConfig, ListConfig, OmegaConf
 
-from lerna import MissingConfigException, version
+from lerna import MissingConfigException
 from lerna._internal.config_repository import IConfigRepository
 from lerna.core.config_store import ConfigStore
 from lerna.core.default_element import (
@@ -25,8 +25,6 @@ from lerna.core.object_type import ObjectType
 from lerna.core.override_parser.overrides_parser import OverridesParser
 from lerna.core.override_parser.types import ListOperationType, Override, OverrideType, ValueType
 from lerna.errors import ConfigCompositionException
-
-from .deprecation_warning import deprecation_warning
 
 # Try to import Rust bindings
 try:
@@ -562,13 +560,7 @@ def _update_overrides(
         else:
             d.update_parent(parent.get_group_path(), parent.get_final_package())
 
-        legacy_hydra_override = False
-        if isinstance(d, GroupDefault):
-            assert d.group is not None
-            if not version.base_at_least("1.2"):
-                legacy_hydra_override = not d.is_override() and d.group.startswith("hydra/")
-
-        if seen_override and not (d.is_override() or d.is_external_append() or legacy_hydra_override):
+        if seen_override and not (d.is_override() or d.is_external_append()):
             assert isinstance(last_override_seen, GroupDefault)
             pcp = parent.get_config_path()
             okey = last_override_seen.get_override_key()
@@ -582,35 +574,21 @@ def _update_overrides(
                 )
             )
 
-        if isinstance(d, GroupDefault):
-            if legacy_hydra_override:
-                d.override = True
-                url = "https://hydra.cc/docs/1.2/upgrades/1.0_to_1.1/defaults_list_override"
-                msg = dedent(
-                    f"""\
-                    In {parent.get_config_path()}: Invalid overriding of {d.group}:
-                    Default list overrides requires 'override' keyword.
-                    See {url} for more information.
-                    """
-                )
-                deprecation_warning(msg)
-
-            if d.override:
-                if not legacy_hydra_override:
-                    seen_override = True
-                last_override_seen = d
-                if interpolated_subtree:
-                    # Since interpolations are deferred for until all the config groups are already set,
-                    # Their subtree may not contain config group overrides
-                    raise ConfigCompositionException(
-                        dedent(
-                            f"""\
-                            {parent.get_config_path()}: Default List Overrides are not allowed in the subtree
-                            of an in interpolated config group (override {d.get_override_key()}={d.get_name()}).
-                            """
-                        )
+        if isinstance(d, GroupDefault) and d.override:
+            seen_override = True
+            last_override_seen = d
+            if interpolated_subtree:
+                # Since interpolations are deferred for until all the config groups are already set,
+                # Their subtree may not contain config group overrides
+                raise ConfigCompositionException(
+                    dedent(
+                        f"""\
+                        {parent.get_config_path()}: Default List Overrides are not allowed in the subtree
+                        of an in interpolated config group (override {d.get_override_key()}={d.get_name()}).
+                        """
                     )
-                overrides.add_override(parent.get_config_path(), d)
+                )
+            overrides.add_override(parent.get_config_path(), d)
 
 
 def _has_config_content(cfg: DictConfig) -> bool:

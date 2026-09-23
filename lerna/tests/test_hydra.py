@@ -11,7 +11,10 @@ from typing import Any
 from omegaconf import DictConfig, OmegaConf
 from pytest import mark, param, raises
 
-from lerna import MissingConfigException, version
+from lerna import MissingConfigException
+from lerna.core.hydra_config import HydraConfig
+from lerna.core.plugins import Plugins
+from lerna.experimental.callback import Callback
 from lerna.test_utils.test_utils import (
     TSweepRunner,
     TTaskRunner,
@@ -1482,49 +1485,8 @@ def test_hydra_main_without_config_path(tmpdir: Path) -> None:
         f'hydra.run.dir="{normalize_path_for_override(tmpdir)}"',
         "hydra.job.chdir=True",
     ]
-    _, err = run_python_script(cmd, allow_warnings=True)
-
-    expected = dedent(
-        f"""
-        .*my_app.py:7: UserWarning:
-        The version_base parameter is not specified.
-        Please specify a compatibility version level, or None.
-        Will assume defaults for version {version.__compat_version__}
-          @lerna.main().*
-        .*my_app.py:7: UserWarning:
-        config_path is not specified in @hydra.main().
-        See https://hydra.cc/docs/1.2/upgrades/1.0_to_1.1/changes_to_hydra_main_config_path for more information.
-          @lerna.main().*
-        """
-    )
-    assert_regex_match(
-        from_line=expected,
-        to_line=err,
-        from_name="Expected error",
-        to_name="Actual error",
-    )
-
-
-def test_job_chdir_not_specified(tmpdir: Path) -> None:
-    cmd = [
-        "lerna/tests/test_apps/app_with_no_chdir_override/my_app.py",
-        f'hydra.run.dir="{normalize_path_for_override(tmpdir)}"',
-    ]
-    _out, err = run_python_script(cmd, allow_warnings=True)
-
-    expected = dedent(
-        """
-        .*UserWarning: Future Hydra versions will no longer change working directory at job runtime by default.
-        See https://hydra.cc/docs/1.2/upgrades/1.1_to_1.2/changes_to_job_working_dir/ for more information..*
-        .*
-        """
-    )
-    assert_regex_match(
-        from_line=expected,
-        to_line=err,
-        from_name="Expected error",
-        to_name="Actual error",
-    )
+    _, err = run_python_script(cmd)
+    assert err == ""
 
 
 def test_app_with_unicode_config(tmpdir: Path) -> None:
@@ -1885,3 +1847,111 @@ def test_hydra_runtime_choice_1882(tmpdir: Path) -> None:
         from_name="Expected output",
         to_name="Actual output",
     )
+
+
+RESOLVED: dict[str, Any] = {}
+
+
+class ControllerProbe(Callback):
+    """Records controller-side ${hydra:...} resolution during multirun startup."""
+
+    def on_multirun_start(self, config: DictConfig, **kwargs: Any) -> None:
+        RESOLVED["controller_cwd"] = HydraConfig.get().runtime.cwd
+
+
+class ComposeProbe(Callback):
+    """Resolves ${hydra:...} in its own constructor arguments at compose time."""
+
+    def __init__(self, compose_cwd: str) -> None:
+        RESOLVED["compose_cwd"] = compose_cwd
+
+
+def test_multirun_controller_resolution_and_restore(
+    hydra_restore_singletons: Any,
+    hydra_sweep_runner: TSweepRunner,
+    tmpdir: Path,
+) -> None:
+    """Controller-side ${hydra:...} resolves and HydraConfig is restored afterwards."""
+    RESOLVED.clear()
+    assert not HydraConfig.initialized()
+    seen: dict[str, Any] = {}
+
+    def task(cfg: DictConfig) -> None:
+        seen["job_id"] = HydraConfig.get().job.id
+
+    with hydra_sweep_runner(
+        calling_file="lerna/tests/test_apps/simple_app/my_app.py",
+        calling_module=None,
+        config_path=None,
+        config_name=None,
+        task_function=task,
+        overrides=[
+            "+x=1",
+            "+hydra.callbacks.probe._target_=lerna.tests.test_hydra.ControllerProbe",
+        ],
+        temp_dir=tmpdir,
+    ):
+        pass
+
+    assert RESOLVED.get("controller_cwd") == os.getcwd()
+    assert seen["job_id"] == "0"
+    assert not HydraConfig.initialized()
+
+
+def test_multirun_restores_hydra_config_when_sweep_raises(
+    hydra_restore_singletons: Any,
+    hydra_sweep_runner: TSweepRunner,
+    tmpdir: Path,
+    monkeypatch: Any,
+) -> None:
+    """HydraConfig must be restored even when the sweep raises."""
+    assert not HydraConfig.initialized()
+
+    def boom(*args: Any, **kwargs: Any) -> Any:
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr(Plugins, "instantiate_sweeper", boom)
+
+    with (
+        raises(RuntimeError, match="boom"),
+        hydra_sweep_runner(
+            calling_file="lerna/tests/test_apps/simple_app/my_app.py",
+            calling_module=None,
+            config_path=None,
+            config_name=None,
+            task_function=None,
+            overrides=["+x=1"],
+            temp_dir=tmpdir,
+        ),
+    ):
+        pass
+
+    assert not HydraConfig.initialized()
+
+
+def test_compose_callback_resolves_hydra_interpolations(
+    hydra_restore_singletons: Any,
+    hydra_sweep_runner: TSweepRunner,
+    tmpdir: Path,
+) -> None:
+    """A compose callback can resolve ${hydra:...} in its constructor arguments."""
+    RESOLVED.clear()
+    assert not HydraConfig.initialized()
+
+    with hydra_sweep_runner(
+        calling_file="lerna/tests/test_apps/simple_app/my_app.py",
+        calling_module=None,
+        config_path=None,
+        config_name=None,
+        task_function=lambda cfg: None,
+        overrides=[
+            "+x=1",
+            "+hydra.callbacks.probe._target_=lerna.tests.test_hydra.ComposeProbe",
+            "+hydra.callbacks.probe.compose_cwd=${hydra:runtime.cwd}",
+        ],
+        temp_dir=tmpdir,
+    ):
+        pass
+
+    assert RESOLVED.get("compose_cwd") == os.getcwd()
+    assert not HydraConfig.initialized()

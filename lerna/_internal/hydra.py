@@ -10,6 +10,7 @@ from typing import Any
 
 from omegaconf import Container, DictConfig, OmegaConf, flag_override
 
+from lerna._internal.execution_policy import _get_active_execution_whitelist
 from lerna._internal.utils import get_column_widths, run_and_report
 from lerna.core.config_loader import ConfigLoader
 from lerna.core.config_search_path import ConfigSearchPath
@@ -118,7 +119,11 @@ class Hydra:
 
         try:
             ret = run_job(
-                hydra_context=HydraContext(config_loader=self.config_loader, callbacks=callbacks),
+                hydra_context=HydraContext(
+                    config_loader=self.config_loader,
+                    callbacks=callbacks,
+                    execution_whitelist=_get_active_execution_whitelist(),
+                ),
                 task_function=task_function,
                 config=cfg,
                 job_dir_key="hydra.run.dir",
@@ -155,22 +160,35 @@ class Hydra:
             activate_config_repository=True,
         )
 
-        callbacks = Callbacks(cfg)
-        callbacks.on_multirun_start(config=cfg, config_name=config_name)
-
-        sweeper = Plugins.instance().instantiate_sweeper(
-            config=cfg,
-            hydra_context=HydraContext(config_loader=self.config_loader, callbacks=callbacks),
-            task_function=task_function,
-        )
-        task_overrides = OmegaConf.to_container(cfg.hydra.overrides.task, resolve=False)
-        assert isinstance(task_overrides, list)
+        # Install the composed controller config so controller-side components
+        # (callbacks, sweeper, launcher) can resolve ${hydra:...} interpolations
+        # such as hydra.runtime.cwd. Individual jobs temporarily replace this
+        # via run_job(), which saves and restores the previous value.
+        orig_hydra_cfg = HydraConfig.instance().cfg
+        HydraConfig.instance().set_config(cfg)
         try:
-            ret = sweeper.sweep(arguments=task_overrides)
-        except KeyboardInterrupt:
+            callbacks = Callbacks(cfg)
+            callbacks.on_multirun_start(config=cfg, config_name=config_name)
+
+            sweeper = Plugins.instance().instantiate_sweeper(
+                config=cfg,
+                hydra_context=HydraContext(
+                    config_loader=self.config_loader,
+                    callbacks=callbacks,
+                    execution_whitelist=_get_active_execution_whitelist(),
+                ),
+                task_function=task_function,
+            )
+            task_overrides = OmegaConf.to_container(cfg.hydra.overrides.task, resolve=False)
+            assert isinstance(task_overrides, list)
+            try:
+                ret = sweeper.sweep(arguments=task_overrides)
+            except KeyboardInterrupt:
+                callbacks.on_multirun_end(config=cfg, config_name=config_name)
+                raise
             callbacks.on_multirun_end(config=cfg, config_name=config_name)
-            raise
-        callbacks.on_multirun_end(config=cfg, config_name=config_name)
+        finally:
+            HydraConfig.instance().cfg = orig_hydra_cfg
         return ret
 
     @staticmethod
@@ -607,12 +625,24 @@ class Hydra:
             log = logging.getLogger(__name__)
             self._print_debug_info(config_name, overrides, run_mode)
         if run_callback:
-            callbacks = Callbacks(cfg, check_cache=False)
-            callbacks.on_compose_config(
-                config=cfg,
-                config_name=config_name,
-                overrides=overrides,
-            )
+            # Install the composed config so compose callbacks can resolve
+            # ${hydra:...} interpolations in their own arguments, then restore
+            # whatever was in place before composing.
+            orig_hydra_cfg = HydraConfig.instance().cfg
+            # set_config() marks cfg.hydra read-only in place, but the composed
+            # config is still the caller's to modify, so restore the flag.
+            was_readonly = OmegaConf.is_readonly(cfg.hydra)
+            HydraConfig.instance().set_config(cfg)
+            try:
+                callbacks = Callbacks(cfg, check_cache=False)
+                callbacks.on_compose_config(
+                    config=cfg,
+                    config_name=config_name,
+                    overrides=overrides,
+                )
+            finally:
+                HydraConfig.instance().cfg = orig_hydra_cfg
+                OmegaConf.set_readonly(cfg.hydra, was_readonly)
         return cfg
 
     def _print_plugins_info(

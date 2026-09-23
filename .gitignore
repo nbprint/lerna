@@ -160,5 +160,7 @@ emsdk
 # AI
 ROADMAP.md
 AGENTS.md
+CHANGES.md
+/hydra/
 .github/hooks/sdlc.json
 .superpowers

@@ -8,7 +8,7 @@ import lerna
 from lerna.core.hydra_config import HydraConfig
 
 
-@lerna.main(version_base=None)
+@lerna.main()
 def main(_: DictConfig) -> None:
     subdir = Path(HydraConfig.get().run.dir) / Path("subdir")
     subdir.mkdir(exist_ok=True, parents=True)

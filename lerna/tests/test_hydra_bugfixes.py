@@ -277,7 +277,7 @@ name: alpha
         GlobalHydra.instance().clear()
 
         try:
-            with initialize_config_dir(config_dir=str(config_dir), version_base=None):
+            with initialize_config_dir(config_dir=str(config_dir)):
                 # This is the test case from Hydra #2935:
                 # +db@db_2=postgresql should look for db/postgresql, not server/db/postgresql
                 # If the bug existed, this would fail with "Could not find server/db/postgresql"
@@ -565,7 +565,7 @@ remove_me: should_be_gone
 
         GlobalHydra.instance().clear()
         try:
-            with initialize_config_dir(config_dir=str(config_dir), version_base=None):
+            with initialize_config_dir(config_dir=str(config_dir)):
                 cfg = compose(config_name="config")
                 assert "drop_me" not in cfg
                 assert "status" not in cfg
@@ -581,7 +581,7 @@ remove_me: should_be_gone
 
         GlobalHydra.instance().clear()
         try:
-            with initialize_config_dir(config_dir=str(packaged_config_dir), version_base=None):
+            with initialize_config_dir(config_dir=str(packaged_config_dir)):
                 cfg = compose(config_name="config")
                 assert "drop_me" not in cfg.pkg
                 assert cfg.pkg["items"] == ["x", "z"]
@@ -596,7 +596,7 @@ remove_me: should_be_gone
 
         GlobalHydra.instance().clear()
         try:
-            with initialize_config_dir(config_dir=str(auto_prefix_config_dir), version_base=None):
+            with initialize_config_dir(config_dir=str(auto_prefix_config_dir)):
                 cfg = compose(config_name="config")
                 # bare ~drop_me resolved to ~pkg.drop_me (auto-prefix with parent_package)
                 assert "drop_me" not in cfg.pkg
@@ -614,7 +614,7 @@ remove_me: should_be_gone
 
         GlobalHydra.instance().clear()
         try:
-            with initialize_config_dir(config_dir=str(global_escape_config_dir), version_base=None):
+            with initialize_config_dir(config_dir=str(global_escape_config_dir)):
                 cfg = compose(config_name="config")
                 # _global_.remove_me targeted root level, setting it to null
                 assert cfg.remove_me is None
@@ -709,7 +709,7 @@ name: app
 
         GlobalHydra.instance().clear()
         try:
-            with initialize_config_dir(config_dir=str(scoped_patch_config_dir), version_base=None):
+            with initialize_config_dir(config_dir=str(scoped_patch_config_dir)):
                 cfg = compose(config_name="config")
                 assert "drop_me" not in cfg.pkg
                 assert cfg.pkg["items"] == ["x", "z"]
@@ -725,7 +725,7 @@ name: app
 
         GlobalHydra.instance().clear()
         try:
-            with initialize_config_dir(config_dir=str(scoped_patch_multi_pkg_dir), version_base=None):
+            with initialize_config_dir(config_dir=str(scoped_patch_multi_pkg_dir)):
                 cfg = compose(config_name="config")
                 # db package: debug removed
                 assert "debug" not in cfg.db
@@ -806,7 +806,7 @@ key: value
         GlobalHydra.instance().clear()
         try:
             with (
-                initialize_config_dir(config_dir=str(patch_sweep_config_dir), version_base=None),
+                initialize_config_dir(config_dir=str(patch_sweep_config_dir)),
                 pytest.raises(ConfigCompositionException, match="_patch_ does not support sweep"),
             ):
                 compose(config_name="config")
@@ -822,7 +822,7 @@ key: value
         GlobalHydra.instance().clear()
         try:
             with (
-                initialize_config_dir(config_dir=str(patch_nonexistent_delete_dir), version_base=None),
+                initialize_config_dir(config_dir=str(patch_nonexistent_delete_dir)),
                 pytest.raises(ConfigCompositionException, match="does not exist"),
             ):
                 compose(config_name="config")
@@ -837,7 +837,7 @@ key: value
         GlobalHydra.instance().clear()
         try:
             with (
-                initialize_config_dir(config_dir=str(patch_empty_scope_dir), version_base=None),
+                initialize_config_dir(config_dir=str(patch_empty_scope_dir)),
                 pytest.raises(ValueError, match="_patch_@ requires a package name"),
             ):
                 compose(config_name="config")
@@ -955,7 +955,7 @@ root_marker: true
 
         GlobalHydra.instance().clear()
         try:
-            with initialize_config_dir(config_dir=str(nested_patch_config_dir), version_base=None):
+            with initialize_config_dir(config_dir=str(nested_patch_config_dir)):
                 cfg = compose(config_name="config")
                 # Sub-config's _patch_ removed beta and 'old' tag
                 assert "beta" not in cfg.lib
@@ -977,7 +977,7 @@ root_marker: true
 
         GlobalHydra.instance().clear()
         try:
-            with initialize_config_dir(config_dir=str(nested_patch_deep_dir), version_base=None):
+            with initialize_config_dir(config_dir=str(nested_patch_deep_dir)):
                 cfg = compose(config_name="config")
                 # leaf had x=1, y=2, z=3, w=4
                 # mid removed y
@@ -1017,7 +1017,7 @@ gateway:
 
         GlobalHydra.instance().clear()
         try:
-            with initialize_config_dir(config_dir=str(conf_dir), version_base=None):
+            with initialize_config_dir(config_dir=str(conf_dir)):
                 cfg = compose(config_name="config", overrides=["gateway.modules=append(cli)"])
             assert cfg.gateway.modules == ["universe", "trigger", "market_data", "cli"]
         finally:
@@ -1050,7 +1050,7 @@ frequency_modules: [trigger, market_data]
 
         GlobalHydra.instance().clear()
         try:
-            with initialize_config_dir(config_dir=str(conf_dir), version_base=None):
+            with initialize_config_dir(config_dir=str(conf_dir)):
                 cfg = compose(config_name="config")
             assert cfg.gateway.modules == ["universe", "trigger", "market_data"]
         finally:
@@ -1077,7 +1077,7 @@ missing_items: ???
         GlobalHydra.instance().clear()
         try:
             with (
-                initialize_config_dir(config_dir=str(conf_dir), version_base=None),
+                initialize_config_dir(config_dir=str(conf_dir)),
                 pytest.raises(Exception, match="destination 'items'.*source 'missing_items'.*mandatory missing"),
             ):
                 compose(config_name="config")
@@ -1138,7 +1138,7 @@ obsolete: true
     def test_structured_and_string_operations_execute_in_order(self, config_dir):
         from lerna import compose, initialize_config_dir
 
-        with initialize_config_dir(config_dir=str(config_dir), version_base=None):
+        with initialize_config_dir(config_dir=str(config_dir)):
             cfg = compose(config_name="config")
 
         assert cfg.gateway.modules == ["auth", "core", "rest", ["outputs", "metrics"]]
@@ -1188,7 +1188,7 @@ obsolete: true
         }
         (conf_dir / "config.yaml").write_text(OmegaConf.to_yaml(config))
 
-        with initialize_config_dir(config_dir=str(conf_dir), version_base=None):
+        with initialize_config_dir(config_dir=str(conf_dir)):
             cfg = compose(config_name="config")
 
         assert cfg.added == {"enabled": True}
@@ -1216,5 +1216,5 @@ obsolete: true
         patch = OmegaConf.to_yaml({"defaults": ["_self_", {"_patch_": [operation]}], "items": []})
         (conf_dir / "config.yaml").write_text(patch)
 
-        with initialize_config_dir(config_dir=str(conf_dir), version_base=None), pytest.raises(Exception, match=message):
+        with initialize_config_dir(config_dir=str(conf_dir)), pytest.raises(Exception, match=message):
             compose(config_name="config")

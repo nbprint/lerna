@@ -6,8 +6,6 @@ from dataclasses import dataclass
 
 from omegaconf import Container
 
-from lerna import version
-from lerna._internal.deprecation_warning import deprecation_warning
 from lerna.core.default_element import InputDefault
 from lerna.core.object_type import ObjectType
 from lerna.errors import HydraException
@@ -115,20 +113,14 @@ class ConfigSource(Plugin):
     @staticmethod
     def _normalize_file_name(filename: str) -> str:
         if filename.endswith(".yml"):
-            if version.base_at_least("1.2"):
-                raise ConfigLoadError("Unsupported config file extension '.yml'. Hydra config files must use the '.yaml' extension.")
-            deprecation_warning("Support for .yml files is deprecated. Use .yaml extension for Hydra config files")
-            return filename
+            raise ConfigLoadError("Unsupported config file extension '.yml'. Hydra config files must use the '.yaml' extension.")
 
         # Use Rust for normalization when available
         if _HAS_RUST:
             return _rs.normalize_file_name(filename)
 
         # Fallback to Python
-        supported_extensions = [".yaml"]
-        if not version.base_at_least("1.2"):
-            supported_extensions.append(".yml")
-        if not any(filename.endswith(ext) for ext in supported_extensions):
+        if not filename.endswith(".yaml"):
             filename += ".yaml"
         return filename
 

@@ -18,7 +18,7 @@ class Config:
 ConfigStore.instance().store(name="config_schema", node=Config)
 
 
-@lerna.main(version_base=None, config_path=".", config_name="config")
+@lerna.main(config_path=".", config_name="config")
 def my_app(cfg: Config) -> None:
     print(f"job_name: {HydraConfig().get().job.name}, name: {cfg.name}, age: {cfg.age}, group: {cfg.group['name']}")
 

@@ -2,14 +2,13 @@
 import re
 import subprocess
 import sys
+import warnings
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from textwrap import dedent
 from typing import Any
 
 from omegaconf import MISSING, OmegaConf
-from packaging.version import InvalidVersion
 from pytest import fixture, mark, param, raises, warns
 
 from lerna import (
@@ -28,6 +27,7 @@ from lerna.core.config_store import ConfigStore
 from lerna.core.global_hydra import GlobalHydra
 from lerna.errors import (
     ConfigCompositionException,
+    Hydra15MigrationWarning,
     HydraException,
     OverrideParseException,
 )
@@ -41,7 +41,7 @@ chdir_hydra_root()
 def initialize_hydra(config_path: str | None) -> Any:
     init = None
     try:
-        init = initialize(version_base=None, config_path=config_path)
+        init = initialize(config_path=config_path)
         init.__enter__()
         yield
     finally:
@@ -53,7 +53,7 @@ def initialize_hydra(config_path: str | None) -> Any:
 def initialize_hydra_no_path() -> Any:
     init = None
     try:
-        init = initialize(version_base=None)
+        init = initialize()
         init.__enter__()
         yield
     finally:
@@ -63,54 +63,67 @@ def initialize_hydra_no_path() -> Any:
 
 def test_initialize(hydra_restore_singletons: Any) -> None:
     assert not GlobalHydra().is_initialized()
-    initialize(version_base=None)
+    initialize()
     assert GlobalHydra().is_initialized()
 
 
-def test_initialize_old_version_base(hydra_restore_singletons: Any) -> None:
+@mark.parametrize("version_base", ["1.0", "1.1", "1.2", "1.2.0", "1.2.0.dev2", "1.2.0rc1"])
+def test_initialize_old_version_base(hydra_restore_singletons: Any, version_base: str) -> None:
     assert not GlobalHydra().is_initialized()
     with raises(
         HydraException,
-        match=f'version_base must be >= "{version.__compat_version__}"',
+        match=f"version_base={version_base!r} is not supported in Hydra 1.4; omit version_base to use the current behavior",
     ):
-        initialize(version_base="1.0")
+        initialize(version_base=version_base)
 
 
-def test_initialize_bad_version_base(hydra_restore_singletons: Any) -> None:
+@mark.parametrize("version_base", [1.1, object()])
+def test_initialize_bad_version_base(hydra_restore_singletons: Any, version_base: Any) -> None:
     assert not GlobalHydra().is_initialized()
-    with raises(
-        (TypeError, InvalidVersion),
-        match="expected string or bytes-like object|'float' object is not iterable|Invalid version: 1.1",
-    ):
-        initialize(version_base=1.1)  # type: ignore
+    with raises(TypeError):
+        initialize(version_base=version_base)
 
 
-def test_initialize_dev_version_base(hydra_restore_singletons: Any) -> None:
+@mark.parametrize("version_base", ["1.3", "1.3.0", "1.3.0.dev2", "1.3.0rc1", "1.4"])
+def test_initialize_hydra_version_string_base(hydra_restore_singletons: Any, version_base: str) -> None:
     assert not GlobalHydra().is_initialized()
-    # packaging will compare "1.2.0.dev2" < "1.2", so need to ensure handled correctly
-    initialize(version_base="1.2.0.dev2")
-    assert version.base_at_least("1.2")
+    with warns(Hydra15MigrationWarning, match="The version_base parameter is deprecated and will be removed in Hydra 1.5"):
+        initialize(version_base=version_base)
+    assert version.getbase() == version._get_version(version_base)
+
+
+@mark.parametrize("version_base", ["1", "one.two", "1.2rc1", "1.2.bad", "1.2.0a1", "1.2.0b1"])
+def test_initialize_invalid_version_base(hydra_restore_singletons: Any, version_base: str) -> None:
+    with raises(ValueError, match="Invalid version"):
+        initialize(version_base=version_base)
 
 
 def test_initialize_cur_version_base(hydra_restore_singletons: Any) -> None:
     assert not GlobalHydra().is_initialized()
-    initialize(version_base=None)
-    assert version.base_at_least(__version__)
+    with warns(Hydra15MigrationWarning, match="The version_base parameter is deprecated and will be removed in Hydra 1.5"):
+        initialize(version_base=None)
+    assert version.getbase() == version._get_version(__version__)
 
 
-def test_initialize_compat_version_base(hydra_restore_singletons: Any) -> None:
+def test_initialize_omitted_version_base(hydra_restore_singletons: Any) -> None:
     assert not GlobalHydra().is_initialized()
-    with raises(
-        UserWarning,
-        match=f"Will assume defaults for version {version.__compat_version__}",
-    ):
-        initialize()
-    assert version.base_at_least(str(version.__compat_version__))
+    initialize()
+    assert version.getbase() == version._get_version(__version__)
+
+
+def test_suppress_version_base_warning(hydra_restore_singletons: Any) -> None:
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        warnings.filterwarnings("ignore", category=Hydra15MigrationWarning)
+        initialize(version_base=None)
+        warnings.warn("unrelated warning", UserWarning, stacklevel=1)
+
+    assert [str(item.message) for item in caught] == ["unrelated warning"]
 
 
 def test_initialize_with_config_path(hydra_restore_singletons: Any) -> None:
     assert not GlobalHydra().is_initialized()
-    initialize(version_base=None, config_path="../test_utils/configs")
+    initialize(config_path="../test_utils/configs")
     assert GlobalHydra().is_initialized()
 
     gh = GlobalHydra.instance()
@@ -189,7 +202,7 @@ name: app
         return conf_dir
 
     def test_public_result_preserves_unresolved_config_and_returns_resolved_copy(self, config_dir):
-        with initialize_config_dir(config_dir=str(config_dir), version_base=None):
+        with initialize_config_dir(config_dir=str(config_dir)):
             result = compose_with_provenance(config_name="config")
 
         assert isinstance(result, CompositionResult)
@@ -200,7 +213,7 @@ name: app
         assert OmegaConf.to_container(result.config, resolve=False)["gateway"]["label"] == "${name}"
 
     def test_selected_defaults_options_and_node_provenance(self, config_dir):
-        with initialize_config_dir(config_dir=str(config_dir), version_base=None):
+        with initialize_config_dir(config_dir=str(config_dir)):
             result = compose_with_provenance(config_name="config")
 
         gateway = next(default for default in result.selected_defaults if default.config_path == "gateway/base")
@@ -216,7 +229,7 @@ name: app
         assert metrics is not None and metrics.operation == 0
 
     def test_patch_history_retains_removed_item_and_cli_is_separate(self, config_dir):
-        with initialize_config_dir(config_dir=str(config_dir), version_base=None):
+        with initialize_config_dir(config_dir=str(config_dir)):
             result = compose_with_provenance(config_name="config", overrides=["gateway.modules=append(cli)"])
 
         assert [operation.name for operation in result.patch_operations] == ["append", "remove_value"]
@@ -227,7 +240,7 @@ name: app
         assert result.provenance("gateway.modules[2]").origin == "cli"
 
     def test_canonical_operation_names_and_slice_history(self, config_dir):
-        with initialize_config_dir(config_dir=str(config_dir), version_base=None):
+        with initialize_config_dir(config_dir=str(config_dir)):
             result = compose_with_provenance(
                 config_name="config",
                 overrides=["gateway.modules=pop(0)", "gateway.modules=delete_slice(0,1)"],
@@ -322,7 +335,6 @@ def test_compose_with_provenance_structured_source() -> None:
 class TestComposeInits:
     def test_initialize_ctx(self, config_file: str, overrides: list[str], expected: Any) -> None:
         with initialize(
-            version_base=None,
             config_path="../../examples/jupyter_notebooks/cloud_app/conf",
         ):
             ret = compose(config_file, overrides)
@@ -336,7 +348,6 @@ class TestComposeInits:
             ),
             initialize_config_dir(
                 config_dir="../../examples/jupyter_notebooks/cloud_app/conf",
-                version_base=None,
                 job_name="job_name",
             ),
         ):
@@ -346,7 +357,6 @@ class TestComposeInits:
     def test_initialize_config_module_ctx(self, config_file: str, overrides: list[str], expected: Any) -> None:
         with initialize_config_module(
             config_module="examples.jupyter_notebooks.cloud_app.conf",
-            version_base=None,
             job_name="job_name",
         ):
             ret = compose(config_file, overrides)
@@ -356,7 +366,7 @@ class TestComposeInits:
 def test_initialize_ctx_with_absolute_dir(hydra_restore_singletons: Any, tmpdir: Any) -> None:
     with (
         raises(HydraException, match=re.escape("config_path in initialize() must be relative")),
-        initialize(version_base=None, config_path=str(tmpdir)),
+        initialize(config_path=str(tmpdir)),
     ):
         compose(overrides=["+test_group=test"])
 
@@ -372,7 +382,6 @@ def test_initialize_config_dir_ctx_with_absolute_dir(hydra_restore_singletons: A
 
     with initialize_config_dir(
         config_dir=str(tmpdir),
-        version_base=None,
     ):
         ret = compose(overrides=["+test_group=test"])
         assert ret == {"test_group": cfg}
@@ -381,7 +390,6 @@ def test_initialize_config_dir_ctx_with_absolute_dir(hydra_restore_singletons: A
 @mark.parametrize("job_name,expected", [(None, "test_compose"), ("test_job", "test_job")])
 def test_jobname_override_initialize_ctx(hydra_restore_singletons: Any, job_name: str | None, expected: str) -> None:
     with initialize(
-        version_base=None,
         config_path="../../examples/jupyter_notebooks/cloud_app/conf",
         job_name=job_name,
     ):
@@ -390,7 +398,7 @@ def test_jobname_override_initialize_ctx(hydra_restore_singletons: Any, job_name
 
 
 def test_jobname_override_initialize_config_dir_ctx(hydra_restore_singletons: Any, tmpdir: Any) -> None:
-    with initialize_config_dir(config_dir=str(tmpdir), version_base=None, job_name="test_job"):
+    with initialize_config_dir(config_dir=str(tmpdir), job_name="test_job"):
         ret = compose(return_hydra_config=True)
         assert ret.hydra.job.name == "test_job"
 
@@ -398,7 +406,6 @@ def test_jobname_override_initialize_config_dir_ctx(hydra_restore_singletons: An
 def test_initialize_config_module_ctx(hydra_restore_singletons: Any) -> None:
     with initialize_config_module(
         config_module="examples.jupyter_notebooks.cloud_app.conf",
-        version_base=None,
     ):
         ret = compose(return_hydra_config=True)
         assert ret.hydra.job.name == "app"
@@ -406,7 +413,6 @@ def test_initialize_config_module_ctx(hydra_restore_singletons: Any) -> None:
     with initialize_config_module(
         config_module="examples.jupyter_notebooks.cloud_app.conf",
         job_name="test_job",
-        version_base=None,
     ):
         ret = compose(return_hydra_config=True)
         assert ret.hydra.job.name == "test_job"
@@ -414,7 +420,6 @@ def test_initialize_config_module_ctx(hydra_restore_singletons: Any) -> None:
     with initialize_config_module(
         config_module="examples.jupyter_notebooks.cloud_app.conf",
         job_name="test_job",
-        version_base=None,
     ):
         ret = compose(return_hydra_config=True)
         assert ret.hydra.job.name == "test_job"
@@ -427,7 +432,6 @@ def test_missing_init_py_error(hydra_restore_singletons: Any) -> None:
         raises(Exception, match=re.escape(expected)),
         initialize_config_module(
             config_module="lerna.test_utils.configs.missing_init_py",
-            version_base=None,
         ),
     ):
         hydra = GlobalHydra.instance().hydra
@@ -448,7 +452,6 @@ def test_missing_bad_config_dir_error(hydra_restore_singletons: Any) -> None:
         raises(Exception, match=re.escape(expected)),
         initialize_config_dir(
             config_dir=bad_dir,
-            version_base=None,
         ),
     ):
         hydra = GlobalHydra.instance().hydra
@@ -460,13 +463,12 @@ def test_initialize_with_module(hydra_restore_singletons: Any) -> None:
     with initialize_config_module(
         config_module="lerna.tests.test_apps.app_with_cfg_groups.conf",
         job_name="my_pp",
-        version_base=None,
     ):
         assert compose(config_name="config") == {"optimizer": {"type": "nesterov", "lr": 0.001}}
 
 
 def test_hydra_main_passthrough(hydra_restore_singletons: Any) -> None:
-    with initialize(version_base=None, config_path="test_apps/app_with_cfg_groups/conf"):
+    with initialize(config_path="test_apps/app_with_cfg_groups/conf"):
         from lerna.tests.test_apps.app_with_cfg_groups.my_app import my_app
 
         cfg = compose(config_name="config", overrides=["optimizer.lr=1.0"])
@@ -753,118 +755,12 @@ class TestConfigSearchPathOverride:
         assert [(source.provider, source.path) for source in config_loader.get_sources()] == sources
 
 
-def test_deprecated_compose(hydra_restore_singletons: Any) -> None:
-    from lerna import initialize
-    from lerna.experimental import compose as expr_compose
-
-    msg = "hydra.experimental.compose() is no longer experimental. Use hydra.compose()"
-
-    with (
-        initialize(version_base="1.1"),
-        warns(
-            expected_warning=UserWarning,
-            match=re.escape(msg),
-        ),
-    ):
-        assert expr_compose() == {}
-
-    with (
-        initialize(version_base="1.2"),
-        raises(
-            ImportError,
-            match=re.escape(msg),
-        ),
-    ):
-        assert expr_compose() == {}
-
-
-def test_deprecated_initialize(hydra_restore_singletons: Any) -> None:
-    from lerna.experimental import initialize as expr_initialize
-
-    msg = "hydra.experimental.initialize() is no longer experimental. Use hydra.initialize()"
-
-    version.setbase("1.1")
-    with warns(expected_warning=UserWarning, match=re.escape(msg)), expr_initialize():
-        assert compose() == {}
-
-    version.setbase("1.2")
-    with raises(ImportError, match=re.escape(msg)), expr_initialize():
-        assert compose() == {}
-
-
-def test_deprecated_initialize_config_dir(hydra_restore_singletons: Any) -> None:
-    from lerna.experimental import initialize_config_dir as expr_initialize_config_dir
-
-    msg = "hydra.experimental.initialize_config_dir() is no longer experimental. Use hydra.initialize_config_dir()"
-
-    version.setbase("1.1")
-    with (
-        warns(
-            expected_warning=UserWarning,
-            match=re.escape(msg),
-        ),
-        expr_initialize_config_dir(
-            config_dir=str(Path(".").absolute()),
-        ),
-    ):
-        assert compose() == {}
-
-    version.setbase("1.2")
-    with (
-        raises(
-            ImportError,
-            match=re.escape(msg),
-        ),
-        expr_initialize_config_dir(
-            config_dir=str(Path(".").absolute()),
-        ),
-    ):
-        assert compose() == {}
-
-
-def test_deprecated_initialize_config_module(hydra_restore_singletons: Any) -> None:
-    from lerna.experimental import (
-        initialize_config_module as expr_initialize_config_module,
-    )
-
-    msg = "hydra.experimental.initialize_config_module() is no longer experimental. Use hydra.initialize_config_module()"
-
-    version.setbase("1.1")
-    with (
-        warns(expected_warning=UserWarning, match=re.escape(msg)),
-        expr_initialize_config_module(
-            config_module="examples.jupyter_notebooks.cloud_app.conf",
-        ),
-    ):
-        assert compose() == {}
-
-    version.setbase("1.2")
-    with (
-        raises(ImportError, match=re.escape(msg)),
-        expr_initialize_config_module(
-            config_module="examples.jupyter_notebooks.cloud_app.conf",
-        ),
-    ):
-        assert compose() == {}
-
-
 def test_initialize_without_config_path(tmpdir: Path) -> None:
-    expected0 = dedent(
-        f"""
-        The version_base parameter is not specified.
-        Please specify a compatibility version level, or None.
-        Will assume defaults for version {version.__compat_version__}"""
-    )
-    expected1 = dedent(
-        """\
-        config_path is not specified in hydra.initialize().
-        See https://hydra.cc/docs/1.2/upgrades/1.0_to_1.1/changes_to_hydra_main_config_path for more information."""
-    )
-    with warns(expected_warning=UserWarning) as record, initialize():
-        pass
-    assert len(record) == 2
-    assert str(record[0].message) == expected0
-    assert str(record[1].message) == expected1
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        with initialize():
+            pass
+    assert caught == []
 
 
 @mark.usefixtures("initialize_hydra_no_path")
@@ -892,29 +788,6 @@ def test_initialize_without_config_path(tmpdir: Path) -> None:
 def test_error_assigning_null_to_logging_config(hydra_restore_singletons: Any, overrides: list[str], expected: Any) -> None:
     with expected:
         compose(overrides=overrides)
-
-
-@mark.usefixtures("initialize_hydra_no_path")
-@mark.parametrize("strict", [param(True, id="strict=True"), param(False, id="strict=False")])
-def test_deprecated_compose_strict_flag(strict: bool, hydra_restore_singletons: Any) -> None:
-    msg = dedent(
-        """\
-
-        The strict flag in the compose API is deprecated.
-        See https://hydra.cc/docs/1.2/upgrades/0.11_to_1.0/strict_mode_flag_deprecated for more info.
-        """
-    )
-
-    version.setbase("1.1")
-
-    with warns(
-        expected_warning=UserWarning,
-        match=re.escape(msg),
-    ):
-        cfg = compose(overrides=[], strict=strict)
-
-    assert cfg == {}
-    assert OmegaConf.is_struct(cfg) is strict
 
 
 @mark.usefixtures("initialize_hydra_no_path")
