@@ -4,7 +4,7 @@ from typing import Any
 from omegaconf import DictConfig
 
 import lerna
-from lerna.utils import instantiate
+from lerna.utils import execution_whitelist, instantiate
 
 
 class Optimizer:
@@ -28,10 +28,11 @@ class Model:
         return f"Model(Optimizer={self.optim})"
 
 
-@lerna.main(version_base=None, config_path=".", config_name="config")
+@lerna.main(config_path=".", config_name="config")
 def my_app(cfg: DictConfig) -> None:
-    model = instantiate(cfg.model)
-    print(model)
+    with execution_whitelist("my_app.*"):
+        model = instantiate(cfg.model)
+        print(model)
 
 
 if __name__ == "__main__":

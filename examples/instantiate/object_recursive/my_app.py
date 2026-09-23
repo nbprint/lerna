@@ -4,7 +4,7 @@ from typing import List
 from omegaconf import DictConfig
 
 import lerna
-from lerna.utils import instantiate
+from lerna.utils import execution_whitelist, instantiate
 
 
 class Driver:
@@ -28,10 +28,11 @@ class Car:
         print(f"Driver : {self.driver.name}, {len(self.wheels)} wheels")
 
 
-@lerna.main(version_base=None, config_path=".", config_name="config")
+@lerna.main(config_path=".", config_name="config")
 def my_app(cfg: DictConfig) -> None:
-    car: Car = instantiate(cfg.car)
-    car.drive()
+    with execution_whitelist("my_app.*"):
+        car: Car = instantiate(cfg.car)
+        car.drive()
 
 
 if __name__ == "__main__":

@@ -8,6 +8,7 @@ from omegaconf import DictConfig
 import lerna
 from lerna.experimental.callback import Callback
 from lerna.types import TaskFunction
+from lerna.utils import execution_whitelist
 
 log = logging.getLogger(__name__)
 
@@ -18,10 +19,11 @@ class OnJobStartCallback(Callback):
         log.info(f"on_job_start task_function: {task_function}")
 
 
-@lerna.main(version_base=None, config_path=".", config_name="config")
+@lerna.main(config_path=".", config_name="config")
 def my_app(cfg: DictConfig) -> Any:
     return "called my_app"
 
 
 if __name__ == "__main__":
-    my_app()
+    with execution_whitelist("my_app.*"):
+        my_app()

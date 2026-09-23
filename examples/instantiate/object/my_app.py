@@ -2,7 +2,7 @@
 from omegaconf import DictConfig
 
 import lerna
-from lerna.utils import instantiate
+from lerna.utils import execution_whitelist, instantiate
 
 
 class DBConnection:
@@ -30,10 +30,11 @@ class PostgreSQLConnection(DBConnection):
         print(f"PostgreSQL connecting to {self.host}")
 
 
-@lerna.main(version_base=None, config_path="conf", config_name="config")
+@lerna.main(config_path="conf", config_name="config")
 def my_app(cfg: DictConfig) -> None:
-    connection = instantiate(cfg.db)
-    connection.connect()
+    with execution_whitelist("my_app.*"):
+        connection = instantiate(cfg.db)
+        connection.connect()
 
 
 if __name__ == "__main__":

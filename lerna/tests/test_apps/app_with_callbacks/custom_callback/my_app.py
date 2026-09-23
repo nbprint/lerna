@@ -8,6 +8,7 @@ from omegaconf import DictConfig, OmegaConf
 import lerna
 from lerna.core.utils import JobReturn
 from lerna.experimental.callback import Callback
+from lerna.utils import execution_whitelist
 
 log = logging.getLogger(__name__)
 
@@ -36,10 +37,11 @@ class CustomCallback(Callback):
         log.info(f"{self.name} on_multirun_end")
 
 
-@lerna.main(version_base=None, config_path=".", config_name="config")
+@lerna.main(config_path=".", config_name="config")
 def my_app(cfg: DictConfig) -> None:
     log.info(OmegaConf.to_yaml(cfg))
 
 
 if __name__ == "__main__":
-    my_app()
+    with execution_whitelist("my_app.*"):
+        my_app()
