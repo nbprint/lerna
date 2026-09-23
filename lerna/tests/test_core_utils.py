@@ -14,6 +14,7 @@ from lerna._internal.config_loader_impl import ConfigLoaderImpl
 from lerna._internal.utils import create_config_search_path
 from lerna.core import utils
 from lerna.core.hydra_config import HydraConfig
+from lerna.test_utils.test_utils import normalize_path_for_override
 from lerna.types import HydraContext, RunMode
 
 
@@ -212,7 +213,7 @@ def test_run_job_handles_unprintable_chained_exception(hydra_restore_singletons:
     cfg = config_loader.load_configuration(
         config_name="compose",
         run_mode=RunMode.RUN,
-        overrides=[f"hydra.run.dir={tmp_path}", "hydra.output_subdir=null"],
+        overrides=[f"hydra.run.dir={normalize_path_for_override(tmp_path)}", "hydra.output_subdir=null"],
     )
     result = utils.run_job(
         task_function=task_function,
