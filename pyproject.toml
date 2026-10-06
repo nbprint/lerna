@@ -154,14 +154,11 @@ packages = [
     "Cargo.lock",
 ]
 exclude = [
-<<<<<<< before updating
-    "examples",
-=======
     "*.dll",
     "*.dylib",
     "*.so",
     "*.pyd",
->>>>>>> after updating
+    "examples",
     "rust/Makefile",
     "target",
 ]
