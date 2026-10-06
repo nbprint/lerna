@@ -70,7 +70,8 @@ tag = true
 commit_args = "-s"
 pre_commit_hooks = [
     "cargo update --workspace",
-    "git add Cargo.lock",
+    "cargo update --manifest-path rust/Cargo.toml --workspace",
+    "git add Cargo.lock rust/Cargo.lock",
 ]
 
 [[tool.bumpversion.files]]
@@ -135,13 +136,6 @@ exclude_also = [
 ignore_errors = true
 fail_under = 50
 
-[tool.hatch.build]
-artifacts = [
-    "lerna/*.dll",
-    "lerna/*.dylib",
-    "lerna/*.so",
-]
-
 [tool.hatch.build.sources]
 src = "/"
 
@@ -160,12 +154,21 @@ packages = [
     "Cargo.lock",
 ]
 exclude = [
+    "*.dll",
+    "*.dylib",
+    "*.so",
+    "*.pyd",
     "examples",
     "rust/Makefile",
     "target",
 ]
 
 [tool.hatch.build.targets.wheel]
+artifacts = [
+    "lerna/*.dll",
+    "lerna/*.dylib",
+    "lerna/*.so",
+]
 packages = [
     "lerna",
     "hydra_plugins",
