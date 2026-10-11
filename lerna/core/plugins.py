@@ -14,6 +14,7 @@ from typing import Any
 
 from omegaconf import DictConfig
 
+from lerna._internal.core_plugins.pkg_helper import find_package_dir
 from lerna._internal.execution_policy import _trusted_internal_target
 from lerna._internal.sources_registry import SourcesRegistry
 from lerna.core.singleton import Singleton
@@ -303,6 +304,8 @@ def _is_pkg_path_available(pkg_path: str) -> bool:
     """Check whether a pkg:// path refers to an importable Python package."""
     # Convert path separators to dots for importlib
     module_path = pkg_path.replace("/", ".")
+    if find_package_dir(module_path) is not None:
+        return True
     try:
         spec = importlib.util.find_spec(module_path)
         return spec is not None
