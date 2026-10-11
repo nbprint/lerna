@@ -7,6 +7,7 @@ from typing import Any
 import yaml
 from omegaconf import OmegaConf
 
+from lerna._internal.core_plugins.pkg_helper import pkg_files
 from lerna.core.object_type import ObjectType
 from lerna.plugins.config_source import ConfigLoadError, ConfigResult, ConfigSource
 
@@ -103,6 +104,7 @@ class ImportlibResourcesConfigSource(ConfigSource):
 
     def load_config(self, config_path: str) -> ConfigResult:
         normalized_config_path = self._normalize_file_name(config_path)
+        # Reading a config imports the package as before, so its import side effects still run
         res = resources.files(self.path).joinpath(normalized_config_path)
         if not (self._safe_is_file(res) or self._safe_is_dir(res)):
             raise ConfigLoadError(f"Config not found : {normalized_config_path}")
@@ -111,14 +113,14 @@ class ImportlibResourcesConfigSource(ConfigSource):
 
     def available(self) -> bool:
         try:
-            files = resources.files(self.path)
+            files = pkg_files(self.path)
         except (ValueError, ModuleNotFoundError, TypeError):
             return False
         return any(f.name == "__init__.py" and self._safe_is_file(f) for f in files.iterdir())
 
     def is_group(self, config_path: str) -> bool:
         try:
-            files = resources.files(self.path)
+            files = pkg_files(self.path)
         except (ValueError, ModuleNotFoundError, TypeError):
             return False
 
@@ -128,7 +130,7 @@ class ImportlibResourcesConfigSource(ConfigSource):
     def is_config(self, config_path: str) -> bool:
         config_path = self._normalize_file_name(config_path)
         try:
-            files = resources.files(self.path)
+            files = pkg_files(self.path)
         except (ValueError, ModuleNotFoundError, TypeError):
             return False
         res = files.joinpath(config_path)
@@ -136,7 +138,7 @@ class ImportlibResourcesConfigSource(ConfigSource):
 
     def list(self, config_path: str, results_filter: ObjectType | None) -> list[str]:
         files: list[str] = []
-        for file in resources.files(self.path).joinpath(config_path).iterdir():
+        for file in pkg_files(self.path).joinpath(config_path).iterdir():
             fname = file.name
             fpath = os.path.join(config_path, fname)
             self._list_add_result(
