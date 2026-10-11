@@ -267,7 +267,7 @@ def setup_globals() -> None:
     # please add documentation when you add a new resolver
     OmegaConf.register_new_resolver(
         "now",
-        lambda pattern: datetime.now().strftime(pattern),  # noqa: DTZ005
+        lambda pattern: datetime.now().strftime(pattern),
         use_cache=True,
         replace=True,
     )
