@@ -189,6 +189,7 @@ class ConfigRepository(IConfigRepository):
                     assert node is not None and isinstance(node, Node)
                     patch_value = node._value()
 
+                    operations: list[str | DictConfig]
                     if isinstance(patch_value, str):
                         operations = [patch_value]
                     elif isinstance(patch_value, list):

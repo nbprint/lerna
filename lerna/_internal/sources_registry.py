@@ -29,4 +29,4 @@ class SourcesRegistry(metaclass=Singleton):
 
     @staticmethod
     def instance(*args: Any, **kwargs: Any) -> "SourcesRegistry":
-        return Singleton.instance(SourcesRegistry, *args, **kwargs)  # type: ignore
+        return Singleton.instance(SourcesRegistry, *args, **kwargs)

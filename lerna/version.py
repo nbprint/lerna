@@ -31,7 +31,7 @@ class VersionBase(metaclass=Singleton):
 
     @staticmethod
     def instance(*args: Any, **kwargs: Any) -> "VersionBase":
-        return Singleton.instance(VersionBase, *args, **kwargs)  # type: ignore
+        return Singleton.instance(VersionBase, *args, **kwargs)
 
     @staticmethod
     def set_instance(instance: "VersionBase") -> None:

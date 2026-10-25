@@ -229,3 +229,10 @@ section-order = [
     "F401",
     "F403",
 ]
+
+[tool.ty.src]
+exclude = [
+    "examples",
+    "lerna/tests",
+    "lerna/test_utils",
+]

@@ -38,4 +38,4 @@ class HydraConfig(metaclass=Singleton):
 
     @staticmethod
     def instance(*args: Any, **kwargs: Any) -> "HydraConfig":
-        return Singleton.instance(HydraConfig, *args, **kwargs)  # type: ignore
+        return Singleton.instance(HydraConfig, *args, **kwargs)

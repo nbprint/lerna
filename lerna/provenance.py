@@ -1,6 +1,6 @@
 import copy
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, cast
 
 from omegaconf import DictConfig, ListConfig, OmegaConf
 from omegaconf.errors import OmegaConfBaseException
@@ -250,7 +250,7 @@ class _CompositionTracker:
             return state
         state.value = copy.deepcopy(OmegaConf.to_container(value, resolve=False) if OmegaConf.is_config(value) else value)
         if isinstance(value, ListConfig):
-            state.resolved_values = list(OmegaConf.to_container(value, resolve=True))
+            state.resolved_values = list(cast(list[Any], OmegaConf.to_container(value, resolve=True)))
             state.item_provenance = [self.node_provenance.get(self._child_path(key, index)) for index in range(len(value))]
             override_value = override.value()
             candidates = override_value if isinstance(override_value, list) else []

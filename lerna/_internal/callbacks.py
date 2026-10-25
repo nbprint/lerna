@@ -19,7 +19,7 @@ class CallbacksCache(metaclass=Singleton):
 
     @staticmethod
     def instance() -> "CallbacksCache":
-        return Singleton.instance(CallbacksCache)  # type: ignore
+        return Singleton.instance(CallbacksCache)
 
     cache: dict[int, "Callbacks"]
 

@@ -130,6 +130,7 @@ class OverridesParser:
             # For extend_list, wrap the values back in ListExtensionOverrideValue
             # since parse_rule("value") should return the function result, not the unwrapped value
             if override.type == OverrideType.EXTEND_LIST:
+                assert isinstance(override._value, list)
                 return ListExtensionOverrideValue(values=override._value)
             return override.value()
         elif rule_name == "primitive":
@@ -420,7 +421,7 @@ def _rust_dict_to_override(
         type=override_type,
         key_or_group=data["key_or_group"],
         value_type=value_type,
-        _value=value,
+        _value=value,  # ty: ignore[invalid-argument-type]
         package=data.get("package"),
         input_line=data.get("input_line"),
         config_loader=config_loader,

@@ -112,7 +112,7 @@ class CompletionPlugin(Plugin):
                 except MissingMandatoryValue:
                     conf_node = ""
                 if conf_node is not None:
-                    if OmegaConf.is_config(conf_node):
+                    if isinstance(conf_node, Container):
                         key_matches = CompletionPlugin._get_matches(conf_node, "")
                     else:
                         # primitive

@@ -343,10 +343,10 @@ class Override:
         if isinstance(value, list):
             return [Override._convert_value(x) for x in value]
         elif isinstance(value, dict):
-            return {
+            return {  # ty: ignore[invalid-return-type]
                 # We ignore potential type mismatch here so as to let OmegaConf
                 # raise an explicit error in case of invalid type.
-                Override._convert_value(k): Override._convert_value(v)  # type: ignore
+                Override._convert_value(k): Override._convert_value(v)
                 for k, v in value.items()
             }
         elif isinstance(value, QuotedString):
@@ -361,7 +361,7 @@ class Override:
         :return: the value. replaces Quoted strings by regular strings
         """
         if isinstance(self._value, Sweep):
-            return self._value
+            return cast(ChoiceSweep | RangeSweep | IntervalSweep, self._value)
         else:
             return Override._convert_value(self._value)
 

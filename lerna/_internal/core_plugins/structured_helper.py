@@ -6,7 +6,7 @@ These callbacks allow Rust's PyHybridConfigRepository to load configs
 from Python's ConfigStore singleton.
 """
 
-from typing import Any
+from typing import Any, cast
 
 from omegaconf import OmegaConf
 
@@ -32,7 +32,7 @@ def load_structured_config(config_path: str) -> dict[str, Any] | None:
             path = f"{path}.yaml"
         config_node = cs.load(path)
         # Convert DictConfig to plain dict for Rust
-        return OmegaConf.to_container(config_node.node, resolve=False)
+        return cast(dict[str, Any], OmegaConf.to_container(config_node.node, resolve=False))
     except Exception:  # noqa: BLE001
         return None
 

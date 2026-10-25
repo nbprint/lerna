@@ -4,7 +4,7 @@ import copy
 import inspect
 import re
 import weakref
-from collections.abc import Callable, Iterator, Sequence
+from collections.abc import Callable, Generator, Sequence
 from contextlib import AbstractContextManager, ExitStack, contextmanager, nullcontext
 from enum import Enum
 from textwrap import dedent
@@ -83,8 +83,8 @@ def _register_override_resolver() -> None:
         OmegaConf.register_resolver(
             _INSTANTIATE_OVERRIDE_RESOLVER,
             _resolve_instantiate_override,
-            replace=True,
-            annotation_validation="off",
+            replace=True,  # ty: ignore[unknown-argument]
+            annotation_validation="off",  # ty: ignore[unknown-argument]
         )
     else:
         OmegaConf.register_new_resolver(
@@ -119,7 +119,7 @@ def _is_target(x: Any) -> bool:
 
 
 @contextmanager
-def _read_only_config_tree(*configs: Node) -> Iterator[None]:
+def _read_only_config_tree(*configs: Node) -> Generator[None]:
     context_roots = {id(config._get_root()) for config in configs}
     nodes = []
     pending: list[Node] = []
@@ -850,7 +850,7 @@ def _apply_override_interpolations(
             current_value = node._get_node(key, validate_access=False)
             _replace_child(node, key, configured_values[key])
             try:
-                merge_base = _get_dict_override_merge_base(node, key, is_target_parameter=is_target_parameter)
+                merge_base = _get_dict_override_merge_base(node, str(key), is_target_parameter=is_target_parameter)
             finally:
                 _replace_child(node, key, current_value)
 
