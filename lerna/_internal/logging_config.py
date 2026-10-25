@@ -9,7 +9,7 @@ import warnings
 from collections.abc import Callable
 from pathlib import Path
 from textwrap import dedent
-from typing import Any, cast
+from typing import Any
 
 from lerna._internal.deprecation_warning import deprecation_warning
 from lerna._internal.execution_policy import (
@@ -255,7 +255,7 @@ class HydraDictConfigurator(logging.config.DictConfigurator):
 
             kwargs["listener"] = authorized_listener
 
-        configure_queue_handler = super()._configure_queue_handler
+        configure_queue_handler = super()._configure_queue_handler  # ty: ignore[unresolved-attribute]
         return configure_queue_handler(klass, **kwargs)
 
     def configure_handler(self, config: Any) -> Any:
@@ -355,7 +355,7 @@ def configure_logging(config: dict[str, Any], execution_whitelist: ExecutionWhit
     try:
         HydraDictConfigurator(
             config,
-            cast(NormalizedExecutionWhitelist, effective_whitelist),
+            effective_whitelist,
         ).configure()
     except ValueError as e:
         cause = e.__cause__

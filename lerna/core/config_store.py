@@ -51,7 +51,7 @@ class ConfigNode:
 class ConfigStore(metaclass=Singleton):
     @staticmethod
     def instance(*args: Any, **kwargs: Any) -> "ConfigStore":
-        return Singleton.instance(ConfigStore, *args, **kwargs)  # type: ignore
+        return Singleton.instance(ConfigStore, *args, **kwargs)
 
     repo: dict[str, Any]
     _rust_store: Any
@@ -59,7 +59,7 @@ class ConfigStore(metaclass=Singleton):
     def __init__(self) -> None:
         self.repo = {}
         # Initialize Rust store if available
-        if _RUST_AVAILABLE:
+        if _RustConfigStore is not None:
             self._rust_store = _RustConfigStore()
         else:
             self._rust_store = None
@@ -73,7 +73,7 @@ class ConfigStore(metaclass=Singleton):
     def __setstate__(self, state: dict[str, Any]) -> None:
         self.__dict__.update(state)
         # Recreate Rust store on unpickle
-        if _RUST_AVAILABLE:
+        if _RustConfigStore is not None:
             self._rust_store = _RustConfigStore()
         else:
             self._rust_store = None

@@ -44,6 +44,7 @@ develop = [
     "hatch-rs",
     "hatchling",
     "mdformat",
+    "mdformat-frontmatter",
     "mdformat-tables>=1",
     "packaging",
     "pytest",
@@ -124,7 +125,7 @@ test-command = "echo 'TODO'"
 [tool.coverage.run]
 branch = true
 omit = [
-    "lerna/tests/integration/",
+    "lerna/tests/integration/*",
 ]
 
 [tool.coverage.report]
@@ -227,4 +228,11 @@ section-order = [
 "__init__.py" = [
     "F401",
     "F403",
+]
+
+[tool.ty.src]
+exclude = [
+    "examples",
+    "lerna/tests",
+    "lerna/test_utils",
 ]

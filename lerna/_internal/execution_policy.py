@@ -10,7 +10,7 @@ import operator
 import os
 import sys
 import types
-from collections.abc import Callable, Iterator, Mapping, Sequence
+from collections.abc import Callable, Generator, Mapping, Sequence
 from contextlib import contextmanager, nullcontext
 from contextvars import Context, ContextVar
 from textwrap import dedent
@@ -554,7 +554,7 @@ def _validated_execution_policy(expected_digest: str) -> _ExecutionPolicySnapsho
 @contextmanager
 def _execution_policy_context(
     policy: _ExecutionPolicySnapshot | None,
-) -> Iterator[None]:
+) -> Generator[None]:
     if policy is None:
         yield
         return
@@ -575,7 +575,7 @@ def _get_active_execution_policy() -> _ExecutionPolicySnapshot | None:
 
 
 @contextmanager
-def _trusted_internal_target(target: str) -> Iterator[None]:
+def _trusted_internal_target(target: str) -> Generator[None]:
     token = _TRUSTED_INTERNAL_TARGET_CONTEXT.set(target)
     try:
         yield
@@ -1674,7 +1674,7 @@ class _DeferredTarget(functools.partial):  # type: ignore[type-arg]
         execution_policy = attributes.pop("_hydra_execution_policy", None)
         copied_attributes = copy.deepcopy(attributes, memo)
         copied_attributes["_hydra_execution_policy"] = execution_policy
-        setstate = cast(Callable[[Any], None], copied.__setstate__)
+        setstate = cast(Callable[[Any], None], copied.__setstate__)  # ty: ignore[unresolved-attribute]
         setstate(
             (
                 copy.deepcopy(self.func, memo),

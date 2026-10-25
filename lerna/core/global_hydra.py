@@ -28,7 +28,7 @@ class GlobalHydra(metaclass=Singleton):
 
     @staticmethod
     def instance(*args: Any, **kwargs: Any) -> "GlobalHydra":
-        return Singleton.instance(GlobalHydra, *args, **kwargs)  # type: ignore
+        return Singleton.instance(GlobalHydra, *args, **kwargs)
 
     @staticmethod
     def set_instance(instance: "GlobalHydra") -> None:

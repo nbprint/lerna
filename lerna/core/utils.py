@@ -71,7 +71,7 @@ def configure_log(
         if isinstance(verbose_config, str):
             verbose_list = OmegaConf.create([verbose_config])
         elif OmegaConf.is_list(verbose_config):
-            verbose_list = verbose_config  # type: ignore
+            verbose_list = verbose_config
         else:
             assert False
 
@@ -347,7 +347,7 @@ def _exception_group_members(error: BaseException) -> Sequence[BaseException]:
     group_type = getattr(builtins, "BaseExceptionGroup", None)
     if group_type is None or not isinstance(error, group_type):
         return ()
-    return cast(Sequence[BaseException], error.exceptions)
+    return cast(Sequence[BaseException], error.exceptions)  # ty: ignore[unresolved-attribute]
 
 
 def _serialize_exception_node(error: BaseException, ancestors: set[int] | None = None) -> _SerializedExceptionNode:
@@ -419,7 +419,7 @@ def _deserialize_exception_node(serialized: _SerializedExceptionNode) -> BaseExc
     name = qualname.rsplit(".", maxsplit=1)[-1]
     if children:
         group_name = "ExceptionGroup" if is_exception else "BaseExceptionGroup"
-        group_base = cast(Any, getattr(builtins, group_name))
+        group_base = getattr(builtins, group_name)
         error_type = type(
             name,
             (group_base,),

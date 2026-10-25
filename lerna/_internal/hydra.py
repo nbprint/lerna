@@ -301,7 +301,7 @@ class Hydra:
                 overrides = action
             else:
                 s += f"{','.join(action.option_strings)} : {action.help}\n"
-        s += "Overrides : " + overrides.help
+        s += f"Overrides : {overrides.help}"
         return s
 
     def list_all_config_groups(self, parent: str = "") -> Sequence[str]:
@@ -409,7 +409,7 @@ class Hydra:
             SearchPathPlugin,
         ]:
             # Mypy false positive?
-            plugins = Plugins.instance().discover(plugin_type)  # type: ignore
+            plugins = Plugins.instance().discover(plugin_type)
             if len(plugins) > 0:
                 Hydra._log_header(header=f"{plugin_type.__name__}:", prefix="\t")
                 for plugin in plugins:

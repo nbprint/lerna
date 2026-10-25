@@ -6,7 +6,7 @@ import sys
 import warnings
 from collections.abc import MutableSequence
 from textwrap import dedent
-from typing import Any
+from typing import Any, NoReturn
 
 from omegaconf import Container, DictConfig, ListConfig, OmegaConf, flag_override, open_dict
 from omegaconf.errors import (
@@ -235,7 +235,7 @@ class ConfigLoaderImpl(ConfigLoader):
         else:
             provider = "hydra.searchpath in main"
 
-        def _err() -> None:
+        def _err() -> NoReturn:
             raise ConfigCompositionException(f"hydra.searchpath must be a list of strings. Got: {searchpath}")
 
         if searchpath is None:
@@ -556,19 +556,19 @@ class ConfigLoaderImpl(ConfigLoader):
                 elif override.is_force_add():
                     OmegaConf.update(cfg, key, value, merge=True, force_add=True)
                 elif override.is_list_extend():
+                    # Extract value from ListExtensionOverrideValue if needed
+                    extend_value = value.values if isinstance(value, ListExtensionOverrideValue) else value
+                    assert isinstance(extend_value, list)
                     config_val = OmegaConf.select(cfg, key, throw_on_missing=True)
                     if not OmegaConf.is_list(config_val):
                         if override.list_operation == ListOperationType.EXTEND_FROM:
-                            source_expression = value[0]
+                            source_expression = extend_value[0]
                             assert isinstance(source_expression, str)
                             source_path = ConfigLoaderImpl._absolute_interpolation_path(key, source_expression)
                             raise ConfigCompositionException(f"Cannot extend list from source '{source_path}': destination '{key}' is not a list.")
                         raise ConfigCompositionException(
                             f"Could not append to config list. The existing value of '{override.key_or_group}' is {config_val} which is not a list."
                         )
-                    # Extract value from ListExtensionOverrideValue if needed
-                    extend_value = value.values if isinstance(value, ListExtensionOverrideValue) else value
-
                     # Apply the appropriate list operation based on override.list_operation
                     list_op = override.list_operation
                     if list_op is None or list_op == ListOperationType.APPEND:
@@ -884,7 +884,7 @@ class ConfigLoaderImpl(ConfigLoader):
                 # Create nested structure for package
                 if not isinstance(result, dict):
                     result = {}
-                nested = result
+                nested: dict[str, Any] = result
                 parts = package.split(".")
                 for part in parts[:-1]:
                     if part not in nested:

@@ -6,6 +6,7 @@ import warnings
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from textwrap import dedent
+from typing import Any, NoReturn
 
 from omegaconf import DictConfig, ListConfig, OmegaConf
 
@@ -170,7 +171,7 @@ class Overrides:
 
     @staticmethod
     def _structured_patch_override(operation: DictConfig, containing_config_path: str) -> Override:
-        def fail(op: object, path: object, detail: str) -> None:
+        def fail(op: object, path: object, detail: str) -> NoReturn:
             raise ConfigCompositionException(
                 f"In '{containing_config_path}': invalid structured _patch_ operation '{op}' for key '{path}': {detail}."
             )
@@ -195,7 +196,7 @@ class Overrides:
             "remove_all": ListOperationType.REMOVE_ALL,
         }
 
-        def value_of(field: str) -> object:
+        def value_of(field: str) -> Any:
             node = operation._get_node(field)
             if isinstance(node, (DictConfig, ListConfig)):
                 return OmegaConf.to_container(node, resolve=False)
@@ -287,7 +288,7 @@ class Overrides:
 
         extra = set(operation.keys()) - allowed
         if extra:
-            fail(op, path, f"unexpected fields: {', '.join(sorted(extra))}")
+            fail(op, path, f"unexpected fields: {', '.join(sorted(str(k) for k in extra))}")
         override.input_line = f"{op}({path})"
         return override
 

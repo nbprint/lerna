@@ -201,7 +201,7 @@ class Plugins(metaclass=Singleton):
                     import_time = timer()
 
                     with warnings.catch_warnings(record=True) as recorded_warnings:
-                        spec = importer.find_spec(modname)  # type: ignore[call-arg]
+                        spec = importer.find_spec(modname)  # type: ignore[call-arg]  # ty: ignore[missing-argument]
                         assert spec is not None
                         if modname in sys.modules:
                             loaded_mod = sys.modules[modname]
