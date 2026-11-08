@@ -217,12 +217,13 @@ fn yaml_to_config_value(yaml: &serde_yaml::Value) -> ConfigValue {
         serde_yaml::Value::Mapping(map) => {
             let mut dict = ConfigDict::new();
             for (key, value) in map {
-                if let serde_yaml::Value::String(k) = key {
-                    dict.insert(k.clone(), yaml_to_config_value(value));
+                if let Some(k) = key.as_str() {
+                    dict.insert(k.to_string(), yaml_to_config_value(value));
                 }
             }
             ConfigValue::Dict(dict)
         }
+        serde_yaml::Value::Tagged(tagged) => yaml_to_config_value(&tagged.value),
     }
 }
 
@@ -303,6 +304,47 @@ ratio: 3.14
         assert_eq!(dict.get("value").unwrap().as_int(), Some(42));
         assert_eq!(dict.get("enabled").unwrap().as_bool(), Some(true));
         assert_eq!(dict.get("ratio").unwrap().as_float(), Some(3.14));
+    }
+
+    #[test]
+    fn test_parse_tagged_scalars() {
+        for (yaml, expected) in [
+            ("!custom null", ConfigValue::Null),
+            ("!custom true", ConfigValue::Bool(true)),
+            ("!custom 42", ConfigValue::Int(42)),
+            ("!custom 1.5", ConfigValue::Float(1.5)),
+            ("!custom hello", ConfigValue::String("hello".to_string())),
+            ("!custom ???", ConfigValue::Missing),
+            (
+                "!custom ${db.host}",
+                ConfigValue::Interpolation("${db.host}".to_string()),
+            ),
+        ] {
+            assert_eq!(parse_yaml(yaml).unwrap(), expected, "{}", yaml);
+        }
+    }
+
+    #[test]
+    fn test_parse_tagged_collections() {
+        let config = parse_yaml("!custom {items: !custom [!custom 42, !custom hello]}").unwrap();
+        let dict = config.as_dict().unwrap();
+        let items = dict.get("items").unwrap().as_list().unwrap();
+
+        assert_eq!(
+            items,
+            &vec![
+                ConfigValue::Int(42),
+                ConfigValue::String("hello".to_string())
+            ]
+        );
+    }
+
+    #[test]
+    fn test_parse_tagged_mapping_key() {
+        let config = parse_yaml("!custom name: hello").unwrap();
+        let dict = config.as_dict().unwrap();
+
+        assert_eq!(dict.get("name").unwrap().as_str(), Some("hello"));
     }
 
     #[test]

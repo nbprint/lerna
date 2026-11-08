@@ -620,14 +620,15 @@ impl OmegaConf {
             serde_yaml::Value::Mapping(map) => {
                 let mut content = HashMap::new();
                 for (k, v) in map {
-                    if let serde_yaml::Value::String(key) = k {
+                    if let Some(key) = k.as_str() {
                         let config_value = Self::yaml_value_to_config_value(v)?;
-                        content.insert(key, config_value);
+                        content.insert(key.to_string(), config_value);
                     }
                 }
                 Ok(OmegaConf::create_dict(content))
             }
             serde_yaml::Value::Null => Ok(DictConfig::none()),
+            serde_yaml::Value::Tagged(tagged) => Self::yaml_value_to_dictconfig(tagged.value),
             _ => Err(OmegaConfError::from(super::errors::ValidationError::new(
                 "Expected YAML mapping at root",
             ))),
@@ -659,17 +660,14 @@ impl OmegaConf {
             serde_yaml::Value::Mapping(map) => {
                 let mut dict = HashMap::new();
                 for (k, v) in map {
-                    if let serde_yaml::Value::String(key) = k {
+                    if let Some(key) = k.as_str() {
                         let config_value = Self::yaml_value_to_config_value(v)?;
-                        dict.insert(key, config_value);
+                        dict.insert(key.to_string(), config_value);
                     }
                 }
                 Ok(ConfigValue::Dict(dict))
             }
-            #[allow(unreachable_patterns)]
-            _ => Err(OmegaConfError::from(super::errors::ValidationError::new(
-                "Unsupported YAML value type",
-            ))),
+            serde_yaml::Value::Tagged(tagged) => Self::yaml_value_to_config_value(tagged.value),
         }
     }
 }
@@ -677,6 +675,19 @@ impl OmegaConf {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_yaml_value_to_config_value_tagged_collections() {
+        let yaml = "!custom [!custom 42, !custom {!custom name: !custom hello}]";
+        let parsed = serde_yaml::from_str(yaml).unwrap();
+        let mut dict = HashMap::new();
+        dict.insert("name".to_string(), ConfigValue::String("hello".to_string()));
+
+        assert_eq!(
+            OmegaConf::yaml_value_to_config_value(parsed).unwrap(),
+            ConfigValue::List(vec![ConfigValue::Int(42), ConfigValue::Dict(dict)])
+        );
+    }
 
     #[test]
     fn test_create_dict() {

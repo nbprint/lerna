@@ -9,7 +9,7 @@ use lerna::{
 };
 
 /// Python-exposed Quote enum
-#[pyclass(name = "Quote", eq, eq_int)]
+#[pyclass(name = "Quote", eq, eq_int, from_py_object)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum PyQuote {
     #[pyo3(name = "single")]
@@ -51,7 +51,7 @@ impl From<PyQuote> for RustQuote {
 }
 
 /// Python-exposed OverrideType enum
-#[pyclass(name = "OverrideType", eq, eq_int)]
+#[pyclass(name = "OverrideType", eq, eq_int, from_py_object)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum PyOverrideType {
     #[pyo3(name = "CHANGE")]
@@ -96,7 +96,7 @@ impl From<RustOverrideType> for PyOverrideType {
 }
 
 /// Python-exposed ValueType enum
-#[pyclass(name = "ValueType", eq, eq_int)]
+#[pyclass(name = "ValueType", eq, eq_int, from_py_object)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum PyValueType {
     #[pyo3(name = "ELEMENT")]
