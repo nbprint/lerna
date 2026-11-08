@@ -347,7 +347,7 @@ def _exception_group_members(error: BaseException) -> Sequence[BaseException]:
     group_type = getattr(builtins, "BaseExceptionGroup", None)
     if group_type is None or not isinstance(error, group_type):
         return ()
-    return cast(Sequence[BaseException], error.exceptions)  # ty: ignore[unresolved-attribute]
+    return cast(Sequence[BaseException], error.exceptions)
 
 
 def _serialize_exception_node(error: BaseException, ancestors: set[int] | None = None) -> _SerializedExceptionNode:
