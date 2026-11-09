@@ -13,7 +13,7 @@ use super::dictconfig::{py_to_config_value, PyDictConfig};
 use super::listconfig::PyListConfig;
 
 /// Python-facing ConfigValue enum
-#[pyclass(name = "ConfigValue")]
+#[pyclass(name = "ConfigValue", from_py_object)]
 #[derive(Debug, Clone)]
 pub enum PyConfigValue {
     NoneValue {},

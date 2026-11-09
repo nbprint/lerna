@@ -87,7 +87,7 @@ fn py_to_config_value(py: Python, obj: &Bound<'_, PyAny>) -> PyResult<ConfigValu
 }
 
 /// A search path entry for config loading
-#[pyclass(name = "SearchPathEntry")]
+#[pyclass(name = "SearchPathEntry", from_py_object)]
 #[derive(Clone)]
 pub struct PySearchPathEntry {
     pub provider: String,

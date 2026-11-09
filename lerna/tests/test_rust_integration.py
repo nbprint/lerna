@@ -142,6 +142,15 @@ class TestRustDefaultsListIntegration:
 class TestRustConfigIntegration:
     """Test Rust config loading integration"""
 
+    def test_loader_accepts_search_path_entries(self, tmp_path):
+        import lerna.lerna as rs
+
+        (tmp_path / "config.yaml").write_text("name: test\nvalue: 42\n")
+        entry = rs.SearchPathEntry("test", f"file://{tmp_path}")
+        loader = rs.ConfigLoader(search_paths=[entry])
+
+        assert loader.load_config("config") == {"name": "test", "value": 42}
+
     def test_parse_yaml(self):
         """Test YAML parsing"""
         import lerna.lerna as rs
@@ -186,6 +195,23 @@ class TestRustGlobIntegration:
 class TestRustOverrideParserIntegration:
     """Test Rust override parser integration"""
 
+    def test_quoted_string_accepts_quote_enum(self):
+        import lerna.lerna as rs
+
+        quoted = rs.QuotedString("hello", rs.Quote.single)
+
+        assert quoted.with_quotes() == "'hello'"
+        assert quoted.quote == rs.Quote.single
+
+    def test_override_accepts_type_enums(self):
+        import lerna.lerna as rs
+
+        override = rs.Override(rs.OverrideType.ADD, "db", rs.ValueType.CHOICE_SWEEP)
+
+        assert override.is_add()
+        assert override.is_sweep_override()
+        assert override.key_or_group == "db"
+
     def test_parse_simple_override(self):
         """Test parsing simple override"""
         import lerna.lerna as rs
@@ -212,6 +238,39 @@ class TestRustOverrideParserIntegration:
         ovr = parser.parse("~db")
         assert ovr.key_or_group == "db"
         assert ovr.is_delete()
+
+
+class TestRustConfigValueIntegration:
+    @pytest.mark.parametrize(
+        "yaml, expected",
+        [
+            ("!custom {name: hello}", {"name": "hello"}),
+            ("!custom name: hello", {"name": "hello"}),
+            ("name: !custom hello", {"name": "hello"}),
+        ],
+    )
+    def test_omegaconf_from_yaml_accepts_tags(self, yaml, expected):
+        import lerna.lerna as rs
+
+        config = rs.OmegaConf.from_yaml(yaml)
+
+        assert rs.OmegaConf.to_container(config) == expected
+
+    def test_list_accepts_config_values(self):
+        import lerna.lerna as rs
+
+        value = rs.omegaconf.ConfigValue.Int(42)
+        config = rs.omegaconf.ConfigValue.List([value])
+
+        assert config.items[0].value == 42
+
+    def test_dict_accepts_config_values(self):
+        import lerna.lerna as rs
+
+        value = rs.omegaconf.ConfigValue.String("hello")
+        config = rs.omegaconf.ConfigValue.Dict({"name": value})
+
+        assert config.items["name"].value == "hello"
 
 
 class TestRustValidationIntegration:
