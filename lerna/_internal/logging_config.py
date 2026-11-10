@@ -255,7 +255,7 @@ class HydraDictConfigurator(logging.config.DictConfigurator):
 
             kwargs["listener"] = authorized_listener
 
-        configure_queue_handler = super()._configure_queue_handler  # ty: ignore[unresolved-attribute]
+        configure_queue_handler = super()._configure_queue_handler  # ty: ignore[missing-attribute]
         return configure_queue_handler(klass, **kwargs)
 
     def configure_handler(self, config: Any) -> Any:
