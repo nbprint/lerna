@@ -1,5 +1,7 @@
 # Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved
 import importlib
+import sys
+import warnings
 from typing import Any
 
 from pytest import MonkeyPatch, mark, raises, warns
@@ -33,6 +35,21 @@ def test_discover(plugin_type: type[Plugin], expected: list[str]) -> None:
     expected_classes = [get_class(c) for c in expected]
     for ex in expected_classes:
         assert ex in plugins
+
+
+def test_scan_skips_hydra_core_bridge(monkeypatch: MonkeyPatch) -> None:
+    # hydra_plugins.lerna bridges lerna plugins into hydra-core; lerna itself
+    # must not import it, or every scan warns when hydra-core is not installed
+    import hydra_plugins
+
+    for name in [n for n in sys.modules if n == "hydra" or n.startswith(("hydra.", "hydra_plugins.lerna"))]:
+        monkeypatch.delitem(sys.modules, name)
+    monkeypatch.setitem(sys.modules, "hydra", None)
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        Plugins._scan_all_plugins([hydra_plugins])
+    assert "hydra_plugins.lerna" not in sys.modules
 
 
 def test_register_plugin() -> None:
