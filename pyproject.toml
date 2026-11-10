@@ -1,7 +1,7 @@
 [build-system]
 requires = [
     "hatchling",
-    "hatch-rs>=0.1.4",
+    "hatch-rs>=0.3.0",
 ]
 build-backend = "hatchling.build"
 
@@ -41,7 +41,7 @@ develop = [
     "check-dist",
     "cibuildwheel",
     "codespell",
-    "hatch-rs",
+    "hatch-rs>=0.3.0",
     "hatchling",
     "mdformat",
     "mdformat-myst",
@@ -122,6 +122,12 @@ environment = {PATH="$UserProfile\\.cargo\bin;$PATH", CARGO_TERM_COLOR="always"}
 skip = "*win32 *arm64"
 test-command = "echo 'TODO'"
 
+[tool.cibuildwheel.pyodide]
+test-command = "python -m pytest --pyargs lerna.tests.test_pyodide -v"
+test-extras = []
+test-requires = ["pytest"]
+xbuild-tools = ["cargo", "rustc", "rustup"]
+
 [tool.coverage.run]
 branch = true
 omit = [
@@ -165,11 +171,6 @@ exclude = [
 ]
 
 [tool.hatch.build.targets.wheel]
-artifacts = [
-    "lerna/*.dll",
-    "lerna/*.dylib",
-    "lerna/*.so",
-]
 packages = [
     "lerna",
     "hydra_plugins",
@@ -177,6 +178,11 @@ packages = [
 exclude = [
     "examples",
     "rust",
+    # hatch-rs force-includes fresh extensions; exclude stale in-tree builds.
+    "lerna/*.dll",
+    "lerna/*.dylib",
+    "lerna/*.so",
+    "lerna/*.pyd",
 ]
 
 [tool.pytest.ini_options]

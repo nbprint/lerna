@@ -51,7 +51,11 @@ jobs:
             os: windows-2025
             python: "3.11"
             target: native
-          
+          - name: pyodide
+            dist_path: dist/pyodide
+            os: ubuntu-24.04
+            python: "3.14"
+            target: pyodide
 
     steps:
       - name: Checkout

@@ -108,8 +108,13 @@ tests-rs: test-rs
 coverage-rs:  ## run rust tests and collect test coverage
 	make -C rust coverage
 
-.PHONY: test coverage tests
+.PHONY: test test-pyodide coverage tests
 test: test-py test-rs  ## run all tests
+
+test-pyodide:  ## build and test the Python package in Pyodide
+	rustup target add wasm32-unknown-emscripten
+	rm -rf dist/pyodide
+	uvx --from cibuildwheel==4.2.0 cibuildwheel --only cp314-pyodide_wasm32 --output-dir dist/pyodide .
 
 coverage: coverage-py coverage-rs  ## run all tests and collect test coverage
 
