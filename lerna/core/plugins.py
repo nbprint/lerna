@@ -36,6 +36,8 @@ PLUGIN_TYPES: list[type[Plugin]] = [
     SearchPathPlugin,
 ]
 
+_HYDRA_CORE_BRIDGE = "hydra_plugins.lerna"
+
 
 @dataclass
 class ScanStats:
@@ -197,6 +199,11 @@ class Plugins(metaclass=Singleton):
                     # But if the module's name starts with a "__", then load the
                     # module.
                     if module_name.startswith("_") and not module_name.startswith("__"):
+                        continue
+                    # hydra_plugins.lerna bridges lerna plugins into hydra-core.
+                    # Lerna reads those entry points itself, and the bridge
+                    # imports hydra, which may not be installed.
+                    if modname == _HYDRA_CORE_BRIDGE or modname.startswith(_HYDRA_CORE_BRIDGE + "."):
                         continue
                     import_time = timer()
 
