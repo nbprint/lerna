@@ -1674,7 +1674,7 @@ class _DeferredTarget(functools.partial):  # type: ignore[type-arg]
         execution_policy = attributes.pop("_hydra_execution_policy", None)
         copied_attributes = copy.deepcopy(attributes, memo)
         copied_attributes["_hydra_execution_policy"] = execution_policy
-        setstate = cast(Callable[[Any], None], copied.__setstate__)  # ty: ignore[unresolved-attribute]
+        setstate = cast(Callable[[Any], None], copied.__setstate__)  # ty: ignore[missing-attribute]
         setstate(
             (
                 copy.deepcopy(self.func, memo),
