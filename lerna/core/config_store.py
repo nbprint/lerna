@@ -107,8 +107,9 @@ class ConfigStore(metaclass=Singleton):
 
         # Store in Rust if available
         if self._rust_store is not None:
-            # Convert OmegaConf to plain dict for Rust
-            node_dict = OmegaConf.to_container(cfg, resolve=False)
+            # Convert OmegaConf to plain dict for Rust. omegaconf 2.4 returns
+            # None for a None node, where 2.3 returns a None-valued DictConfig.
+            node_dict = None if cfg is None else OmegaConf.to_container(cfg, resolve=False)
             self._rust_store.store(
                 name=name,
                 node=node_dict,

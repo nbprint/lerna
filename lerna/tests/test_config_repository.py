@@ -4,6 +4,7 @@ import re
 import zipfile
 from typing import Any
 
+from omegaconf import OmegaConf
 from pytest import mark, param, raises
 
 from lerna._internal.config_repository import ConfigRepository
@@ -58,6 +59,18 @@ def create_config_search_path(path: str) -> ConfigSearchPathImpl:
     csp = ConfigSearchPathImpl()
     csp.append(provider="test", path=path)
     return csp
+
+
+def test_config_store_none_node(hydra_restore_singletons: Any) -> None:
+    # hydra-core accepts node=None, e.g. to register an empty group for a plugin provider
+    cs = ConfigStore.instance()
+    cs.store(name="provider", node=None, group="provider", provider="provider")
+
+    stored = cs.repo["provider"]["provider.yaml"]
+    assert stored.node is None or OmegaConf.to_container(stored.node) is None
+    assert stored.group == "provider"
+    assert cs.get_type("provider") == ObjectType.GROUP
+    assert cs.list("provider") == ["provider.yaml"]
 
 
 def test_config_store_empty_group_is_stored_at_root(hydra_restore_singletons: Any) -> None:
