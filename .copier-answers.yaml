@@ -1,6 +1,7 @@
 # Changes here will be overwritten by Copier
-_commit: 02f55bd
+_commit: faa8776
 _src_path: https://github.com/python-project-templates/base.git
+add_c_abi: false
 add_docs: false
 add_extension: rust
 add_pyodide: false
