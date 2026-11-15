@@ -343,7 +343,7 @@ class Override:
         if isinstance(value, list):
             return [Override._convert_value(x) for x in value]
         elif isinstance(value, dict):
-            return {  # ty: ignore[invalid-return-type]
+            return {  # ty: ignore[invalid-explicit-return]
                 # We ignore potential type mismatch here so as to let OmegaConf
                 # raise an explicit error in case of invalid type.
                 Override._convert_value(k): Override._convert_value(v)
