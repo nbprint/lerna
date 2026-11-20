@@ -219,6 +219,8 @@ fn yaml_to_config_value(yaml: &serde_yaml::Value) -> ConfigValue {
             for (key, value) in map {
                 if let Some(k) = key.as_str() {
                     dict.insert(k.to_string(), yaml_to_config_value(value));
+                } else if key.is_bool() || key.is_number() {
+                    dict.insert_typed(yaml_to_config_value(key), yaml_to_config_value(value));
                 }
             }
             ConfigValue::Dict(dict)
@@ -409,6 +411,28 @@ db:
         let db = dict.get("db").unwrap().as_dict().unwrap();
         assert_eq!(db.get("host").unwrap().as_str(), Some("localhost"));
         assert_eq!(db.get("port").unwrap().as_int(), Some(3306));
+    }
+
+    #[test]
+    fn test_parse_non_string_keys() {
+        let yaml = r#"
+-99: neg
+5: pos
+1.5: flt
+true: boolean
+"7": strseven
+"#;
+        let config = parse_yaml(yaml).unwrap();
+        let dict = config.as_dict().unwrap();
+
+        assert_eq!(dict.len(), 5);
+        assert_eq!(dict.typed_key("-99"), Some(&ConfigValue::Int(-99)));
+        assert_eq!(dict.typed_key("5"), Some(&ConfigValue::Int(5)));
+        assert_eq!(dict.typed_key("1.5"), Some(&ConfigValue::Float(1.5)));
+        assert_eq!(dict.typed_key("true"), Some(&ConfigValue::Bool(true)));
+        assert_eq!(dict.typed_key("7"), None);
+        assert_eq!(dict.get("-99").unwrap().as_str(), Some("neg"));
+        assert_eq!(dict.get("7").unwrap().as_str(), Some("strseven"));
     }
 
     #[test]

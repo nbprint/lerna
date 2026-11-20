@@ -3,7 +3,7 @@
 
 use pyo3::exceptions::PyRuntimeError;
 use pyo3::prelude::*;
-use pyo3::types::{PyDict, PyList};
+use pyo3::types::{PyBool, PyDict, PyFloat, PyInt, PyList};
 
 use lerna::config::interpolation::{resolve, ResolverContext};
 use lerna::config::value::{ConfigDict, ConfigValue};
@@ -44,7 +44,11 @@ fn config_value_to_py(py: Python, value: &ConfigValue) -> PyResult<Py<PyAny>> {
 fn config_dict_to_py(py: Python, dict: &ConfigDict) -> PyResult<Py<PyAny>> {
     let py_dict = PyDict::new(py);
     for (key, value) in dict.iter() {
-        py_dict.set_item(key, config_value_to_py(py, value)?)?;
+        let value = config_value_to_py(py, value)?;
+        match dict.typed_key(key) {
+            Some(typed) => py_dict.set_item(config_value_to_py(py, typed)?, value)?,
+            None => py_dict.set_item(key, value)?,
+        }
     }
     Ok(py_dict.into_any().unbind())
 }
@@ -77,6 +81,14 @@ fn py_to_config_value(py: Python, obj: &Bound<'_, PyAny>) -> PyResult<ConfigValu
         for (key, value) in dict.iter() {
             if let Ok(k) = key.extract::<String>() {
                 config_dict.insert(k, py_to_config_value(py, &value)?);
+            } else if key.is_instance_of::<PyBool>()
+                || key.is_instance_of::<PyInt>()
+                || key.is_instance_of::<PyFloat>()
+            {
+                config_dict.insert_typed(
+                    py_to_config_value(py, &key)?,
+                    py_to_config_value(py, &value)?,
+                );
             }
         }
         Ok(ConfigValue::Dict(config_dict))

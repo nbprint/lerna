@@ -33,7 +33,11 @@ fn config_value_to_py(py: Python<'_>, value: &ConfigValue) -> PyResult<Py<PyAny>
         ConfigValue::Dict(d) => {
             let dict = PyDict::new(py);
             for (k, v) in d.iter() {
-                dict.set_item(k, config_value_to_py(py, v)?)?;
+                let v = config_value_to_py(py, v)?;
+                match d.typed_key(k) {
+                    Some(typed) => dict.set_item(config_value_to_py(py, typed)?, v)?,
+                    None => dict.set_item(k, v)?,
+                }
             }
             Ok(dict.into_any().unbind())
         }
