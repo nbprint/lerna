@@ -192,7 +192,11 @@ fn resolve_with_depth(
         ConfigValue::Dict(dict) => {
             let mut new_dict = ConfigDict::new();
             for (k, v) in dict.iter() {
-                new_dict.insert(k.to_string(), resolve_with_depth(v, ctx, depth)?);
+                let v = resolve_with_depth(v, ctx, depth)?;
+                match dict.typed_key(k) {
+                    Some(typed) => new_dict.insert_typed(typed.clone(), v),
+                    None => new_dict.insert(k.to_string(), v),
+                }
             }
             Ok(ConfigValue::Dict(new_dict))
         }

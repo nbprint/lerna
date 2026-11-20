@@ -100,7 +100,10 @@ impl ConfigLoader {
                 // Merge the primary config (excluding defaults)
                 for (key, value) in dict.iter() {
                     if key != "defaults" {
-                        merged_config.insert(key.to_string(), value.clone());
+                        match dict.typed_key(key) {
+                            Some(typed) => merged_config.insert_typed(typed.clone(), value.clone()),
+                            None => merged_config.insert(key.to_string(), value.clone()),
+                        }
                     }
                 }
             }

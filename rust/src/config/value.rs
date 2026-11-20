@@ -193,6 +193,8 @@ pub struct ConfigDict {
     entries: Vec<(String, ConfigValue)>,
     /// Fast lookup index
     index: HashMap<String, usize>,
+    /// Original key for entries whose key is not a string (int, float or bool)
+    typed_keys: HashMap<String, ConfigValue>,
 }
 
 impl ConfigDict {
@@ -203,6 +205,7 @@ impl ConfigDict {
 
     /// Insert a value at a key
     pub fn insert(&mut self, key: String, value: ConfigValue) {
+        self.typed_keys.remove(&key);
         if let Some(&idx) = self.index.get(&key) {
             self.entries[idx].1 = value;
         } else {
@@ -210,6 +213,19 @@ impl ConfigDict {
             self.entries.push((key.clone(), value));
             self.index.insert(key, idx);
         }
+    }
+
+    /// Insert a value at a non-string key (int, float or bool), keeping the key's type.
+    /// The entry is stored under the key's string form.
+    pub fn insert_typed(&mut self, key: ConfigValue, value: ConfigValue) {
+        let name = key.to_string();
+        self.insert(name.clone(), value);
+        self.typed_keys.insert(name, key);
+    }
+
+    /// Get the original non-string key stored under `key`, if any
+    pub fn typed_key(&self, key: &str) -> Option<&ConfigValue> {
+        self.typed_keys.get(key)
     }
 
     /// Get a value by key
@@ -235,6 +251,7 @@ impl ConfigDict {
     pub fn remove(&mut self, key: &str) -> Option<ConfigValue> {
         if let Some(&idx) = self.index.get(key) {
             self.index.remove(key);
+            self.typed_keys.remove(key);
             // Mark as removed but keep entry to maintain indices
             let old = std::mem::replace(&mut self.entries[idx].1, ConfigValue::Null);
             Some(old)
@@ -317,7 +334,10 @@ impl ConfigDict {
                 }
             }
             // Replace value
-            self.insert(key.to_string(), value.clone());
+            match other.typed_key(key) {
+                Some(typed) => self.insert_typed(typed.clone(), value.clone()),
+                None => self.insert(key.to_string(), value.clone()),
+            }
         }
     }
 }

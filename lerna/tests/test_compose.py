@@ -263,6 +263,81 @@ def test_compose_with_provenance_structured_source() -> None:
     assert result.provenance("value").source_identifier == selected.source.identifier
 
 
+NON_STRING_KEYS_BASE_YAML = """
+defaults:
+  - g: a
+  - _self_
+top:
+  -99: neg
+  5: pos
+  "7": strseven
+  name: s
+"""
+
+NON_STRING_KEYS_GROUP_YAML = """
+reasons:
+  -99: neg
+  5: pos
+  1.5: flt
+  true: boolean
+  name: s
+lst: [1, -2]
+val: -99
+"""
+
+NON_STRING_KEYS_EXPECTED = {
+    "g": {"reasons": {-99: "neg", 5: "pos", 1.5: "flt", True: "boolean", "name": "s"}, "lst": [1, -2], "val": -99},
+    "top": {-99: "neg", 5: "pos", "7": "strseven", "name": "s"},
+}
+
+
+def _typed(obj: Any) -> Any:
+    # Plain == treats True and 1 (or 1.0 and 1) as the same key, so compare key types explicitly
+    if isinstance(obj, dict):
+        return [(type(k), k, _typed(v)) for k, v in obj.items()]
+    if isinstance(obj, list):
+        return [_typed(v) for v in obj]
+    return (type(obj), obj)
+
+
+@mark.usefixtures("hydra_restore_singletons")
+class TestNonStringMappingKeys:
+    @staticmethod
+    def _write_configs(conf_dir: Path) -> Path:
+        (conf_dir / "g").mkdir(parents=True)
+        (conf_dir / "base.yaml").write_text(NON_STRING_KEYS_BASE_YAML)
+        (conf_dir / "g" / "a.yaml").write_text(NON_STRING_KEYS_GROUP_YAML)
+        return conf_dir
+
+    def test_compose_config_dir(self, tmp_path: Path) -> None:
+        conf_dir = self._write_configs(tmp_path / "conf")
+        with initialize_config_dir(config_dir=str(conf_dir)):
+            cfg = compose("base")
+        assert _typed(OmegaConf.to_container(cfg)) == _typed(NON_STRING_KEYS_EXPECTED)
+
+    def test_compose_with_provenance(self, tmp_path: Path) -> None:
+        conf_dir = self._write_configs(tmp_path / "conf")
+        with initialize_config_dir(config_dir=str(conf_dir)):
+            result = compose_with_provenance(config_name="base")
+        assert _typed(OmegaConf.to_container(result.config)) == _typed(NON_STRING_KEYS_EXPECTED)
+
+    def test_compose_config_module(self, tmp_path: Path, monkeypatch: Any) -> None:
+        pkg_dir = self._write_configs(tmp_path / "non_string_keys_conf")
+        (pkg_dir / "__init__.py").write_text("")
+        monkeypatch.syspath_prepend(str(tmp_path))
+        with initialize_config_module(config_module="non_string_keys_conf"):
+            cfg = compose("base")
+        assert _typed(OmegaConf.to_container(cfg)) == _typed(NON_STRING_KEYS_EXPECTED)
+
+    def test_compose_with_config_store_node(self, tmp_path: Path) -> None:
+        ConfigStore.instance().store(group="extra", name="node", node={2: "two", False: "f", "s": "str"})
+        conf_dir = self._write_configs(tmp_path / "conf")
+        with initialize_config_dir(config_dir=str(conf_dir)):
+            cfg = compose("base", overrides=["+extra=node"])
+        expected = {**NON_STRING_KEYS_EXPECTED, "extra": {2: "two", False: "f", "s": "str"}}
+        assert _typed(OmegaConf.to_container(cfg)) == _typed(expected)
+
+
 @mark.usefixtures("hydra_restore_singletons")
 @mark.parametrize(
     "config_file, overrides, expected",
