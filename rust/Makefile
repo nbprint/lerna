@@ -9,11 +9,11 @@ requirements:  ## install required dev dependencies
 develop: requirements  ## install required dev dependencies
 
 build:  ## build release
-	cargo build --release --all-features
+	cargo build --release --workspace --all-features
 
 .PHONY: lint lints fix format
 lint:  ## run Clippy for linting, rustfmt for autoformat checks
-	cargo clippy --all-features
+	cargo clippy --workspace --all-features
 	cargo fmt --all -- --check
 # alias
 lints: lint
@@ -25,19 +25,19 @@ format: fix
 
 .PHONY: check checks
 check:
-	cargo check --all-features
+	cargo check --workspace --all-features
 # alias
 checks: check
 
 .PHONY: test tests test-ci tests-ci
 test:  ## run the tests
-	cargo llvm-cov nextest --cobertura --output-path coverage.xml
+	cargo llvm-cov nextest --workspace --cobertura --output-path coverage.xml
 
 # alias
 tests: test
 
 coverage:
-	cargo llvm-cov nextest --lcov --output-path coverage
+	cargo llvm-cov nextest --workspace --lcov --output-path coverage
 
 .PHONY: dist publish
 dist:  ## create dist
